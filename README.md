@@ -14,3 +14,19 @@ This is a starting point sketch for projects using the esp32cam development boar
 created using the Arduino IDE with ESP32 module installed   (https://dl.espressif.com/dl/package_esp32_index.json)
 No additional libraries required
 
+----------------
+
+How to use:
+
+Enter your network details (ssid and password in to the sketch) and upload it to your esp32cam module
+If you monitor the serial port (speed 15200) it will tell you what ip address it has been given.
+If you now enter this ip address in to your browser you should be greated with the message "Hello from esp32cam"
+
+If you now put /stream at the end of the url      i.e.   http://x.x.x.x/stream
+It will live stream video from the camera
+
+If you have an sd card inserted then accessing    http://x/x/x/x/photo
+Will capture an image and save it to the sd card
+
+
+----------------
