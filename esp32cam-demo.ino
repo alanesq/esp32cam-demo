@@ -289,12 +289,19 @@ void showError(int errorNo) {
 // ----------------------------------------------------------------
 //           Capture image from camera and save to sd card
 // ----------------------------------------------------------------
+// returns TRUE if image was saved ok
 
-void storeImage() {
+bool storeImage() {
 
-  if (debugInfo) Serial.println("Storing image #" + String(imageCounter) + " to sd card");
+  if (sdcardPresent) {
+    if (debugInfo) Serial.println("Storing image #" + String(imageCounter) + " to sd card");
+  } else {
+    if (debugInfo) Serial.println("Storing image requested but there is no sd card");
+    return 0;           // no sd card available so exit procedure
+  }
 
   fs::FS &fs = SD_MMC;                              // sd card file system
+  bool tResult = 0;                                 // result flag
 
   // capture live image from camera
   if (flashRequired) digitalWrite(brightLED,HIGH);  // turn flash on
@@ -306,8 +313,7 @@ void storeImage() {
   }
   
   // save the image to sd card
-    imageCounter ++;                                                              // increment image counter
-    String SDfilename = "/img/" + String(imageCounter) + ".jpg";                  // build the image file name
+    String SDfilename = "/img/" + String(imageCounter + 1) + ".jpg";              // build the image file name
     File file = fs.open(SDfilename, FILE_WRITE);                                  // create file on sd card
     if (!file) {
       Serial.println("Error: Failed to create file on sd-card: " + SDfilename);
@@ -315,6 +321,8 @@ void storeImage() {
     } else {
       if (file.write(fb->buf, fb->len)) {                                         // File created ok so save image to it
         if (debugInfo) Serial.println("Image saved to sd card"); 
+        tResult = 1;                                                              // set sucess flag
+        imageCounter ++;                                                          // increment image counter
       } else {
         Serial.println("Error: failed to save image to sd card");
         flashLED(4);
@@ -322,6 +330,8 @@ void storeImage() {
       file.close();                // close image file on sd card
     }
     esp_camera_fb_return(fb);        // return frame so memory can be released
+    
+    return tResult;                  // return image save sucess flag
 
 } // storeImage
 
@@ -391,7 +401,7 @@ void handleRoot() {
     client.write("<FORM action='/' method='post'>\n");       // used by the buttons in the html (action = the web page to send it to)
 
   // if button1 was pressed 
-  //        Note:  if using an input box etc. you would read the value with the command:    String Tvalue = server.arg("demobutton1"); 
+  //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1"); 
     if (server.hasArg("button1")) {
       digitalWrite(iopinA,!digitalRead(iopinA));         // toggle output pin
       if (debugInfo) Serial.println("Button 1 pressed");
@@ -420,15 +430,20 @@ void handleRoot() {
   
   
     client.write("<h1>Hello from ESP32Cam</h1>\n");
-    
-    if (sdcardPresent) client.write("<p>SD Card detected</p>\n");
-    else client.write("<p>No SD Card detected</p>\n");
 
-    if (digitalRead(iopinA) == LOW) client.write("<p>Pin 13 is Low</p>\n");
-    else client.write("<p>Pin 13 is High</p>\n");
-    
-    if (digitalRead(iopinB) == LOW) client.write("<p>Pin 12 is Low</p>\n");
-    else client.write("<p>Pin 12 is High</p>\n");
+    // sd card details
+      if (sdcardPresent) {
+        tstr = "<p>SD Card detected - " + String(imageCounter) + " images stored</p>\n"; 
+        client.write(tstr.c_str());       
+      }
+      else client.write("<p>No SD Card detected</p>\n");
+
+    // io pin details
+      if (digitalRead(iopinA) == LOW) client.write("<p>Pin 13 is Low</p>\n");
+      else client.write("<p>Pin 13 is High</p>\n");
+      
+      if (digitalRead(iopinB) == LOW) client.write("<p>Pin 12 is Low</p>\n");
+      else client.write("<p>Pin 12 is High</p>\n");
 
     // Control bottons 
       client.write("<input style='height: 35px;' name='button1' value='Toggle pin 13' type='submit'> \n");
@@ -465,15 +480,16 @@ void handlePhoto() {
       if (debugInfo) Serial.println("Photo to sd card requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
 
   // save an image to sd card
-    storeImage();              // save an image to sd card
-
+    bool sRes = storeImage();              // save an image to sd card (store sucess or failed flag)
+    
   // html header
     client.write("<!DOCTYPE html> <html> <body>\n");
 
   // html body
     // note: if the line of html is not just plain text it has to be first put in to 'tstr' then sent in this way
     //       I find it easier to use strings then convert but this is probably frowned upon ;-)
-    tstr = "<p>Image saved to sd card as image number " + String(imageCounter) + "</p>\n";
+    if (sRes == 1) tstr = "<p>Image saved to sd card as image number " + String(imageCounter) + "</p>\n";
+    else tstr = "<p>Failed to save image to sd card</p>\n";
     client.write(tstr.c_str());           
     
   // end html
@@ -492,8 +508,11 @@ void handlePhoto() {
 //    -show image from sd card    i.e. http://x.x.x.x/img?img=x
 // ----------------------------------------------------------------
 // default image = most recent
+// returns 1 if image displayed ok
 
-void handleImg() {
+bool handleImg() {
+
+    if (imageCounter == 0 && debugInfo == 1) Serial.println("Image display from sd card requested but no image to display");
 
     WiFiClient client = server.client();                 // open link with client
     int imgToShow = imageCounter;                        // default to showing most recent file
@@ -508,13 +527,18 @@ void handleImg() {
     if (debugInfo) Serial.println("Displaying image #" + String(imgToShow) + " from sd card");   
  
     String tFileName = "/img/" + String(imgToShow) + ".jpg";
-    fs::FS &fs = SD_MMC;                    // sd card file system
+    fs::FS &fs = SD_MMC;                                 // sd card file system
     File timg = fs.open(tFileName, "r");
     if (timg) {
-        size_t sent = server.streamFile(timg, "image/jpeg"); 
+        size_t sent = server.streamFile(timg, "image/jpeg");     // send the image
         timg.close();
     } else {
       if (debugInfo) Serial.println("Error: image file not found");
+      WiFiClient client = server.client();                       // open link with client
+      client.write("<!DOCTYPE html> <html> <body>\n");
+      client.write("<p>Error: Image not found</p?\n");
+      delay(3);
+      client.stop();
     }
     
 }  // handleImg
