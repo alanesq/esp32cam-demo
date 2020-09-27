@@ -1,19 +1,19 @@
 
-<p align="center"><img src="/images/esp32cam.jpeg" width="30%"/></p>
+<p align="center"><img src="/images/esp32cam.jpeg" width="40%"/></p>
 
 # esp32cam-demo
 esp32cam module demo / project starting point sketch using Arduino ide
 
 This can be used as a starting point sketch for your projects using the esp32cam development board, it has the following features
- *        web server with live video streaming
- *        sd card support (using 1bit mode to free some io pins)
- *        io pins available for use are 13, 12(must be low at boot)
- *        flash led is still available for use on pin 4 when using sd card
+         web server with live video streaming
+         sd card support (using 1bit mode to free some io pins)
+         io pins available for use are 13 and 12 (12 must be low at boot)
+         flash led is still available for use on pin 4 when using sd card
  
- I found it quiet confusing trying to do much with this module and so have tried to compile everything I have learned so far in to 
+ I found it quiet confusing at first trying to do much with this module and so have tried to compile everything I have learned so far in to 
  a easy to follow sketch to encourage others to have a try with these powerful and VERY affordable modules...
  
- The module is not the easiest to use as it does not have a usb socket on board so you will need an in circuit programmer to program it, these can be bought on eBay very cheaply.  I built myself a "shield" from perf board which I can plug the esp32cam module and in circuit programmer in to and using a couple of toggle switches switch the module on and off and select programming mode.  This makes using these boards much more convenient - I think there is a gap in the market for someone to produce these and sell on eBay ;-)
+ The module is not the easiest to use as it does not have usb on board so you will need an in circuit programmer to program it, these can be bought on eBay very cheaply.  I built myself a "shield" from perf board which I can plug the esp32cam module and the programmer in to and using a couple of toggle switches switch the esp32cam on and off and also select programming mode.  This makes using these boards much more convenient - I think there is a gap in the market for someone to produce these and sell on eBay ;-)
 
 created using the Arduino IDE with ESP32 module installed   (https://dl.espressif.com/dl/package_esp32_index.json)
 No additional libraries required
