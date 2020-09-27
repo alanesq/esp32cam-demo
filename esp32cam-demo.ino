@@ -397,7 +397,7 @@ void handleRoot() {
       if (debugInfo) Serial.println("Root page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
 
   // html header
-    client.write("<!DOCTYPE html> <html> <body>\n");         // basic html header
+    client.write("<!DOCTYPE html> <html lang="en"> <head> <title>root</title> </head> <body>\n");         // basic html header
     client.write("<FORM action='/' method='post'>\n");       // used by the buttons in the html (action = the web page to send it to)
 
   // if button1 was pressed 
@@ -456,7 +456,7 @@ void handleRoot() {
 
     
   // end html
-    client.write("</body></htlm>\n");
+    client.write("</form></body></html>\n");
     delay(3);
     client.stop();
 
