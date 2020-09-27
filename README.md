@@ -1,5 +1,5 @@
 
-<p align="center"><img src="/images/esp32cam.jpeg" width="90%"/></p>
+<p align="center"><img src="/images/esp32cam.jpeg" width="30%"/></p>
 
 # esp32cam-demo
 esp32cam module demo / project starting point sketch using Arduino ide
