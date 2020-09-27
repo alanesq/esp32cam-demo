@@ -6,8 +6,8 @@
  *     Starting point sketch for projects using the esp32cam development board with the following features
  *        web server with live video streaming
  *        sd card support (using 1bit mode to free some io pins)
- *        io pins available for use are 13, 12(must be low at boot)
- *        flash led is still available for use on pin 4
+ *        io pins available for use are 13 and 12 (12 must be low at boot)
+ *        flash led is still available for use on pin 4 and does not flash when accessing sd card
  * 
  *     
  *     - created using the Arduino IDE with ESP32 module installed   (https://dl.espressif.com/dl/package_esp32_index.json)
@@ -17,7 +17,9 @@
  * 
  *     Info on the esp32cam board:  https://randomnerdtutorials.com/esp32-cam-video-streaming-face-recognition-arduino-ide/
  *            
- *            
+ *     To see a more advanced sketch along the same format as this one have a look at https://github.com/alanesq/CameraWifiMotion
+ *        which includes email support, FTP, OTA updates, time from NTP servers and motion detection
+ *        
  * 
  *******************************************************************************************************************/
 
@@ -32,8 +34,8 @@
 // ---------------------------------------------------------------
 
   // Wifi settings (enter your wifi network details)
-    const char* ssid     = "<your wifi network name here>";
-    const char* password = "<your wifi password here>";
+   const char* ssid     = "<your wifi network name here>";
+   const char* password = "<your wifi password here>";
 
   const String stitle = "ESP32Cam-demo";                 // title of this sketch
   const String sversion = "26Sep20";                     // Sketch version
@@ -61,7 +63,7 @@
 
 WebServer server(80);                       // serve web pages on port 80
 
-#include "soc/soc.h"                        // Used to disable brownout detection on 5v power feed
+#include "soc/soc.h"                        // Used to disable brownout detection 
 #include "soc/rtc_cntl_reg.h"      
 
 #include "SD_MMC.h"                         // sd card - see https://randomnerdtutorials.com/esp32-cam-take-photo-save-microsd-card/
@@ -72,11 +74,11 @@ WebServer server(80);                       // serve web pages on port 80
 // Define global variables:
   uint32_t lastStatus = millis();           // last time status light changed status (to flash all ok led)
   bool sdcardPresent;                       // flag if an sd card is detected
-  int imageCounter;                         // image file name counter
+  int imageCounter;                         // image file name on sd card counter
 
 // camera type settings (CAMERA_MODEL_AI_THINKER)
   #define CAMERA_MODEL_AI_THINKER
-  #define PWDN_GPIO_NUM     32      // power to camera enable
+  #define PWDN_GPIO_NUM     32      // power to camera on/off
   #define RESET_GPIO_NUM    -1      // -1 = not used
   #define XCLK_GPIO_NUM      0
   #define SIOD_GPIO_NUM     26      // i2c sda
@@ -93,7 +95,7 @@ WebServer server(80);                       // serve web pages on port 80
   #define HREF_GPIO_NUM     23      // href_pin
   #define PCLK_GPIO_NUM     22      // pixel_clock_pin
 
-  camera_config_t config;
+  camera_config_t config;           
   
   
   
@@ -117,7 +119,14 @@ void setup() {
   // Turn-off the 'brownout detector'
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
 
+  // Define io pins
+    pinMode(indicatorLED, OUTPUT);
+    digitalWrite(indicatorLED,HIGH);
+    pinMode(brightLED, OUTPUT);
+    digitalWrite(brightLED,LOW);
+
   // Connect to wifi
+    digitalWrite(indicatorLED,LOW);               // small indicator led on
     Serial.println();
     Serial.println();
     Serial.print("Connecting to ");
@@ -132,18 +141,14 @@ void setup() {
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
     server.begin();
+    digitalWrite(indicatorLED,HIGH);               // small indicator led off
 
-  // define web pages (call procedures when url requested)
+  // define web pages (call procedures when url is requested)
     server.on("/", handleRoot);               // root page
     server.on("/stream", handleStream);       // stream live video
-    server.on("/photo", handlePhoto);         // capture image and save to sd card
+    server.on("/photo", handlePhoto);         // save image to sd card
+    server.on("/img", handleImg);             // show image from sd card
     server.onNotFound(handleNotFound);        // invalid url requested
-
-  // Define io pins
-    pinMode(indicatorLED, OUTPUT);
-    digitalWrite(indicatorLED,HIGH);
-    pinMode(brightLED, OUTPUT);
-    digitalWrite(brightLED,LOW);
 
   // set up camera
       Serial.print(("Initialising camera: "));
@@ -164,7 +169,7 @@ void setup() {
             Serial.println("SD Card type detect failed"); 
             sdcardPresent = 0;                // flag no sd card available
         } else {
-          sdcardPresent = 1;                  // valid sd card found
+          // valid sd card detected
           uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
           Serial.println("SD Card found, free space = " + String(SDfreeSpace) + "MB");  
           sdcardPresent = 1;                  // flag sd card available
@@ -217,10 +222,13 @@ void loop() {
   server.handleClient();          // handle any web page requests
 
 
-  
+
+
+
+
   
     
-  // If not in triggered state flash status light to show sketch is running ok
+  // flash status light to show sketch is running 
     if ((unsigned long)(millis() - lastStatus) >= TimeBetweenStatus) { 
       lastStatus = millis();                                               // reset timer
       digitalWrite(indicatorLED,!digitalRead(indicatorLED));               // flip indicator led status
@@ -234,10 +242,11 @@ void loop() {
 
 
 // ----------------------------------------------------------------
-//                       Flash indicator LED
+//                       Misc small procedures
 // ----------------------------------------------------------------
 
 
+// flash led 'reps' number of times
 void flashLED(int reps) {
   for(int x=0; x < reps; x++) {
     digitalWrite(indicatorLED,LOW);
@@ -246,6 +255,7 @@ void flashLED(int reps) {
     delay(500);
   }
 }
+
 
 
 // critical error - stop sketch and continually flash error status 
@@ -261,10 +271,9 @@ void showError(int errorNo) {
 
 
 // ----------------------------------------------------------------
-//                save live camera image to sd card
+//           Capture image from camera and save to sd card
 //                   iTitle = file name to use
 // ----------------------------------------------------------------
-
 
 void storeImage(String iTitle) {
 
@@ -273,7 +282,6 @@ void storeImage(String iTitle) {
   fs::FS &fs = SD_MMC;                              // sd card file system
 
   // capture live image from camera
-    // cameraImageSettings();                         // apply camera sensor settings (in camera.h)
   if (flashRequired) digitalWrite(brightLED,HIGH);  // turn flash on
   camera_fb_t *fb = esp_camera_fb_get();            // capture image frame from camera
   digitalWrite(brightLED,LOW);                      // turn flash off
@@ -308,9 +316,8 @@ void storeImage(String iTitle) {
 
 
 // ----------------------------------------------------------------
-//                       Set up the camera
+//                       Configure the camera
 // ----------------------------------------------------------------
-
 
 bool setupCameraHardware() {
   
@@ -370,6 +377,8 @@ void handleRoot() {
 
   // html body
     client.write("<p>Hello from esp32cam</p>\n");
+    if (sdcardPresent) client.write("<p>SD Card available</p>\n");
+    else client.write("<p>No SD Card detected</p>\n");
 
   // end html
     client.write("</body></htlm>\n");
@@ -405,7 +414,7 @@ void handlePhoto() {
     // note: if the line of html is not just plain text it has to be first put in to 'tstr' then sent in this way
     //       I find it easier to use strings then convert but this is probably frowned upon ;-)
     tstr = "<p>Image saved to sd card as image number " + String(imageCounter) + "</p>\n";
-    client.write(tstr.c_str());          
+    client.write(tstr.c_str());           
     
   // end html
     client.write("</body></htlm>\n");
@@ -413,6 +422,42 @@ void handlePhoto() {
     client.stop();
 
 }  // handlePhoto
+
+
+
+
+
+
+// ----------------------------------------------------------------
+//    -show image from sd card    i.e. http://x.x.x.x/img?img=x
+// ----------------------------------------------------------------
+// default image = most recent
+
+void handleImg() {
+
+    WiFiClient client = server.client();                 // open link with client
+    int imgToShow = imageCounter;                        // default to showing most recent file
+
+    // get image number from url parameter 
+      if (server.hasArg("img")) {
+        String Tvalue = server.arg("img");               // read value
+        imgToShow = Tvalue.toInt();                      // convert string to int
+        if (imgToShow < 1 || imgToShow > imageCounter) imgToShow = imageCounter;    // validate image number
+      }
+
+    if (debugInfo) Serial.println("Displaying image #" + String(imgToShow) + " from sd card");   
+ 
+    String tFileName = "/img/" + String(imgToShow) + ".jpg";
+    fs::FS &fs = SD_MMC;                    // sd card file system
+    File timg = fs.open(tFileName, "r");
+    if (timg) {
+        size_t sent = server.streamFile(timg, "image/jpeg"); 
+        timg.close();
+    } else {
+      if (debugInfo) Serial.println("Error: image file not found");
+    }
+    
+}  // handleImg
 
 
 // ******************************************************************************************************************
