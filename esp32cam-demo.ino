@@ -38,7 +38,7 @@
    const char* password = "<your wifi password here>";
 
   const String stitle = "ESP32Cam-demo";                 // title of this sketch
-  const String sversion = "26Sep20";                     // Sketch version
+  const String sversion = "27Sep20";                     // Sketch version
 
   const bool debugInfo = 1;                              // show additional debug info. on serial port (1=enabled)
 
@@ -55,6 +55,9 @@
   const int indicatorLED = 33;                           // onboard status LED pin (33)
 
   const int brightLED = 4;                               // onboard flash LED pin (4)
+
+  const int iopinA = 13;                                 // general io pin
+  const int iopinB = 12;                                 // general io pin (must be low at boot)
 
 
   
@@ -73,6 +76,7 @@ WebServer server(80);                       // serve web pages on port 80
   
 // Define global variables:
   uint32_t lastStatus = millis();           // last time status light changed status (to flash all ok led)
+  uint32_t lastCamera = millis();           // timer for periodic image capture
   bool sdcardPresent;                       // flag if an sd card is detected
   int imageCounter;                         // image file name on sd card counter
 
@@ -119,15 +123,12 @@ void setup() {
   // Turn-off the 'brownout detector'
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
 
-  // Define io pins
+  // Define indicator led
     pinMode(indicatorLED, OUTPUT);
     digitalWrite(indicatorLED,HIGH);
-    pinMode(brightLED, OUTPUT);
-    digitalWrite(brightLED,LOW);
 
   // Connect to wifi
     digitalWrite(indicatorLED,LOW);               // small indicator led on
-    Serial.println();
     Serial.println();
     Serial.print("Connecting to ");
     Serial.println(ssid);
@@ -194,9 +195,13 @@ void setup() {
       Serial.println("Image file count = " + String(imageCounter));
     }
    
-  // re-define io pins as sd card config. seems to reset them
+  // define io pins 
+    pinMode(indicatorLED, OUTPUT);        // re defined as sd card config can reset it
+    digitalWrite(indicatorLED,HIGH);
     pinMode(brightLED, OUTPUT);
-    pinMode(indicatorLED, OUTPUT);
+    digitalWrite(brightLED,LOW);
+    pinMode(iopinA, OUTPUT);      // pin 13 - free io pin, can be input or output
+    pinMode(iopinB, OUTPUT);      // pin 12 - free io pin, can be input or output (must be low at boot)
 
   if (!psramFound()) {
     Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
@@ -219,14 +224,25 @@ void setup() {
 
 void loop() {
 
-  server.handleClient();          // handle any web page requests
-
+  server.handleClient();          // handle any incoming web page requests
 
 
 
 
 
   
+  //    <<< your code here >>>
+
+
+
+
+
+//  //  Capture an image and save to sd card every 5 seconds 
+//      if ((unsigned long)(millis() - lastCamera) >= 5000) { 
+//        lastCamera = millis();     // reset timer
+//        storeImage();              // save an image to sd card
+//      }
+ 
     
   // flash status light to show sketch is running 
     if ((unsigned long)(millis() - lastStatus) >= TimeBetweenStatus) { 
@@ -272,10 +288,9 @@ void showError(int errorNo) {
 
 // ----------------------------------------------------------------
 //           Capture image from camera and save to sd card
-//                   iTitle = file name to use
 // ----------------------------------------------------------------
 
-void storeImage(String iTitle) {
+void storeImage() {
 
   if (debugInfo) Serial.println("Storing image #" + String(imageCounter) + " to sd card");
 
@@ -292,7 +307,7 @@ void storeImage(String iTitle) {
   
   // save the image to sd card
     imageCounter ++;                                                              // increment image counter
-    String SDfilename = "/img/" + iTitle + ".jpg";                                // build the image file name
+    String SDfilename = "/img/" + String(imageCounter) + ".jpg";                  // build the image file name
     File file = fs.open(SDfilename, FILE_WRITE);                                  // create file on sd card
     if (!file) {
       Serial.println("Error: Failed to create file on sd-card: " + SDfilename);
@@ -361,7 +376,6 @@ bool setupCameraHardware() {
 // ----------------------------------------------------------------
 //       -root web page requested    i.e. http://x.x.x.x/
 // ----------------------------------------------------------------
-// Info on using html see https://www.arduino.cc/en/Reference/Ethernet 
 
 void handleRoot() {
 
@@ -373,13 +387,59 @@ void handleRoot() {
       if (debugInfo) Serial.println("Root page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
 
   // html header
-    client.write("<!DOCTYPE html> <html> <body>\n");
+    client.write("<!DOCTYPE html> <html> <body>\n");         // basic html header
+    client.write("<FORM action='/' method='post'>\n");       // used by the buttons in the html (action = the web page to send it to)
 
-  // html body
-    client.write("<p>Hello from esp32cam</p>\n");
-    if (sdcardPresent) client.write("<p>SD Card available</p>\n");
+  // if button1 was pressed 
+  //        Note:  if using an input box etc. you would read the value with the command:    String Tvalue = server.arg("demobutton1"); 
+    if (server.hasArg("button1")) {
+      digitalWrite(iopinA,!digitalRead(iopinA));         // toggle output pin
+      if (debugInfo) Serial.println("Button 1 pressed");
+    }
+
+  // if button2 was pressed 
+    if (server.hasArg("button2")) {
+      digitalWrite(iopinB,!digitalRead(iopinB));         // toggle output pin
+      if (debugInfo) Serial.println("Button 2 pressed");
+    }
+
+  // if button3 was pressed 
+    if (server.hasArg("button3")) {
+      digitalWrite(brightLED,!digitalRead(brightLED));   // toggle flash LED
+      if (debugInfo) Serial.println("Button 3 pressed");
+    }
+    
+
+  // --------------------------------------------------------------------
+
+
+  // html main body
+  //     Info on the arduino ethernet library:  https://www.arduino.cc/en/Reference/Ethernet 
+  //     Info in HTML:  https://www.w3schools.com/html/
+  //     Info on Javascript (can be inserted in to the HTML):  https://www.w3schools.com/js/default.asp
+  
+  
+    client.write("<h1>Hello from ESP32Cam</h1>\n");
+    
+    if (sdcardPresent) client.write("<p>SD Card detected</p>\n");
     else client.write("<p>No SD Card detected</p>\n");
 
+    if (digitalRead(iopinA) == LOW) client.write("<p>Pin 13 is Low</p>\n");
+    else client.write("<p>Pin 13 is High</p>\n");
+    
+    if (digitalRead(iopinB) == LOW) client.write("<p>Pin 12 is Low</p>\n");
+    else client.write("<p>Pin 12 is High</p>\n");
+
+    // Control bottons 
+      client.write("<input style='height: 35px;' name='button1' value='Toggle pin 13' type='submit'> \n");
+      client.write("<input style='height: 35px;' name='button2' value='Toggle pin 12' type='submit'> \n");
+      client.write("<input style='height: 35px;' name='button3' value='Toggle Flash' type='submit'> \n");
+
+      
+  
+  // --------------------------------------------------------------------
+
+    
   // end html
     client.write("</body></htlm>\n");
     delay(3);
@@ -405,7 +465,7 @@ void handlePhoto() {
       if (debugInfo) Serial.println("Photo to sd card requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
 
   // save an image to sd card
-    storeImage(String(imageCounter));
+    storeImage();              // save an image to sd card
 
   // html header
     client.write("<!DOCTYPE html> <html> <body>\n");
