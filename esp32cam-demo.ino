@@ -58,6 +58,8 @@
 
   const int iopinA = 13;                                 // general io pin
   const int iopinB = 12;                                 // general io pin (must be low at boot)
+  
+  const int serialSpeed = 115200;                        // Serial data speed to use
 
 
   
@@ -113,12 +115,12 @@ WebServer server(80);                       // serve web pages on port 80
 
 void setup() {
   
-  // Serial communication 
-    Serial.begin(115200);
+  Serial.begin(serialSpeed);                   // Serial communication 
   
-    Serial.println(("\n\n\n---------------------------------------"));
-    Serial.println("Starting - " + stitle + " - " + sversion);
-    Serial.println(("---------------------------------------"));
+  Serial.println("\n\n\n");                    // line feeds
+  Serial.println("---------------------------------------");
+  Serial.println("Starting - " + stitle + " - " + sversion);
+  Serial.println("---------------------------------------");
 
   // Turn-off the 'brownout detector'
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
@@ -129,8 +131,7 @@ void setup() {
 
   // Connect to wifi
     digitalWrite(indicatorLED,LOW);               // small indicator led on
-    Serial.println();
-    Serial.print("Connecting to ");
+    Serial.print("\nConnecting to ");
     Serial.println(ssid);
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
@@ -397,7 +398,7 @@ void handleRoot() {
       if (debugInfo) Serial.println("Root page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
 
   // html header
-    client.write("<!DOCTYPE html> <html lang="en"> <head> <title>root</title> </head> <body>\n");         // basic html header
+    client.write("<!DOCTYPE html> <html lang='en'> <head> <title>root</title> </head> <body>\n");         // basic html header
     client.write("<FORM action='/' method='post'>\n");       // used by the buttons in the html (action = the web page to send it to)
 
   // if button1 was pressed 
