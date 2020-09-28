@@ -14,7 +14,7 @@ This can be used as a starting point sketch for your projects using the esp32cam
  a easy to follow sketch to encourage others to have a try with these powerful and VERY affordable modules...
  
 The module is not the easiest to use as it does not have a usb socket on board so you will need an in circuit programmer to program it, these can be bought on eBay very cheaply or you can use an Arduino - see: https://pre-processing.com/how-to-configure-the-esp32-cam-with-arduino-uno/
-I built myself a "shield" from perf board which I can plug the esp32cam module and programmer in to and using a couple of toggle switches switch the module on and off and select programming mode.  This makes using these boards much more convenient - I think there is a gap in the market for someone to produce these and sell on eBay ;-)
+I built myself a "shield" from perf board which I can plug the esp32cam module and programmer in to and using a couple of toggle switches switch the module on and off and select programming mode.  This makes using these boards much more convenient - Turns out you can buy one here: https://www.tindie.com/products/bitluni/cam-prog/
 
 created using the Arduino IDE with ESP32 module installed   (https://dl.espressif.com/dl/package_esp32_index.json)
 No additional libraries required
