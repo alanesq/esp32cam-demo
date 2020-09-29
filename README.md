@@ -17,7 +17,7 @@ The module is not the easiest to use as it does not have a usb socket on board s
 I built myself a simple "shield" which I can plug the esp32cam module in to and program it using a couple of toggle switches to the ESP32Cam on and off and select programming mode, this makes using these boards much more convenient.
 BTW: Turns out you can buy one here: https://www.tindie.com/products/bitluni/cam-prog/
 
-created using the Arduino IDE with ESP32 module installed   (https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json)
+created using the Arduino IDE with ESP32 module installed  (See https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/)
 No additional libraries required
 
 ----------------
