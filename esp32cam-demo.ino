@@ -13,7 +13,7 @@
  *     - created using the Arduino IDE with ESP32 module installed   (https://dl.espressif.com/dl/package_esp32_index.json)
  *       No additional libraries required
  * 
- * 
+ *     ESP32 support for Arduino IDE: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
  * 
  *     Info on the esp32cam board:  https://randomnerdtutorials.com/esp32-cam-video-streaming-face-recognition-arduino-ide/
  *            
@@ -37,8 +37,8 @@
    const char* ssid     = "<your wifi network name here>";
    const char* password = "<your wifi password here>";
 
-  const String stitle = "ESP32Cam-demo";                 // title of this sketch
-  const String sversion = "27Sep20";                     // Sketch version
+  const char stitle[] = "ESP32Cam-demo";                 // title of this sketch
+  const char sversion[] = "27Sep20";                     // Sketch version
 
   const bool debugInfo = 1;                              // show additional debug info. on serial port (1=enabled)
 
@@ -82,7 +82,7 @@ WebServer server(80);                       // serve web pages on port 80
   bool sdcardPresent;                       // flag if an sd card is detected
   int imageCounter;                         // image file name on sd card counter
 
-// camera type settings (CAMERA_MODEL_AI_THINKER)
+// camera settings (CAMERA_MODEL_AI_THINKER)
   #define CAMERA_MODEL_AI_THINKER
   #define PWDN_GPIO_NUM     32      // power to camera on/off
   #define RESET_GPIO_NUM    -1      // -1 = not used
@@ -104,8 +104,6 @@ WebServer server(80);                       // serve web pages on port 80
   camera_config_t config;           
   
   
-  
-
 // ******************************************************************************************************************
 
 
@@ -118,9 +116,9 @@ void setup() {
   Serial.begin(serialSpeed);                   // Serial communication 
   
   Serial.println("\n\n\n");                    // line feeds
-  Serial.println("---------------------------------------");
-  Serial.println("Starting - " + stitle + " - " + sversion);
-  Serial.println("---------------------------------------");
+  Serial.println("-----------------------------------");
+  Serial.printf("Starting - %s - %s \n", stitle, sversion);
+  Serial.println("-----------------------------------");
 
   // Turn-off the 'brownout detector'
     WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
@@ -138,14 +136,13 @@ void setup() {
         delay(500);
         Serial.print(".");
     }
-    Serial.println("");
-    Serial.println("WiFi connected.");
+    Serial.print("\nWiFi connected.  ");
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
     server.begin();
     digitalWrite(indicatorLED,HIGH);               // small indicator led off
 
-  // define web pages (call procedures when url is requested)
+  // define web pages (call these procedures when url is requested)
     server.on("/", handleRoot);               // root page
     server.on("/stream", handleStream);       // stream live video
     server.on("/photo", handlePhoto);         // save image to sd card
@@ -153,7 +150,7 @@ void setup() {
     server.onNotFound(handleNotFound);        // invalid url requested
 
   // set up camera
-      Serial.print(("Initialising camera: "));
+      Serial.print(("\nInitialising camera: "));
       if (setupCameraHardware()) Serial.println("OK");
       else {
         Serial.println("Error!");
@@ -162,7 +159,7 @@ void setup() {
 
   // Configure sd card
       if (!SD_MMC.begin("/sdcard", true)) {         // if loading sd card fails     
-        // note: ("/sdcard", true) = 1 wire - see: https://www.reddit.com/r/esp32/comments/d71es9/a_breakdown_of_my_experience_trying_to_talk_to_an/
+        // note: ('/sdcard", true)' = 1bit mode - see: https://www.reddit.com/r/esp32/comments/d71es9/a_breakdown_of_my_experience_trying_to_talk_to_an/
         Serial.println("No SD Card detected"); 
         sdcardPresent = 0;                    // flag no sd card available
       } else {
@@ -173,43 +170,45 @@ void setup() {
         } else {
           // valid sd card detected
           uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
-          Serial.println("SD Card found, free space = " + String(SDfreeSpace) + "MB");  
+          Serial.printf("SD Card found, free space = %dMB \n", SDfreeSpace);  
           sdcardPresent = 1;                  // flag sd card available
         }
       }
       fs::FS &fs = SD_MMC;                    // sd card file system
 
-  // discover number of image files stored /img of sd card and set image file counter accordingly
+  // discover the number of image files stored in '/img' folder of the sd card and set image file counter accordingly
+    imageCounter = 0;
     if (sdcardPresent) {
-      int tq=fs.mkdir("/img");              // create the "/img" folder on sd card if not already there
+      int tq=fs.mkdir("/img");                // create the '/img' folder on sd card (in case it is not already there)
       if (!tq) Serial.println("Unable to create IMG folder on sd card");
-      
-      File root = fs.open("/img");
-      while (true)
-      {
-        File entry =  root.openNextFile();
-        if (! entry) break;
-        imageCounter ++;    // increment image counter
-        entry.close();
-      }
-      root.close();
-      Serial.println("Image file count = " + String(imageCounter));
+
+      // open the image folder and step through all files in it
+        File root = fs.open("/img");            
+        while (true)
+        {
+            File entry =  root.openNextFile();    // open next file in the folder
+            if (!entry) break;                    // if no more files in the folder
+            imageCounter ++;                      // increment image counter
+            entry.close();
+        }
+        root.close();
+        Serial.printf("Image file count = %d",imageCounter);
     }
    
   // define io pins 
     pinMode(indicatorLED, OUTPUT);        // re defined as sd card config can reset it
-    digitalWrite(indicatorLED,HIGH);
+    digitalWrite(indicatorLED,HIGH);      // led off = High
     pinMode(brightLED, OUTPUT);
-    digitalWrite(brightLED,LOW);
-    pinMode(iopinA, OUTPUT);      // pin 13 - free io pin, can be input or output
-    pinMode(iopinB, OUTPUT);      // pin 12 - free io pin, can be input or output (must be low at boot)
+    digitalWrite(brightLED,LOW);          // led off = Low
+    pinMode(iopinA, OUTPUT);              // pin 13 - free io pin, can be input or output
+    pinMode(iopinB, OUTPUT);              // pin 12 - free io pin, can be input or output (must be low at boot)
 
   if (!psramFound()) {
     Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
     framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_CIF;
   }
 
-  Serial.println("Started...");
+  Serial.println("\nStarted...");
   
 }  // setup
 
@@ -245,7 +244,7 @@ void loop() {
 //      }
  
     
-  // flash status light to show sketch is running 
+  // flash status LED to show sketch is running 
     if ((unsigned long)(millis() - lastStatus) >= TimeBetweenStatus) { 
       lastStatus = millis();                                               // reset timer
       digitalWrite(indicatorLED,!digitalRead(indicatorLED));               // flip indicator led status
@@ -259,7 +258,51 @@ void loop() {
 
 
 // ----------------------------------------------------------------
-//                       Misc small procedures
+//                        Configure the camera
+// ----------------------------------------------------------------
+// returns '1' if camera set up was ok
+
+bool setupCameraHardware() {
+  
+    config.ledc_channel = LEDC_CHANNEL_0;
+    config.ledc_timer = LEDC_TIMER_0;
+    config.pin_d0 = Y2_GPIO_NUM;
+    config.pin_d1 = Y3_GPIO_NUM;
+    config.pin_d2 = Y4_GPIO_NUM;
+    config.pin_d3 = Y5_GPIO_NUM;
+    config.pin_d4 = Y6_GPIO_NUM;
+    config.pin_d5 = Y7_GPIO_NUM;
+    config.pin_d6 = Y8_GPIO_NUM;
+    config.pin_d7 = Y9_GPIO_NUM;
+    config.pin_xclk = XCLK_GPIO_NUM;
+    config.pin_pclk = PCLK_GPIO_NUM;
+    config.pin_vsync = VSYNC_GPIO_NUM;
+    config.pin_href = HREF_GPIO_NUM;
+    config.pin_sscb_sda = SIOD_GPIO_NUM;
+    config.pin_sscb_scl = SIOC_GPIO_NUM;
+    config.pin_pwdn = PWDN_GPIO_NUM;
+    config.pin_reset = RESET_GPIO_NUM;
+    config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
+    config.pixel_format = PIXFORMAT_JPEG;         // Options =  YUV422, GRAYSCALE, RGB565, JPEG, RGB888
+    config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 
+                                                  //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
+    config.jpeg_quality = 5;                      // 0-63 lower number means higher quality
+    config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
+    
+    esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
+    if (camerr != ESP_OK) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
+
+    
+    return (camerr == ESP_OK);                    // return boolean result of camera initialisation
+}
+
+
+
+// ******************************************************************************************************************
+
+
+// ----------------------------------------------------------------
+//                        Misc small procedures
 // ----------------------------------------------------------------
 
 
@@ -275,13 +318,14 @@ void flashLED(int reps) {
 
 
 
-// critical error - stop sketch and continually flash error status 
+// critical error - stop sketch and continually flash error code 
 void showError(int errorNo) {
   while(1) {
     flashLED(errorNo);
     delay(4000);
   }
 }
+
 
 
 // ******************************************************************************************************************
@@ -295,7 +339,7 @@ void showError(int errorNo) {
 bool storeImage() {
 
   if (sdcardPresent) {
-    if (debugInfo) Serial.println("Storing image #" + String(imageCounter) + " to sd card");
+    if (debugInfo) Serial.printf("Storing image #%d to sd card \n", imageCounter);
   } else {
     if (debugInfo) Serial.println("Storing image requested but there is no sd card");
     return 0;           // no sd card available so exit procedure
@@ -342,101 +386,61 @@ bool storeImage() {
 
 
 // ----------------------------------------------------------------
-//                       Configure the camera
-// ----------------------------------------------------------------
-
-bool setupCameraHardware() {
-  
-    config.ledc_channel = LEDC_CHANNEL_0;
-    config.ledc_timer = LEDC_TIMER_0;
-    config.pin_d0 = Y2_GPIO_NUM;
-    config.pin_d1 = Y3_GPIO_NUM;
-    config.pin_d2 = Y4_GPIO_NUM;
-    config.pin_d3 = Y5_GPIO_NUM;
-    config.pin_d4 = Y6_GPIO_NUM;
-    config.pin_d5 = Y7_GPIO_NUM;
-    config.pin_d6 = Y8_GPIO_NUM;
-    config.pin_d7 = Y9_GPIO_NUM;
-    config.pin_xclk = XCLK_GPIO_NUM;
-    config.pin_pclk = PCLK_GPIO_NUM;
-    config.pin_vsync = VSYNC_GPIO_NUM;
-    config.pin_href = HREF_GPIO_NUM;
-    config.pin_sscb_sda = SIOD_GPIO_NUM;
-    config.pin_sscb_scl = SIOC_GPIO_NUM;
-    config.pin_pwdn = PWDN_GPIO_NUM;
-    config.pin_reset = RESET_GPIO_NUM;
-    config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
-    config.pixel_format = PIXFORMAT_JPEG;         // PIXFORMAT_ + YUV422, GRAYSCALE, RGB565, JPEG, RGB888?
-    config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 
-                                                  //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
-    config.jpeg_quality = 5;                      // 0-63 lower number means higher quality
-    config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
-    
-    esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
-    if (camerr != ESP_OK) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
-
-    // cameraImageSettings();                 // apply camera sensor settings
-    
-    return (camerr == ESP_OK);             // return boolean result of camera initilisation
-}
-
-
-// ******************************************************************************************************************
-
-
-// ----------------------------------------------------------------
 //       -root web page requested    i.e. http://x.x.x.x/
 // ----------------------------------------------------------------
 
 void handleRoot() {
 
-  WiFiClient client = server.client();                                                        // open link with client
-  String tstr;                                                                                // temp store for building line of html
+  WiFiClient client = server.client();                       // open link with client
 
   // log page request including clients IP address
+    if (debugInfo) {
       IPAddress cip = client.remoteIP();
-      if (debugInfo) Serial.println("Root page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
+      if (debugInfo) Serial.printf("Root page requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+    }
 
-  // html header
+  // Action any button presses on this page
+
+    // if button1 was pressed (toggle io pin A)
+    //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1"); 
+      if (server.hasArg("button1")) {
+        digitalWrite(iopinA,!digitalRead(iopinA));             // toggle output pin on/off
+        if (debugInfo) Serial.println("Button 1 pressed");
+      }
+  
+    // if button2 was pressed (toggle io pin B)
+      if (server.hasArg("button2")) {
+        digitalWrite(iopinB,!digitalRead(iopinB));             // toggle output pin on/off
+        if (debugInfo) Serial.println("Button 2 pressed");
+      }
+  
+    // if button3 was pressed (toggle flash LED)
+      if (server.hasArg("button3")) {
+        digitalWrite(brightLED,!digitalRead(brightLED));       // toggle flash LED on/off
+        if (debugInfo) Serial.println("Button 3 pressed");
+      }
+
+
+
+   // html header
     client.write("<!DOCTYPE html> <html lang='en'> <head> <title>root</title> </head> <body>\n");         // basic html header
     client.write("<FORM action='/' method='post'>\n");       // used by the buttons in the html (action = the web page to send it to)
 
-  // if button1 was pressed 
-  //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1"); 
-    if (server.hasArg("button1")) {
-      digitalWrite(iopinA,!digitalRead(iopinA));         // toggle output pin
-      if (debugInfo) Serial.println("Button 1 pressed");
-    }
-
-  // if button2 was pressed 
-    if (server.hasArg("button2")) {
-      digitalWrite(iopinB,!digitalRead(iopinB));         // toggle output pin
-      if (debugInfo) Serial.println("Button 2 pressed");
-    }
-
-  // if button3 was pressed 
-    if (server.hasArg("button3")) {
-      digitalWrite(brightLED,!digitalRead(brightLED));   // toggle flash LED
-      if (debugInfo) Serial.println("Button 3 pressed");
-    }
-    
 
   // --------------------------------------------------------------------
 
 
   // html main body
-  //     Info on the arduino ethernet library:  https://www.arduino.cc/en/Reference/Ethernet 
-  //     Info in HTML:  https://www.w3schools.com/html/
+  //                    Info on the arduino ethernet library:  https://www.arduino.cc/en/Reference/Ethernet 
+  //                                            Info in HTML:  https://www.w3schools.com/html/
   //     Info on Javascript (can be inserted in to the HTML):  https://www.w3schools.com/js/default.asp
+  //                               Verify your HTML is valid:  https://validator.w3.org/
   
   
     client.write("<h1>Hello from ESP32Cam</h1>\n");
 
     // sd card details
-      if (sdcardPresent) {
-        tstr = "<p>SD Card detected - " + String(imageCounter) + " images stored</p>\n"; 
-        client.write(tstr.c_str());       
-      }
+      if (sdcardPresent) client.printf("<p>SD Card detected - %d images stored</p>\n", imageCounter);       
       else client.write("<p>No SD Card detected</p>\n");
 
     // io pin details
@@ -474,27 +478,25 @@ void handleRoot() {
 void handlePhoto() {
 
   WiFiClient client = server.client();                                                        // open link with client
-  String tstr;                                                                                // temp store for building line of html
 
   // log page request including clients IP address
+    if (debugInfo) {
       IPAddress cip = client.remoteIP();
-      if (debugInfo) Serial.println("Photo to sd card requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
+      if (debugInfo) Serial.printf("Photo requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+    }
 
   // save an image to sd card
     bool sRes = storeImage();              // save an image to sd card (store sucess or failed flag)
     
   // html header
-    client.write("<!DOCTYPE html> <html> <body>\n");
+    client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");         // basic html header
 
   // html body
-    // note: if the line of html is not just plain text it has to be first put in to 'tstr' then sent in this way
-    //       I find it easier to use strings then convert but this is probably frowned upon ;-)
-    if (sRes == 1) tstr = "<p>Image saved to sd card as image number " + String(imageCounter) + "</p>\n";
-    else tstr = "<p>Failed to save image to sd card</p>\n";
-    client.write(tstr.c_str());           
+    if (sRes == 1) client.printf("<p>Image saved to sd card as image number %d </p>\n", imageCounter);
+    else client.write("<p>Failed to save image to sd card</p>\n");         
     
   // end html
-    client.write("</body></htlm>\n");
+    client.write("</body></html>\n");
     delay(3);
     client.stop();
 
@@ -513,9 +515,15 @@ void handlePhoto() {
 
 bool handleImg() {
 
-    if (imageCounter == 0 && debugInfo == 1) Serial.println("Image display from sd card requested but no image to display");
-
     WiFiClient client = server.client();                 // open link with client
+
+  // log page request including clients IP address
+    if (debugInfo) {
+      IPAddress cip = client.remoteIP();
+      if (debugInfo) Serial.printf("Image display requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+      if (imageCounter == 0) Serial.println("Error: no images to display");
+    }
+    
     int imgToShow = imageCounter;                        // default to showing most recent file
 
     // get image number from url parameter 
@@ -525,7 +533,7 @@ bool handleImg() {
         if (imgToShow < 1 || imgToShow > imageCounter) imgToShow = imageCounter;    // validate image number
       }
 
-    if (debugInfo) Serial.println("Displaying image #" + String(imgToShow) + " from sd card");   
+    if (debugInfo) Serial.printf("Displaying image #%d from sd card", imgToShow);   
  
     String tFileName = "/img/" + String(imgToShow) + ".jpg";
     fs::FS &fs = SD_MMC;                                 // sd card file system
@@ -587,8 +595,10 @@ void handleStream(){
   WiFiClient client = server.client();          // open link with client
 
   // log page request including clients IP address
+    if (debugInfo) {
       IPAddress cip = client.remoteIP();
-      if (debugInfo) Serial.println("Video stream requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]));
+      if (debugInfo) Serial.printf("Video stream requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+    }
 
   // HTML used in the web page
   const char HEADER[] = "HTTP/1.1 200 OK\r\n" \
