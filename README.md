@@ -44,6 +44,12 @@ http://x.x.x.x/img?img=1     Show image number 1 on sd card
 
 ----------------
 
-BTW - You m ay like to have a look at the security camera sketch I have created as this has lots more going on including FTP, email, OTA updates
+Notes
+-----
+
+These modules require a good 5volt power supply.  I find it best to put a good sized smoothing capacitor across the 5volts.
+If you get strange error messages, random reboots, wifi dropping etc. first thing to do is make sure it is not a power problem.
+
+BTW - You may like to have a look at the security camera sketch I have created as this has lots more going on including FTP, email, OTA updates
 https://github.com/alanesq/CameraWifiMotion
 
