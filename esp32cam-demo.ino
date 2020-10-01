@@ -21,6 +21,9 @@
  *        which includes email support, FTP, OTA updates, time from NTP servers and motion detection
  *        
  * 
+ *      esp32cam-demo is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the 
+ *        implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * 
  *******************************************************************************************************************/
 
 
@@ -49,6 +52,8 @@
                                                          //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 
                                                          //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 
                                                          //               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
+  int cameraImageExposure = 0;                           // Camera exposure (0 - 1200), if gain and exposure set to zero then auto adjust is enabled
+  int cameraImageGain = 0;                               // Image gain (0 - 30)
 
   const int TimeBetweenStatus = 600;                     // speed of flashing system running ok status light (milliseconds)
 
@@ -209,6 +214,8 @@ void setup() {
   }
 
   Serial.println("\n\nStarted...");
+
+  cameraImageSettings();                      // Apply camera image settings
   
 }  // setup
 
@@ -401,7 +408,7 @@ void handleRoot() {
     }
 
 
-  // Action any button presses on the web page
+  // Action any button presses or settings entered on web page
 
     // if button1 was pressed (toggle io pin A)
     //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1"); 
@@ -422,11 +429,36 @@ void handleRoot() {
         if (debugInfo) Serial.println("Button 3 pressed");
       }
 
+    // if exposure was adjusted - cameraImageExposure
+        if (server.hasArg("exp")) {
+          String Tvalue = server.arg("exp");   // read value
+          if (Tvalue != NULL) {
+            int val = Tvalue.toInt();
+            if (val >= 0 && val <= 1200 && val != cameraImageExposure) { 
+              if (debugInfo) Serial.printf("Exposure changed to %d\n", val);
+              cameraImageExposure = val;
+              cameraImageSettings();           // Apply camera image settings
+            }
+          }
+        }
+
+     // if image gain was adjusted - cameraImageGain
+        if (server.hasArg("gain")) {
+          String Tvalue = server.arg("gain");   // read value
+            if (Tvalue != NULL) {
+              int val = Tvalue.toInt();
+              if (val >= 0 && val <= 31 && val != cameraImageGain) { 
+                if (debugInfo) Serial.printf("Gain changed to %d\n", val);
+                cameraImageGain = val;
+                cameraImageSettings();          // Apply camera image settings
+              }
+            }
+         }
 
 
    // html header
     client.write("<!DOCTYPE html> <html lang='en'> <head> <title>root</title> </head> <body>\n");         // basic html header
-    client.write("<FORM action='/' method='post'>\n");       // used by the buttons in the html (action = the web page to send it to)
+    client.write("<FORM action='/' method='post'>\n");       // used by the buttons in the html (action = the web page to send it to
 
 
   // --------------------------------------------------------------------
@@ -457,6 +489,12 @@ void handleRoot() {
       client.write("<input style='height: 35px;' name='button2' value='Toggle pin 12' type='submit'> \n");
       client.write("<input style='height: 35px;' name='button3' value='Toggle Flash' type='submit'> \n");
 
+    // Image setting controls
+      client.write("<br><br>CAMERA SETTINGS: \n");
+      client.printf("Exposure: <input type='number' style='width: 50px' name='exp' min='0' max='1200' value='%d'>  \n", cameraImageExposure);
+      client.printf("Gain: <input type='number' style='width: 50px' name='gain' min='0' max='30' value='%d'>\n", cameraImageGain); 
+      client.write(" - Set both to zero for auto adjust<br>\n");      
+      
       
   
   // --------------------------------------------------------------------
@@ -495,7 +533,8 @@ void handlePhoto() {
 
   // html body
     if (sRes == 1) client.printf("<p>Image saved to sd card as image number %d </p>\n", imageCounter);
-    else client.write("<p>Failed to save image to sd card</p>\n");         
+    else client.write("<p>Failed to save image to sd card</p>\n");     
+    client.write("<a href='/img'>View Image</a>\n");                // link to the image    
     
   // end html
     client.write("</body></html>\n");
@@ -645,6 +684,66 @@ void handleStream(){
 
   
 }  // handleStream
+
+
+// ******************************************************************************************************************
+
+// ----------------------------------------------------------------
+//                 -Change camera image settings
+// ----------------------------------------------------------------
+// Returns TRUE is sucessful
+
+bool cameraImageSettings() { 
+   
+    sensor_t *s = esp_camera_sensor_get();  
+
+    if (s == NULL) {
+      Serial.println("Error: problem getting camera sensor settings");
+      return 0;
+    } 
+
+    if (cameraImageExposure == 0 && cameraImageGain == 0) {              
+      // enable auto adjust
+        s->set_gain_ctrl(s, 1);                       // auto gain off (1 or 0)
+        s->set_exposure_ctrl(s, 1);                   // auto exposure off (1 or 0)
+    } else {
+      // Apply manual settings
+        s->set_gain_ctrl(s, 0);                       // auto gain off (1 or 0)
+        s->set_exposure_ctrl(s, 0);                   // auto exposure off (1 or 0)
+        s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
+        s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
+    }
+
+    return 1;
+}
+
+//    // More settings available:
+//    // If you enable gain_ctrl or exposure_ctrl it will prevent a lot of the other settings having any effect
+//    // more info on settings here: https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
+//    s->set_gain_ctrl(s, 0);                       // auto gain off (1 or 0)
+//    s->set_exposure_ctrl(s, 0);                   // auto exposure off (1 or 0)
+//    s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
+//    s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
+//    s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)     
+//    s->set_quality(s, 10);                        // (0 - 63)
+//    s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
+//    s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
+//    s->set_lenc(s, 1);                            // lens correction? (1 or 0)
+//    s->set_saturation(s, 0);                      // (-2 to 2)
+//    s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
+//    s->set_sharpness(s, 0);                       // (-2 to 2)  
+//    s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
+//    s->set_colorbar(s, 0);                        // (0 or 1) - show a testcard
+//    s->set_special_effect(s, 0);                  // (0 to 6?) apply special effect
+//    s->set_whitebal(s, 0);                        // white balance enable (0 or 1)
+//    s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1) 
+//    s->set_wb_mode(s, 0);                         // 0 to 4 - if awb_gain enabled (0 - Auto, 1 - Sunny, 2 - Cloudy, 3 - Office, 4 - Home)
+//    s->set_dcw(s, 0);                             // downsize enable? (1 or 0)?
+//    s->set_raw_gma(s, 1);                         // (1 or 0)
+//    s->set_aec2(s, 0);                            // automatic exposure sensor?  (0 or 1)
+//    s->set_ae_level(s, 0);                        // auto exposure levels (-2 to 2)
+//    s->set_bpc(s, 0);                             // black pixel correction
+//    s->set_wpc(s, 0);                             // white pixel correction
 
 
 // ******************************************************************************************************************
