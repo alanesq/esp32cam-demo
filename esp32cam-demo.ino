@@ -37,8 +37,8 @@
    const char* ssid     = "<your wifi network name here>";
    const char* password = "<your wifi password here>";
 
-  const char stitle[] = "ESP32Cam-demo";                 // title of this sketch
-  const char sversion[] = "27Sep20";                     // Sketch version
+  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
+  const char* sversion = "01Oct20";                      // Sketch version
 
   const bool debugInfo = 1;                              // show additional debug info. on serial port (1=enabled)
 
@@ -82,7 +82,7 @@ WebServer server(80);                       // serve web pages on port 80
   bool sdcardPresent;                       // flag if an sd card is detected
   int imageCounter;                         // image file name on sd card counter
 
-// camera settings (CAMERA_MODEL_AI_THINKER)
+// camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
   #define CAMERA_MODEL_AI_THINKER
   #define PWDN_GPIO_NUM     32      // power to camera on/off
   #define RESET_GPIO_NUM    -1      // -1 = not used
@@ -113,73 +113,73 @@ WebServer server(80);                       // serve web pages on port 80
 
 void setup() {
   
-  Serial.begin(serialSpeed);                   // Serial communication 
+  Serial.begin(serialSpeed);                     // Start serial communication 
   
-  Serial.println("\n\n\n");                    // line feeds
+  Serial.println("\n\n\n");                      // line feeds
   Serial.println("-----------------------------------");
-  Serial.printf("Starting - %s - %s \n", stitle, sversion);
+  Serial.printf("Starting - %s - %s \n", stitle, sversion);  
   Serial.println("-----------------------------------");
 
-  // Turn-off the 'brownout detector'
-    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);     // Turn-off the 'brownout detector'
 
-  // Define indicator led
+  // Define small indicator led
     pinMode(indicatorLED, OUTPUT);
     digitalWrite(indicatorLED,HIGH);
 
   // Connect to wifi
     digitalWrite(indicatorLED,LOW);               // small indicator led on
     Serial.print("\nConnecting to ");
-    Serial.println(ssid);
+    Serial.print(ssid);
+    Serial.print("\n   ");
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
     }
-    Serial.print("\nWiFi connected.  ");
-    Serial.println("IP address: ");
+    Serial.print("\nWiFi connected, ");
+    Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
     server.begin();
-    digitalWrite(indicatorLED,HIGH);               // small indicator led off
+    digitalWrite(indicatorLED,HIGH);              // small indicator led off
 
-  // define web pages (call these procedures when url is requested)
-    server.on("/", handleRoot);               // root page
-    server.on("/stream", handleStream);       // stream live video
-    server.on("/photo", handlePhoto);         // save image to sd card
-    server.on("/img", handleImg);             // show image from sd card
-    server.onNotFound(handleNotFound);        // invalid url requested
+  // define the web pages (i.e. call these procedures when url is requested)
+    server.on("/", handleRoot);                   // root page
+    server.on("/stream", handleStream);           // stream live video
+    server.on("/photo", handlePhoto);             // save image to sd card
+    server.on("/img", handleImg);                 // show image from sd card
+    server.onNotFound(handleNotFound);            // invalid url requested
 
   // set up camera
       Serial.print(("\nInitialising camera: "));
       if (setupCameraHardware()) Serial.println("OK");
       else {
         Serial.println("Error!");
-        showError(2);       // critical error so stop and flash led
+        showError(2);                              // critical error so stop and flash led
       }
 
-  // Configure sd card
-      if (!SD_MMC.begin("/sdcard", true)) {         // if loading sd card fails     
+  // SD Card - if one is detected set 'sdcardPresent' High
+      if (!SD_MMC.begin("/sdcard", true)) {        // if loading sd card fails     
         // note: ('/sdcard", true)' = 1bit mode - see: https://www.reddit.com/r/esp32/comments/d71es9/a_breakdown_of_my_experience_trying_to_talk_to_an/
         Serial.println("No SD Card detected"); 
-        sdcardPresent = 0;                    // flag no sd card available
+        sdcardPresent = 0;                        // flag no sd card available
       } else {
         uint8_t cardType = SD_MMC.cardType();
-        if (cardType == CARD_NONE) {          // if invalid card found
+        if (cardType == CARD_NONE) {              // if invalid card found
             Serial.println("SD Card type detect failed"); 
-            sdcardPresent = 0;                // flag no sd card available
+            sdcardPresent = 0;                    // flag no sd card available
         } else {
           // valid sd card detected
           uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
           Serial.printf("SD Card found, free space = %dMB \n", SDfreeSpace);  
-          sdcardPresent = 1;                  // flag sd card available
+          sdcardPresent = 1;                      // flag sd card available
         }
       }
-      fs::FS &fs = SD_MMC;                    // sd card file system
+      fs::FS &fs = SD_MMC;                        // sd card file system
 
   // discover the number of image files stored in '/img' folder of the sd card and set image file counter accordingly
     imageCounter = 0;
     if (sdcardPresent) {
-      int tq=fs.mkdir("/img");                // create the '/img' folder on sd card (in case it is not already there)
+      int tq=fs.mkdir("/img");                    // create the '/img' folder on sd card (in case it is not already there)
       if (!tq) Serial.println("Unable to create IMG folder on sd card");
 
       // open the image folder and step through all files in it
@@ -196,19 +196,19 @@ void setup() {
     }
    
   // define io pins 
-    pinMode(indicatorLED, OUTPUT);        // re defined as sd card config can reset it
-    digitalWrite(indicatorLED,HIGH);      // led off = High
-    pinMode(brightLED, OUTPUT);
-    digitalWrite(brightLED,LOW);          // led off = Low
-    pinMode(iopinA, OUTPUT);              // pin 13 - free io pin, can be input or output
-    pinMode(iopinB, OUTPUT);              // pin 12 - free io pin, can be input or output (must be low at boot)
+    pinMode(indicatorLED, OUTPUT);            // defined again as sd card config can reset it
+    digitalWrite(indicatorLED,HIGH);          // led off = High
+    pinMode(brightLED, OUTPUT);               // flash LED
+    digitalWrite(brightLED,LOW);              // led off = Low
+    pinMode(iopinA, OUTPUT);                  // pin 13 - free io pin, can be input or output
+    pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be input or output (must be low at boot)
 
   if (!psramFound()) {
     Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
     framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_CIF;
   }
 
-  Serial.println("\nStarted...");
+  Serial.println("\n\nStarted...");
   
 }  // setup
 
@@ -260,7 +260,7 @@ void loop() {
 // ----------------------------------------------------------------
 //                        Configure the camera
 // ----------------------------------------------------------------
-// returns '1' if camera set up was ok
+// returns TRUE if sucessful
 
 bool setupCameraHardware() {
   
@@ -306,7 +306,8 @@ bool setupCameraHardware() {
 // ----------------------------------------------------------------
 
 
-// flash led 'reps' number of times
+
+// flash the indicator led 'reps' number of times
 void flashLED(int reps) {
   for(int x=0; x < reps; x++) {
     digitalWrite(indicatorLED,LOW);
@@ -318,7 +319,7 @@ void flashLED(int reps) {
 
 
 
-// critical error - stop sketch and continually flash error code 
+// critical error - stop sketch and continually flash error code on indicator led
 void showError(int errorNo) {
   while(1) {
     flashLED(errorNo);
@@ -334,7 +335,7 @@ void showError(int errorNo) {
 // ----------------------------------------------------------------
 //           Capture image from camera and save to sd card
 // ----------------------------------------------------------------
-// returns TRUE if image was saved ok
+// returns TRUE if sucessful
 
 bool storeImage() {
 
@@ -393,13 +394,14 @@ void handleRoot() {
 
   WiFiClient client = server.client();                       // open link with client
 
-  // log page request including clients IP address
+  // log the page request including clients IP address
     if (debugInfo) {
       IPAddress cip = client.remoteIP();
-      if (debugInfo) Serial.printf("Root page requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+      Serial.printf("Root page requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
     }
 
-  // Action any button presses on this page
+
+  // Action any button presses on the web page
 
     // if button1 was pressed (toggle io pin A)
     //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1"); 
@@ -482,7 +484,7 @@ void handlePhoto() {
   // log page request including clients IP address
     if (debugInfo) {
       IPAddress cip = client.remoteIP();
-      if (debugInfo) Serial.printf("Photo requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+      Serial.printf("Photo requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
     }
 
   // save an image to sd card
@@ -520,7 +522,7 @@ bool handleImg() {
   // log page request including clients IP address
     if (debugInfo) {
       IPAddress cip = client.remoteIP();
-      if (debugInfo) Serial.printf("Image display requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+      Serial.printf("Image display requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
       if (imageCounter == 0) Serial.println("Error: no images to display");
     }
     
@@ -561,8 +563,12 @@ bool handleImg() {
 // ----------------------------------------------------------------
 
 void handleNotFound() {
+
+  // log page request
+    if (debugInfo) {
+      Serial.print("Invalid page requested");
+    }
   
-  if (debugInfo) Serial.println("Invalid web page requested");      
   String message = "File Not Found\n\n";
   message += "URI: ";
   message += server.uri();
@@ -597,7 +603,7 @@ void handleStream(){
   // log page request including clients IP address
     if (debugInfo) {
       IPAddress cip = client.remoteIP();
-      if (debugInfo) Serial.printf("Video stream requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+      Serial.printf("Video stream requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
     }
 
   // HTML used in the web page
@@ -623,14 +629,14 @@ void handleStream(){
   while (true)
   {
     if (!client.connected()) break;
-      fb = esp_camera_fb_get();                   // capture live image frame
+      fb = esp_camera_fb_get();                   // capture live image 
       s = fb->len;                                // store size of image (i.e. buffer length)
       client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
-      sprintf( buf, "%d\r\n\r\n", s );            // format the image's size as html 
-      client.write(buf, strlen(buf));             // send image size 
+      sprintf( buf, "%d\r\n\r\n", s );            // format the image's size as html and put in to 'buf'
+      client.write(buf, strlen(buf));             // send result (image size)
       client.write((char *)fb->buf, s);           // send the image data
       client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
-      esp_camera_fb_return(fb);                   // return frame so memory can be released
+      esp_camera_fb_return(fb);                   // return image so memory can be released
   }
   
   if (debugInfo) Serial.println("Video stream stopped");
