@@ -1,8 +1,6 @@
 <h1>ESP32Cam-demo sketch for use with the Arduino IDE</h1>
 <p align="center"><img src="/images/esp32cam.jpeg" width="80%"/></p>
 
-esp32cam module demo / project starting point sketch using Arduino ide
-
 This can be used as a starting point sketch for your projects using the esp32cam development board, it has the following features
  *        web server with live video streaming and control buttons
  *        sd card support (using 1bit mode to free some io pins)
