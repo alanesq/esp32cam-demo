@@ -4,8 +4,8 @@
 This can be used as a starting point sketch for your projects using the esp32cam development board, it has the following features
  *        web server with live video streaming and control buttons
  *        sd card support (using 1bit mode to free some io pins)
- *        io pins available for use are 12 and 13 (must be low at boot)
- *        flash led is still available for use on pin 4 when using sd card
+ *        io pins available for use are 12 and 13 (12 must be low at boot)
+ *        flash led is still available for use on pin 4 when using an sd card
  
  I found it quiet confusing trying to do much with this module and so have tried to compile everything I have learned so far in to 
  a easy to follow sketch to encourage others to have a try with these powerful and VERY affordable modules...
