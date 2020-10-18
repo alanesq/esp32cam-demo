@@ -19,10 +19,14 @@
  *            
  *     To see a more advanced sketch along the same format as this one have a look at https://github.com/alanesq/CameraWifiMotion
  *        which includes email support, FTP, OTA updates, time from NTP servers and motion detection
+ * 
+ *     Example of how to use the image data:   https://forum.arduino.cc/?topic=708266#msg4760255
+ * 
  *        
  * 
- *      esp32cam-demo is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the 
+ *     esp32cam-demo is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the 
  *        implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * 
  * 
  *******************************************************************************************************************/
 
@@ -37,8 +41,8 @@
 // ---------------------------------------------------------------
 
   // Wifi settings (enter your wifi network details)
-   const char* ssid     = "<your wifi network name here>";
-   const char* password = "<your wifi password here>";
+  const char* ssid     = "<your wifi network name here>";
+  const char* password = "<your wifi password here>";
 
   const char* stitle = "ESP32Cam-demo";                  // title of this sketch
   const char* sversion = "01Oct20";                      // Sketch version
@@ -88,6 +92,7 @@ WebServer server(80);                       // serve web pages on port 80
   int imageCounter;                         // image file name on sd card counter
 
 // camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
+//     see: https://randomnerdtutorials.com/esp32-cam-camera-pin-gpios/
   #define CAMERA_MODEL_AI_THINKER
   #define PWDN_GPIO_NUM     32      // power to camera on/off
   #define RESET_GPIO_NUM    -1      // -1 = not used
@@ -532,10 +537,13 @@ void handlePhoto() {
     client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");         // basic html header
 
   // html body
-    if (sRes == 1) client.printf("<p>Image saved to sd card as image number %d </p>\n", imageCounter);
-    else client.write("<p>Failed to save image to sd card</p>\n");     
-    client.write("<a href='/img'>View Image</a>\n");                // link to the image    
-    
+    if (sRes == 1) {
+        client.printf("<p>Image saved to sd card as image number %d </p>\n", imageCounter);
+        client.write("<a href='/img'>View Image</a>\n");                // link to the image   
+    } else {
+        client.write("<p>Error: Failed to save image to sd card</p>\n");     
+    }
+     
   // end html
     client.write("</body></html>\n");
     delay(3);
@@ -689,14 +697,13 @@ void handleStream(){
 // ******************************************************************************************************************
 
 // ----------------------------------------------------------------
-//                 -Change camera image settings
+//                      -Change camera settings
 // ----------------------------------------------------------------
-// Returns TRUE is sucessful
+// Returns TRUE is successful
 
 bool cameraImageSettings() { 
    
-    sensor_t *s = esp_camera_sensor_get();  
-
+    sensor_t *s = esp_camera_sensor_get();       
     if (s == NULL) {
       Serial.println("Error: problem getting camera sensor settings");
       return 0;
@@ -704,20 +711,21 @@ bool cameraImageSettings() {
 
     if (cameraImageExposure == 0 && cameraImageGain == 0) {              
       // enable auto adjust
-        s->set_gain_ctrl(s, 1);                       // auto gain off (1 or 0)
-        s->set_exposure_ctrl(s, 1);                   // auto exposure off (1 or 0)
+        s->set_gain_ctrl(s, 1);                       // auto gain on 
+        s->set_exposure_ctrl(s, 1);                   // auto exposure on 
     } else {
       // Apply manual settings
-        s->set_gain_ctrl(s, 0);                       // auto gain off (1 or 0)
-        s->set_exposure_ctrl(s, 0);                   // auto exposure off (1 or 0)
+        s->set_gain_ctrl(s, 0);                       // auto gain off 
+        s->set_exposure_ctrl(s, 0);                   // auto exposure off 
         s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
         s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
     }
 
     return 1;
-}
+}  // cameraImageSettings
 
-//    // More settings available:
+
+//    // More camera settings available:
 //    // If you enable gain_ctrl or exposure_ctrl it will prevent a lot of the other settings having any effect
 //    // more info on settings here: https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
 //    s->set_gain_ctrl(s, 0);                       // auto gain off (1 or 0)
