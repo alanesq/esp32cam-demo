@@ -51,3 +51,6 @@ BTW - You may like to have a look at the security camera sketch I have created a
 https://github.com/alanesq/CameraWifiMotion
 
 There is some great info. here on how to access the data from the camera:  https://forum.arduino.cc/?topic=708266#msg4760255
+
+In the Misc folder there is a version of the sketch which includes NTP (Real time) support
+
