@@ -34,6 +34,7 @@
 #include "esp_camera.h"       // https://github.com/espressif/esp32-camera
 #include <WiFi.h>
 #include <WebServer.h>
+#include "fd_forward.h"       // required for converting frame to RGB?
 
 
 // ---------------------------------------------------------------
@@ -41,17 +42,20 @@
 // ---------------------------------------------------------------
 
   // Wifi settings (enter your wifi network details)
-  const char* ssid     = "<your wifi network name here>";
-  const char* password = "<your wifi password here>";
+   const char* ssid     = "<your wifi network name here>";
+   const char* password = "<your wifi password here>";
 
-  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
-  const char* sversion = "01Oct20";                      // Sketch version
+  const char* stitle = "ESP32Cam-demo";              // title of this sketch
+  const char* sversion = "10Nov20";                      // Sketch version
 
   const bool debugInfo = 1;                              // show additional debug info. on serial port (1=enabled)
 
   // Camera related
   const bool flashRequired = 1;                          // If flash to be used when capturing image (1 = yes)
-  const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA;    // Image resolution:   
+  const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA;    
+  const int I_WIDTH = 640;                               // image dimensions (used for converting image to rgb)
+  const int I_HEIGHT = 480;
+                                                         // Image resolution:   
                                                          //               default = "const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_XGA"
                                                          //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 
                                                          //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 
@@ -157,6 +161,7 @@ void setup() {
     server.on("/stream", handleStream);           // stream live video
     server.on("/photo", handlePhoto);             // save image to sd card
     server.on("/img", handleImg);                 // show image from sd card
+    server.on("/rgb", readRGBImage);              // capture image and convert to RGB
     server.onNotFound(handleNotFound);            // invalid url requested
 
   // set up camera
@@ -489,16 +494,26 @@ void handleRoot() {
       if (digitalRead(iopinB) == LOW) client.write("<p>Pin 12 is Low</p>\n");
       else client.write("<p>Pin 12 is High</p>\n");
 
+//    // touch input on the two gpio pins 
+//      client.printf("<p>Touch on pin 12: %d </p>\n", touchRead(T5) );
+//      client.printf("<p>Touch on pin 13: %d </p>\n", touchRead(T4) );
+
     // Control bottons 
       client.write("<input style='height: 35px;' name='button1' value='Toggle pin 13' type='submit'> \n");
       client.write("<input style='height: 35px;' name='button2' value='Toggle pin 12' type='submit'> \n");
-      client.write("<input style='height: 35px;' name='button3' value='Toggle Flash' type='submit'> \n");
+      client.write("<input style='height: 35px;' name='button3' value='Toggle Flash' type='submit'><br> \n");
 
     // Image setting controls
-      client.write("<br><br>CAMERA SETTINGS: \n");
+      client.write("<br>CAMERA SETTINGS: \n");
       client.printf("Exposure: <input type='number' style='width: 50px' name='exp' min='0' max='1200' value='%d'>  \n", cameraImageExposure);
       client.printf("Gain: <input type='number' style='width: 50px' name='gain' min='0' max='30' value='%d'>\n", cameraImageGain); 
       client.write(" - Set both to zero for auto adjust<br>\n");      
+
+    // links to the other pages available
+      client.write("<br>LINKS: \n");
+      client.write("<a href='/photo'>Capture an image</a> - \n"); 
+      client.write("<a href='/img'>View stored images</a> - \n");         
+      client.write("<a href='/stream'>Live stream</a><br>\n");       
       
       
   
@@ -633,6 +648,47 @@ void handleNotFound() {
   message = "";      // clear variable
   
 }  // handleNotFound
+
+
+// ******************************************************************************************************************
+
+// read image as rgb data
+//          insparation from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
+
+void readRGBImage() {
+  Serial.println("Reading camera image as RGB");
+
+  // capture live image (jpg)
+    camera_fb_t * fb = NULL;
+    fb = esp_camera_fb_get();                
+
+  // convert jpg to rgb (store in array called 'rgb')
+    void *ptrVal = NULL;
+    int ARRAY_LENGTH = I_WIDTH * I_HEIGHT * 3;     // pixels in image x 3
+    ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);
+    uint8_t *rgb = (uint8_t *)ptrVal;
+    fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);
+
+  // display some of the result
+      Serial.println("RGB data: ");
+      for (uint32_t i = 0; i < 25; i++) {
+        // const uint16_t x = i % I_WIDTH;
+        // const uint16_t y = floor(i / I_WIDTH);
+        if (i%3 == 0) Serial.print("R");
+        if (i%3 == 1) Serial.print("G");
+        if (i%3 == 2) Serial.print("B");
+        Serial.print(rgb[i],DEC);
+        Serial.print(",");
+      }
+      Serial.println();
+
+  // clear buffers
+    esp_camera_fb_return(fb);
+    heap_caps_free(ptrVal);
+
+  server.send ( 404, "text/plain", "RGB done" );
+  
+}
 
 
 // ******************************************************************************************************************
