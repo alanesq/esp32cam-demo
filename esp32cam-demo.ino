@@ -661,8 +661,10 @@ void handleNotFound() {
 //          note: I do not know how high resolution you can go and not run out of memory
 
 void readRGBImage() {
-  Serial.println("Reading camera image as RGB");
-  String tHTML = "LIVE IMAGE AS RGB DATA: ";      // reply to send to web client
+
+  uint32_t resultsToShow = 40;     // how much data to display
+    
+  String tReply = "LIVE IMAGE AS RGB DATA: ";      // reply to send to web client and serial port
 
   // capture live image (jpg)
     camera_fb_t * fb = NULL;
@@ -670,7 +672,7 @@ void readRGBImage() {
     
   // allocate memory to store rgb data
     void *ptrVal = NULL;
-    int ARRAY_LENGTH = I_WIDTH * I_HEIGHT * 3;     // pixels in the image image x 3
+    uint32_t ARRAY_LENGTH = I_WIDTH * I_HEIGHT * 3;              // pixels in the image image x 3
     ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);      
     uint8_t *rgb = (uint8_t *)ptrVal;
   
@@ -678,28 +680,22 @@ void readRGBImage() {
     fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);      
 
   // display some of the result
-      int resultsToShow = 40;     // how much data to display
-      String tOut;
-      Serial.println("RGB data: ");
       for (uint32_t i = 0; i < resultsToShow; i++) {
-        // const uint16_t x = i % I_WIDTH;
-        // const uint16_t y = floor(i / I_WIDTH);
-        tOut = "";
-        if (i%3 == 0) tOut="R";
-        if (i%3 == 1) tOut="G";
-        if (i%3 == 2) tOut="B";
-        tOut+= String(rgb[i]);
-        tOut+=",";
-        Serial.print(tOut);
-        tHTML+=tOut;
+        // // x and y coordinate of the pixel
+        //   uint16_t x = i % I_WIDTH;
+        //   uint16_t y = floor(i / I_WIDTH);
+        if (i%3 == 0) tReply+=",B";
+        else if (i%3 == 1) tReply+=",G";
+        else if (i%3 == 2) tReply+=",R";
+        tReply+= String(rgb[i]);
       }
-      Serial.println();
 
   // free up memory
     esp_camera_fb_return(fb);
     heap_caps_free(ptrVal);
 
-  server.send ( 404, "text/plain", tHTML );
+  Serial.println(tReply);
+  server.send ( 404, "text/plain", tReply);
   
 }
 
