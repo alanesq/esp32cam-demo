@@ -32,13 +32,16 @@ It will live stream video from the camera
 If you have an sd card inserted then accessing    http://x/x/x/x/photo
 Will capture an image and save it to the sd card
 
+There is a procedure which demonstarates how to get RGB data from an image which will allow for processing the images as data (http://x.x.x.x/rgb).
+
+
 URLs:
 http://x.x.x.x/              Hello message
 http://x.x.x.x/photo         Capture an image and save to sd card
 http://x.x.x.x/stream        Show live streaming video
 http://x.x.x.x/img           Show most recent image saved to sd card
 http://x.x.x.x/img?img=1     Show image number 1 on sd card
-http://x.x.x.x/rgb           Captures an image and converts to RGB data
+http://x.x.x.x/rgb           Captures an image and converts to RGB data (will not work with the highest resolution images as there is not enough memory)
 
 
 ----------------
