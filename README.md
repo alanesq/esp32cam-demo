@@ -52,8 +52,6 @@ If you get strange error messages, random reboots, wifi dropping etc. first thin
 BTW - You may like to have a look at the security camera sketch I have created as this has lots more going on including FTP, email, OTA updates
 https://github.com/alanesq/CameraWifiMotion
 
-There is some great info. here on how to access the data from the camera:  https://forum.arduino.cc/?topic=708266#msg4760255
-
 In the Misc folder there is a version of the sketch which includes NTP (Real time) support
 
 I have heard reports of these modules getting very warm when in use although I have not experienced this myself, I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
