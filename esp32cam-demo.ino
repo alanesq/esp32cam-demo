@@ -42,8 +42,8 @@
 // ---------------------------------------------------------------
 
   // Wifi settings (enter your wifi network details)
-   const char* ssid     = "<your wifi network name here>";
-   const char* password = "<your wifi password here>";
+  const char* ssid     = "<your wifi network name here>";
+  const char* password = "<your wifi password here>";
 
   const char* stitle = "ESP32Cam-demo";              // title of this sketch
   const char* sversion = "11Nov20";                      // Sketch version
@@ -115,7 +115,7 @@ WebServer server(80);                       // serve web pages on port 80
   #define HREF_GPIO_NUM     23      // href_pin
   #define PCLK_GPIO_NUM     22      // pixel_clock_pin
 
-  camera_config_t config;           
+  camera_config_t config;        
   
   
 // ******************************************************************************************************************
@@ -224,8 +224,6 @@ void setup() {
   }
 
   Serial.println("\n\nStarted...");
-
-  cameraImageSettings();                      // Apply camera image settings
   
 }  // setup
 
@@ -305,7 +303,8 @@ bool setupCameraHardware() {
                                                   //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
     config.jpeg_quality = 5;                      // 0-63 lower number means higher quality
     config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
-    
+
+    cameraImageSettings();                        // apply custom camera settings                   
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
     if (camerr != ESP_OK) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
 
@@ -662,34 +661,53 @@ void handleNotFound() {
 
 void readRGBImage() {
 
-  uint32_t resultsToShow = 40;     // how much data to display
+  uint32_t resultsToShow = 50;     // how much data to display
     
   String tReply = "LIVE IMAGE AS RGB DATA: ";      // reply to send to web client and serial port
 
   // capture live image (jpg)
     camera_fb_t * fb = NULL;
-    fb = esp_camera_fb_get();                
+    fb = esp_camera_fb_get();  
+    if (!fb) tReply+=" -Error capturing image from camera- ";               
     
-  // allocate memory to store rgb data
+  // allocate memory to store rgb data in psram
+    if (!psramFound()) tReply+=" -Error - no psram found- ";
     void *ptrVal = NULL;
     uint32_t ARRAY_LENGTH = I_WIDTH * I_HEIGHT * 3;              // pixels in the image image x 3
     ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);      
     uint8_t *rgb = (uint8_t *)ptrVal;
   
   // convert jpg to rgb (store in array called 'rgb')
-    fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);      
+    bool jpeg_converted = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);     
+    if (!jpeg_converted) tReply+=" -Error converting image to RGB- "; 
 
   // display some of the result
       for (uint32_t i = 0; i < resultsToShow; i++) {
         // // x and y coordinate of the pixel
         //   uint16_t x = i % I_WIDTH;
         //   uint16_t y = floor(i / I_WIDTH);
-        if (i%3 == 0) tReply+=",B";
-        else if (i%3 == 1) tReply+=",G";
-        else if (i%3 == 2) tReply+=",R";
-        tReply+= String(rgb[i]);
+        if (i%3 == 0) tReply+="B";
+        else if (i%3 == 1) tReply+="G";
+        else if (i%3 == 2) tReply+="R";
+        tReply+= String(rgb[i]) + ",";
       }
 
+  // find average values for each colour
+      uint32_t aRed = 0;
+      uint32_t aGreen = 0;
+      uint32_t aBlue = 0;
+      for (uint32_t i = 0; i < (ARRAY_LENGTH - 2); i+=3) {
+        aBlue+=rgb[i];
+        aGreen+=rgb[i+1];
+        aRed+=rgb[i+2];
+      }    
+      aRed = aRed / (I_WIDTH * I_HEIGHT);
+      aGreen = aGreen / (I_WIDTH * I_HEIGHT);
+      aBlue = aBlue / (I_WIDTH * I_HEIGHT);
+      tReply+=" Average Red = " + String(aRed);
+      tReply+=", Average Green = " + String(aGreen);
+      tReply+=", Average Blue = " + String(aBlue);
+      
   // free up memory
     esp_camera_fb_return(fb);
     heap_caps_free(ptrVal);
@@ -765,6 +783,7 @@ void handleStream(){
 //                      -Change camera settings
 // ----------------------------------------------------------------
 // Returns TRUE is successful
+// white balance disabled to assist when using RGB to compare colours
 
 bool cameraImageSettings() { 
    
@@ -778,9 +797,11 @@ bool cameraImageSettings() {
       // enable auto adjust
         s->set_gain_ctrl(s, 1);                       // auto gain on 
         s->set_exposure_ctrl(s, 1);                   // auto exposure on 
+        s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1)
     } else {
       // Apply manual settings
         s->set_gain_ctrl(s, 0);                       // auto gain off 
+        s->set_awb_gain(s, 0);                        // Auto White Balance enable (0 or 1)
         s->set_exposure_ctrl(s, 0);                   // auto exposure off 
         s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
         s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
