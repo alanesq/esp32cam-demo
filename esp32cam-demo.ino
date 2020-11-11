@@ -49,10 +49,7 @@
 
   // Camera related
   const bool flashRequired = 1;                          // If flash to be used when capturing image (1 = yes)
-  const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA;    
-  const int I_WIDTH = 640;                               // image dimensions (used for converting image to rgb)
-  const int I_HEIGHT = 480;
-                                                         // Image resolution:   
+  const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA;    // Image resolution:   
                                                          //               default = "const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_XGA"
                                                          //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 
                                                          //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 
@@ -730,14 +727,15 @@ void readRGBImage() {
   // capture live image (jpg)
     camera_fb_t * fb = NULL;
     fb = esp_camera_fb_get();  
-    if (!fb) tReply+=" -Error capturing image from camera- ";               
+    if (!fb) tReply+=" -Error capturing image from camera- ";   
+    tReply+="(Image resolution=" + String(fb->width) + "x" + String(fb->height) + ")";         // display image resolution         
     
   // allocate memory to store rgb data in psram
     if (!psramFound()) tReply+=" -Error no psram found- ";
     void *ptrVal = NULL;
-    uint32_t ARRAY_LENGTH = I_WIDTH * I_HEIGHT * 3;               // number of pixels in the jpg image x 3
-    bool memRes = ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);   
-    if (!memRes) tReply+=" -Error allocating memory for RGB data- ";       
+    uint32_t ARRAY_LENGTH = fb->width * fb->height * 3;               // number of pixels in the jpg image x 3
+    if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM) <  ARRAY_LENGTH) tReply+=" -Error not enough free psram to store rgb data- ";      // check free memory in psram
+    ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);   
     uint8_t *rgb = (uint8_t *)ptrVal;
   
   // convert jpg to rgb (store in an array 'rgb')
@@ -747,8 +745,8 @@ void readRGBImage() {
   // display some of the resulting data
       for (uint32_t i = 0; i < resultsToShow; i++) {
         // // x and y coordinate of the pixel
-        //   uint16_t x = i % I_WIDTH;
-        //   uint16_t y = floor(i / I_WIDTH);
+        //   uint16_t x = i % fb->width;
+        //   uint16_t y = floor(i / fb->width);
         if (i%3 == 0) tReply+="B";
         else if (i%3 == 1) tReply+="G";
         else if (i%3 == 2) tReply+="R";
@@ -764,9 +762,9 @@ void readRGBImage() {
         aGreen+=rgb[i+1];
         aRed+=rgb[i+2];
       }    
-      aRed = aRed / (I_WIDTH * I_HEIGHT);
-      aGreen = aGreen / (I_WIDTH * I_HEIGHT);
-      aBlue = aBlue / (I_WIDTH * I_HEIGHT);
+      aRed = aRed / (fb->width * fb->height);
+      aGreen = aGreen / (fb->width * fb->height);
+      aBlue = aBlue / (fb->width * fb->height);
       tReply+=" Average Red = " + String(aRed);
       tReply+=", Average Green = " + String(aGreen);
       tReply+=", Average Blue = " + String(aBlue);
