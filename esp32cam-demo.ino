@@ -318,9 +318,74 @@ bool setupCameraHardware() {
 
 
 // ----------------------------------------------------------------
+//                      -Change camera settings
+// ----------------------------------------------------------------
+// Adjust image properties (e.g. brightness)
+// Defaults to auto adjustments if exposure and gain are both set to zero
+// Note: White balance is disabled when manual settings applied to assist when using RGB data to compare colours
+// Returns TRUE if successful
+
+bool cameraImageSettings() { 
+   
+    sensor_t *s = esp_camera_sensor_get();       
+    if (s == NULL) {
+      Serial.println("Error: problem getting camera sensor settings");
+      return 0;
+    } 
+
+    if (cameraImageExposure == 0 && cameraImageGain == 0) {              
+      // enable auto adjust
+        s->set_gain_ctrl(s, 1);                       // auto gain on 
+        s->set_exposure_ctrl(s, 1);                   // auto exposure on 
+        s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1)
+    } else {
+      // Apply manual settings
+        s->set_gain_ctrl(s, 0);                       // auto gain off 
+        s->set_awb_gain(s, 0);                        // Auto White Balance enable (0 or 1)
+        s->set_exposure_ctrl(s, 0);                   // auto exposure off 
+        s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
+        s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
+    }
+
+    return 1;
+}  // cameraImageSettings
+
+
+//    // More camera settings available:
+//    // If you enable gain_ctrl or exposure_ctrl it will prevent a lot of the other settings having any effect
+//    // more info on settings here: https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
+//    s->set_gain_ctrl(s, 0);                       // auto gain off (1 or 0)
+//    s->set_exposure_ctrl(s, 0);                   // auto exposure off (1 or 0)
+//    s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
+//    s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
+//    s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)     
+//    s->set_quality(s, 10);                        // (0 - 63)
+//    s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
+//    s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
+//    s->set_lenc(s, 1);                            // lens correction? (1 or 0)
+//    s->set_saturation(s, 0);                      // (-2 to 2)
+//    s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
+//    s->set_sharpness(s, 0);                       // (-2 to 2)  
+//    s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
+//    s->set_colorbar(s, 0);                        // (0 or 1) - show a testcard
+//    s->set_special_effect(s, 0);                  // (0 to 6?) apply special effect
+//    s->set_whitebal(s, 0);                        // white balance enable (0 or 1)
+//    s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1) 
+//    s->set_wb_mode(s, 0);                         // 0 to 4 - if awb_gain enabled (0 - Auto, 1 - Sunny, 2 - Cloudy, 3 - Office, 4 - Home)
+//    s->set_dcw(s, 0);                             // downsize enable? (1 or 0)?
+//    s->set_raw_gma(s, 1);                         // (1 or 0)
+//    s->set_aec2(s, 0);                            // automatic exposure sensor?  (0 or 1)
+//    s->set_ae_level(s, 0);                        // auto exposure levels (-2 to 2)
+//    s->set_bpc(s, 0);                             // black pixel correction
+//    s->set_wpc(s, 0);                             // white pixel correction
+
+
+// ******************************************************************************************************************
+
+
+// ----------------------------------------------------------------
 //                        Misc small procedures
 // ----------------------------------------------------------------
-
 
 
 // flash the indicator led 'reps' number of times
@@ -656,7 +721,7 @@ void handleNotFound() {
 // ----------------------------------------------------------------
 //       Access image data as RGB - i.e. http://x.x.x.x/rgb
 // ----------------------------------------------------------------
-//          insparation from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
+//          Info. from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
 //          note: I do not know how high resolution you can go and not run out of memory
 
 void readRGBImage() {
@@ -671,17 +736,17 @@ void readRGBImage() {
     if (!fb) tReply+=" -Error capturing image from camera- ";               
     
   // allocate memory to store rgb data in psram
-    if (!psramFound()) tReply+=" -Error - no psram found- ";
+    if (!psramFound()) tReply+=" -Error no psram found- ";
     void *ptrVal = NULL;
-    uint32_t ARRAY_LENGTH = I_WIDTH * I_HEIGHT * 3;              // pixels in the image image x 3
+    uint32_t ARRAY_LENGTH = I_WIDTH * I_HEIGHT * 3;               // number of pixels in the jpg image x 3
     ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);      
     uint8_t *rgb = (uint8_t *)ptrVal;
   
-  // convert jpg to rgb (store in array called 'rgb')
+  // convert jpg to rgb (store in an array 'rgb')
     bool jpeg_converted = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);     
     if (!jpeg_converted) tReply+=" -Error converting image to RGB- "; 
 
-  // display some of the result
+  // display some of the resulting data
       for (uint32_t i = 0; i < resultsToShow; i++) {
         // // x and y coordinate of the pixel
         //   uint16_t x = i % I_WIDTH;
@@ -692,11 +757,11 @@ void readRGBImage() {
         tReply+= String(rgb[i]) + ",";
       }
 
-  // find average values for each colour
+  // find the average values for each colour over entire image
       uint32_t aRed = 0;
       uint32_t aGreen = 0;
       uint32_t aBlue = 0;
-      for (uint32_t i = 0; i < (ARRAY_LENGTH - 2); i+=3) {
+      for (uint32_t i = 0; i < (ARRAY_LENGTH - 2); i+=3) {         // go through all data and add up totals
         aBlue+=rgb[i];
         aGreen+=rgb[i+1];
         aRed+=rgb[i+2];
@@ -715,7 +780,7 @@ void readRGBImage() {
   Serial.println(tReply);
   server.send ( 404, "text/plain", tReply);
   
-}
+}  // readRGBImage
 
 
 // ******************************************************************************************************************
@@ -724,7 +789,7 @@ void readRGBImage() {
 // ----------------------------------------------------------------
 //      -stream requested     i.e. http://x.x.x.x/stream
 // ----------------------------------------------------------------
-// Sends cam stream - thanks to Uwe Gerlach for the code showing how to do this
+// Sends cam stream - thanks to Uwe Gerlach for the code showing me how to do this
 
 void handleStream(){
 
@@ -775,69 +840,6 @@ void handleStream(){
 
   
 }  // handleStream
-
-
-// ******************************************************************************************************************
-
-// ----------------------------------------------------------------
-//                      -Change camera settings
-// ----------------------------------------------------------------
-// Returns TRUE is successful
-// white balance disabled to assist when using RGB to compare colours
-
-bool cameraImageSettings() { 
-   
-    sensor_t *s = esp_camera_sensor_get();       
-    if (s == NULL) {
-      Serial.println("Error: problem getting camera sensor settings");
-      return 0;
-    } 
-
-    if (cameraImageExposure == 0 && cameraImageGain == 0) {              
-      // enable auto adjust
-        s->set_gain_ctrl(s, 1);                       // auto gain on 
-        s->set_exposure_ctrl(s, 1);                   // auto exposure on 
-        s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1)
-    } else {
-      // Apply manual settings
-        s->set_gain_ctrl(s, 0);                       // auto gain off 
-        s->set_awb_gain(s, 0);                        // Auto White Balance enable (0 or 1)
-        s->set_exposure_ctrl(s, 0);                   // auto exposure off 
-        s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
-        s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
-    }
-
-    return 1;
-}  // cameraImageSettings
-
-
-//    // More camera settings available:
-//    // If you enable gain_ctrl or exposure_ctrl it will prevent a lot of the other settings having any effect
-//    // more info on settings here: https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
-//    s->set_gain_ctrl(s, 0);                       // auto gain off (1 or 0)
-//    s->set_exposure_ctrl(s, 0);                   // auto exposure off (1 or 0)
-//    s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
-//    s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
-//    s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)     
-//    s->set_quality(s, 10);                        // (0 - 63)
-//    s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128) 
-//    s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
-//    s->set_lenc(s, 1);                            // lens correction? (1 or 0)
-//    s->set_saturation(s, 0);                      // (-2 to 2)
-//    s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
-//    s->set_sharpness(s, 0);                       // (-2 to 2)  
-//    s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
-//    s->set_colorbar(s, 0);                        // (0 or 1) - show a testcard
-//    s->set_special_effect(s, 0);                  // (0 to 6?) apply special effect
-//    s->set_whitebal(s, 0);                        // white balance enable (0 or 1)
-//    s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1) 
-//    s->set_wb_mode(s, 0);                         // 0 to 4 - if awb_gain enabled (0 - Auto, 1 - Sunny, 2 - Cloudy, 3 - Office, 4 - Home)
-//    s->set_dcw(s, 0);                             // downsize enable? (1 or 0)?
-//    s->set_raw_gma(s, 1);                         // (1 or 0)
-//    s->set_aec2(s, 0);                            // automatic exposure sensor?  (0 or 1)
-//    s->set_ae_level(s, 0);                        // auto exposure levels (-2 to 2)
-//    s->set_bpc(s, 0);                             // black pixel correction
-//    s->set_wpc(s, 0);                             // white pixel correction
 
 
 // ******************************************************************************************************************
