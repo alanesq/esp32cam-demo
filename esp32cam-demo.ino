@@ -654,6 +654,7 @@ void handleNotFound() {
 
 // read image as rgb data
 //          insparation from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
+//          note: I do not know how high resolution you can go and not run out of memory
 
 void readRGBImage() {
   Serial.println("Reading camera image as RGB");
@@ -665,9 +666,10 @@ void readRGBImage() {
   // convert jpg to rgb (store in array called 'rgb')
     void *ptrVal = NULL;
     int ARRAY_LENGTH = I_WIDTH * I_HEIGHT * 3;     // pixels in image x 3
-    ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);
-    uint8_t *rgb = (uint8_t *)ptrVal;
-    fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);
+    // allocate memory to store rgb data
+      ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);      
+      uint8_t *rgb = (uint8_t *)ptrVal;
+    fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);      // convert to rgb
 
   // display some of the result
       Serial.println("RGB data: ");
