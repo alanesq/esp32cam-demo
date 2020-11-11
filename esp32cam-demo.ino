@@ -20,9 +20,6 @@
  *     To see a more advanced sketch along the same format as this one have a look at https://github.com/alanesq/CameraWifiMotion
  *        which includes email support, FTP, OTA updates, time from NTP servers and motion detection
  * 
- *     Example of how to use the image data:   https://forum.arduino.cc/?topic=708266#msg4760255
- * 
- *        
  * 
  *     esp32cam-demo is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the 
  *        implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -303,11 +300,11 @@ bool setupCameraHardware() {
                                                   //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
     config.jpeg_quality = 5;                      // 0-63 lower number means higher quality
     config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
-
-    cameraImageSettings();                        // apply custom camera settings                   
+                 
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
     if (camerr != ESP_OK) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
 
+    cameraImageSettings();                        // apply custom camera settings  
     
     return (camerr == ESP_OK);                    // return boolean result of camera initialisation
 }
@@ -739,7 +736,8 @@ void readRGBImage() {
     if (!psramFound()) tReply+=" -Error no psram found- ";
     void *ptrVal = NULL;
     uint32_t ARRAY_LENGTH = I_WIDTH * I_HEIGHT * 3;               // number of pixels in the jpg image x 3
-    ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);      
+    bool memRes = ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);   
+    if (!memRes) tReply+=" -Error allocating memory for RGB data- ";       
     uint8_t *rgb = (uint8_t *)ptrVal;
   
   // convert jpg to rgb (store in an array 'rgb')
