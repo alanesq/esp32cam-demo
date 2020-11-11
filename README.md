@@ -6,6 +6,7 @@ This can be used as a starting point sketch for your projects using the esp32cam
  *        sd card support (using 1bit mode to free some io pins)
  *        io pins available for use are 12 and 13 (12 must be low at boot)
  *        flash led is still available for use on pin 4 when using an sd card
+ *        Can read the image as RGB data  (i.e. 3 bytes per pixel for red green and blue value)
  
 I have tried to make the sketch as easy to follow/modify as possible with lots of comments etc. and no additional libraries used, as I found it quiet confusing as an ameteur trying to do much with this module and difficult to find easy to understand examples/explanations of what I wanted to do, so I am publishing this sketch in the hope it will encourage/help others to have a try with these powerful and VERY affordable modules.
 
@@ -37,6 +38,7 @@ http://x.x.x.x/photo         Capture an image and save to sd card
 http://x.x.x.x/stream        Show live streaming video
 http://x.x.x.x/img           Show most recent image saved to sd card
 http://x.x.x.x/img?img=1     Show image number 1 on sd card
+http://x.x.x.x/rgb           Captures an image and converts to RGB data
 
 
 ----------------
