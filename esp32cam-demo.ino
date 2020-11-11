@@ -46,7 +46,7 @@
    const char* password = "<your wifi password here>";
 
   const char* stitle = "ESP32Cam-demo";              // title of this sketch
-  const char* sversion = "10Nov20";                      // Sketch version
+  const char* sversion = "11Nov20";                      // Sketch version
 
   const bool debugInfo = 1;                              // show additional debug info. on serial port (1=enabled)
 
@@ -512,7 +512,8 @@ void handleRoot() {
     // links to the other pages available
       client.write("<br>LINKS: \n");
       client.write("<a href='/photo'>Capture an image</a> - \n"); 
-      client.write("<a href='/img'>View stored images</a> - \n");         
+      client.write("<a href='/img'>View stored images</a> - \n");      
+      client.write("<a href='/rgb'>Access Image as RGB data</a> - \n");   
       client.write("<a href='/stream'>Live stream</a><br>\n");       
       
       
@@ -652,43 +653,53 @@ void handleNotFound() {
 
 // ******************************************************************************************************************
 
-// read image as rgb data
+
+// ----------------------------------------------------------------
+//       Access image data as RGB - i.e. http://x.x.x.x/rgb
+// ----------------------------------------------------------------
 //          insparation from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
 //          note: I do not know how high resolution you can go and not run out of memory
 
 void readRGBImage() {
   Serial.println("Reading camera image as RGB");
+  String tHTML = "LIVE IMAGE AS RGB DATA: ";      // reply to send to web client
 
   // capture live image (jpg)
     camera_fb_t * fb = NULL;
     fb = esp_camera_fb_get();                
-
-  // convert jpg to rgb (store in array called 'rgb')
+    
+  // allocate memory to store rgb data
     void *ptrVal = NULL;
-    int ARRAY_LENGTH = I_WIDTH * I_HEIGHT * 3;     // pixels in image x 3
-    // allocate memory to store rgb data
-      ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);      
-      uint8_t *rgb = (uint8_t *)ptrVal;
-    fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);      // convert to rgb
+    int ARRAY_LENGTH = I_WIDTH * I_HEIGHT * 3;     // pixels in the image image x 3
+    ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);      
+    uint8_t *rgb = (uint8_t *)ptrVal;
+  
+  // convert jpg to rgb (store in array called 'rgb')
+    fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);      
 
   // display some of the result
+      int resultsToShow = 40;     // how much data to display
+      String tOut;
       Serial.println("RGB data: ");
-      for (uint32_t i = 0; i < 25; i++) {
+      for (uint32_t i = 0; i < resultsToShow; i++) {
         // const uint16_t x = i % I_WIDTH;
         // const uint16_t y = floor(i / I_WIDTH);
-        if (i%3 == 0) Serial.print("R");
-        if (i%3 == 1) Serial.print("G");
-        if (i%3 == 2) Serial.print("B");
-        Serial.print(rgb[i],DEC);
-        Serial.print(",");
+        tOut = "";
+        if (i%3 == 0) tOut="R";
+        if (i%3 == 1) tOut="G";
+        if (i%3 == 2) tOut="B";
+        tOut+= String(rgb[i]);
+        tOut+=",";
+        Serial.print(tOut);
+        tHTML+=tOut;
       }
       Serial.println();
 
-  // clear buffers
+  // free up memory
     esp_camera_fb_return(fb);
     heap_caps_free(ptrVal);
 
-  server.send ( 404, "text/plain", "RGB done" );
+  server.send ( 404, "text/plain", tHTML );
   
 }
 
