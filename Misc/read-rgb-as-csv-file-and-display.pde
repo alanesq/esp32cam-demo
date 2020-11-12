@@ -1,7 +1,8 @@
+// PROCESSING SKETCH 
 
 // read a csv file containing RGB data and display the image
 
-// CSV file contains one line for pixel in the format "rrr,ggg,bbb"    
+// CSV file contains one line per pixel in the format "rrr,ggg,bbb"    
 // e.g.     12,34,56
 //          34,128,13
 //          67,77,89
