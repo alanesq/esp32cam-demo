@@ -43,7 +43,7 @@
   const char* password = "<your wifi password here>";
 
   const char* stitle = "ESP32Cam-demo";              // title of this sketch
-  const char* sversion = "11Nov20";                      // Sketch version
+  const char* sversion = "12Nov20";                      // Sketch version
 
   const bool debugInfo = 1;                              // show additional debug info. on serial port (1=enabled)
 
@@ -715,36 +715,48 @@ void handleNotFound() {
 // ----------------------------------------------------------------
 //       Access image data as RGB - i.e. http://x.x.x.x/rgb
 // ----------------------------------------------------------------
-//          Info. from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
-//          note: I do not know how high resolution you can go and not run out of memory
+//    Info. from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
+//    note: Will fail on the highest resolution as it requires more than 4mb to store the data (in psram)
 
 void readRGBImage() {
 
   uint32_t resultsToShow = 50;     // how much data to display
     
   String tReply = "LIVE IMAGE AS RGB DATA: ";      // reply to send to web client and serial port
+  if (debugInfo) Serial.println("Starting RGB procedure at millis=" + String(millis()));
 
   // capture live image (jpg)
     camera_fb_t * fb = NULL;
     fb = esp_camera_fb_get();  
-    if (!fb) tReply+=" -Error capturing image from camera- ";   
+    if (!fb) {
+      tReply+=" -Error capturing image from camera- ";  
+      Serial.println (" -Error capturing image from camera- ");
+    }
     tReply+="(Image resolution=" + String(fb->width) + "x" + String(fb->height) + ")";         // display image resolution         
     
   // allocate memory to store rgb data in psram
-    if (!psramFound()) tReply+=" -Error no psram found- ";
+    if (!psramFound()) {
+      tReply+=" -Error no psram found- ";
+      Serial.println (" -Error no psram found- ");
+    }
+    if (debugInfo) Serial.println("Free psram before rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
     void *ptrVal = NULL;
     uint32_t ARRAY_LENGTH = fb->width * fb->height * 3;               // number of pixels in the jpg image x 3
-    if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM) <  ARRAY_LENGTH) tReply+=" -Error not enough free psram to store rgb data- ";      // check free memory in psram
+    if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM) <  ARRAY_LENGTH) tReply+=" -Error not enough free psram to store the rgb data- ";      // check free memory in psram
     ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);   
     uint8_t *rgb = (uint8_t *)ptrVal;
+    if (debugInfo) Serial.println("Free psram after rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
   
-  // convert jpg to rgb (store in an array 'rgb')
+  // convert jpg to rgb data (stored in array 'rgb')
     bool jpeg_converted = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);     
-    if (!jpeg_converted) tReply+=" -Error converting image to RGB- "; 
+    if (!jpeg_converted) {
+      tReply+=" -Error converting image to RGB- "; 
+      Serial.println (" -Error converting image to RGB- ");
+    }
 
   // display some of the resulting data
       for (uint32_t i = 0; i < resultsToShow; i++) {
-        // // x and y coordinate of the pixel
+        // // calculate x and y coordinate of the pixel
         //   uint16_t x = i % fb->width;
         //   uint16_t y = floor(i / fb->width);
         if (i%3 == 0) tReply+="B";
@@ -765,16 +777,19 @@ void readRGBImage() {
       aRed = aRed / (fb->width * fb->height);
       aGreen = aGreen / (fb->width * fb->height);
       aBlue = aBlue / (fb->width * fb->height);
-      tReply+=" Average Red = " + String(aRed);
+      tReply+=" - Average Blue = " + String(aBlue);
       tReply+=", Average Green = " + String(aGreen);
-      tReply+=", Average Blue = " + String(aBlue);
+      tReply+=", Average Red = " + String(aRed);
       
-  // free up memory
+  // erase the stored images to free up psram
     esp_camera_fb_return(fb);
     heap_caps_free(ptrVal);
 
-  Serial.println(tReply);
-  server.send ( 404, "text/plain", tReply);
+  if (debugInfo) {
+    if (debugInfo) Serial.println("Finishing RGB procedure at millis=" + String(millis()));
+    Serial.println(tReply);          // send info via serial port
+  }
+  server.send ( 404, "text/plain", tReply);       // send info via web page
   
 }  // readRGBImage
 
