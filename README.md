@@ -49,6 +49,8 @@ http://x.x.x.x/rgb           Captures an image and converts to RGB data (will no
 Notes
 -----
 
+This looks like it may contain useful info. on another way of getting RGB data from the camera: https://eloquentarduino.github.io/2020/01/image-recognition-with-esp32-and-arduino/
+
 These modules require a good 5volt power supply.  I find it best to put a good sized smoothing capacitor across the 5volts.
 If you get strange error messages, random reboots, wifi dropping etc. first thing to do is make sure it is not a power problem.
 
