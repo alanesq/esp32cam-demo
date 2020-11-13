@@ -719,77 +719,93 @@ void handleNotFound() {
 //    note: Will fail on the highest resolution as it requires more than 4mb to store the data (in psram)
 
 void readRGBImage() {
-
-  uint32_t resultsToShow = 50;     // how much data to display
     
   String tReply = "LIVE IMAGE AS RGB DATA: ";      // reply to send to web client and serial port
   if (debugInfo) Serial.println("Starting RGB procedure at millis=" + String(millis()));
 
-  // capture live image (jpg)
+
+  // capture a live image (jpg)
     camera_fb_t * fb = NULL;
     fb = esp_camera_fb_get();  
-    if (!fb) {
+    if (!fb) {                                                              // check for error when capturing image
       tReply+=" -Error capturing image from camera- ";  
-      Serial.println (" -Error capturing image from camera- ");
+      Serial.println ("Error capturing image from camera");
     }
     tReply+="(Image resolution=" + String(fb->width) + "x" + String(fb->height) + ")";         // display image resolution         
+
     
-  // allocate memory to store rgb data in psram
-    if (!psramFound()) {
+  // allocate memory to store rgb data (in psram)
+    if (!psramFound()) {                                                    // check the esp32 module has a psram chip
       tReply+=" -Error no psram found- ";
-      Serial.println (" -Error no psram found- ");
+      Serial.println ("Error: no psram found");
     }
     if (debugInfo) Serial.println("Free psram before rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
-    void *ptrVal = NULL;
-    uint32_t ARRAY_LENGTH = fb->width * fb->height * 3;               // number of pixels in the jpg image x 3
-    if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM) <  ARRAY_LENGTH) tReply+=" -Error not enough free psram to store the rgb data- ";      // check free memory in psram
-    ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);   
-    uint8_t *rgb = (uint8_t *)ptrVal;
+    void *ptrVal = NULL;                                                    // create a pointer for memory location to store the data
+    uint32_t ARRAY_LENGTH = fb->width * fb->height * 3;                     // calculate memory required to store the RGB data (i.e. number of pixels in the jpg image x 3)
+    if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM) <  ARRAY_LENGTH) {      // check there is enough free memory in psram to store the RGB data
+      tReply+=" -Error not enough free psram to store the rgb data- ";     
+      if (debugInfo) Serial.println("Error: not enough free psram to store the rgb data");
+    }
+    ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);             // allocate memory space for the rgb data 
+    uint8_t *rgb = (uint8_t *)ptrVal;                                       // create the 'rgb' array pointer to the allocated memory space
     if (debugInfo) Serial.println("Free psram after rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
+
   
-  // convert jpg to rgb data (stored in array 'rgb')
+  // convert the captured jpg image (fb) to rgb data (stored in 'rgb' array)
     bool jpeg_converted = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);     
-    if (!jpeg_converted) {
+    if (!jpeg_converted) {                                                  // check for error converting image
       tReply+=" -Error converting image to RGB- "; 
       Serial.println (" -Error converting image to RGB- ");
     }
 
-  // display some of the resulting data
-      for (uint32_t i = 0; i < resultsToShow; i++) {
-        // // calculate x and y coordinate of the pixel
-        //   uint16_t x = i % fb->width;
-        //   uint16_t y = floor(i / fb->width);
-        if (i%3 == 0) tReply+="B";
-        else if (i%3 == 1) tReply+="G";
-        else if (i%3 == 2) tReply+="R";
-        tReply+= String(rgb[i]) + ",";
-      }
 
-  // find the average values for each colour over entire image
-      uint32_t aRed = 0;
-      uint32_t aGreen = 0;
-      uint32_t aBlue = 0;
-      for (uint32_t i = 0; i < (ARRAY_LENGTH - 2); i+=3) {         // go through all data and add up totals
-        aBlue+=rgb[i];
-        aGreen+=rgb[i+1];
-        aRed+=rgb[i+2];
-      }    
-      aRed = aRed / (fb->width * fb->height);
-      aGreen = aGreen / (fb->width * fb->height);
-      aBlue = aBlue / (fb->width * fb->height);
-      tReply+=" - Average Blue = " + String(aBlue);
-      tReply+=", Average Green = " + String(aGreen);
-      tReply+=", Average Red = " + String(aRed);
-      
-  // erase the stored images to free up psram
+
+
+  // examples of reading the resulting RGB data
+
+    uint32_t resultsToShow = 50;                                   // how much data to display
+
+    // display some of the resulting data
+        for (uint32_t i = 0; i < resultsToShow; i++) {
+          if (i%3 == 0) tReply+="B";                               // 1st byte in series of three
+          else if (i%3 == 1) tReply+="G";                          // 2nd byte in series of three
+          else if (i%3 == 2) tReply+="R";                          // 3rd byte in series of three
+          tReply+= String(rgb[i]) + ",";                           // the value associated with this colour
+          // // how to calculate the x and y coordinate of the pixel
+          //   uint16_t x = i % fb->width;
+          //   uint16_t y = floor(i / fb->width);
+        }
+        
+  
+    // find the average values for each colour over entire image
+        uint32_t aRed = 0;
+        uint32_t aGreen = 0;
+        uint32_t aBlue = 0;
+        for (uint32_t i = 0; i < (ARRAY_LENGTH - 2); i+=3) {         // go through all data and add up totals
+          aBlue+=rgb[i];
+          aGreen+=rgb[i+1];
+          aRed+=rgb[i+2];
+        }    
+        aRed = aRed / (fb->width * fb->height);                      // divide total by number of pixels to give the average value
+        aGreen = aGreen / (fb->width * fb->height);
+        aBlue = aBlue / (fb->width * fb->height);
+        tReply+=" - Average Blue = " + String(aBlue);
+        tReply+=", Average Green = " + String(aGreen);
+        tReply+=", Average Red = " + String(aRed);
+
+        
+
+        
+  // finished with the data so free up the space used in psram 
     esp_camera_fb_return(fb);
     heap_caps_free(ptrVal);
 
-  if (debugInfo) {
-    if (debugInfo) Serial.println("Finishing RGB procedure at millis=" + String(millis()));
-    Serial.println(tReply);          // send info via serial port
+  if (debugInfo) {                                                   // send results to serial port
+    Serial.println("Finishing RGB procedure at millis=" + String(millis()));
+    Serial.println(tReply);   
   }
-  server.send ( 404, "text/plain", tReply);       // send info via web page
+  
+  server.send ( 404, "text/plain", tReply);                          // send results via web page
   
 }  // readRGBImage
 
