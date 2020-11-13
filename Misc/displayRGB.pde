@@ -37,7 +37,7 @@ void setup() {
     rgbFile = loadBytes(fileName);
     print(fileName + " file size = ");
     println(rgbFile.length);
-    println("Drawing image...");
+    print("Drawing image");
   
   size(640,480);        // display screen size
   background(0);        // background colour of screen (0 = black)
@@ -58,9 +58,10 @@ void draw() {
   for(int i = 0; i < (rgbFile.length - 2); i+=3) {
       // Calculate x and y location in image  
         xPos = (i / 3) % resX;
-        yPos = floor( (i / 3) / resX);
+        yPos = floor( (i / 3) / resX );
       stroke(rgbFile[i+2] & 0xff,rgbFile[i+1] & 0xff,rgbFile[i+0] & 0xff);
-      point(resX-xPos,yPos);
+      point(xPos,yPos);
+      if ( (i % 5000) == 0 ) print(".");       // show progress
    }
 
  println("Finished");
