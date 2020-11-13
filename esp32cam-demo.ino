@@ -10,10 +10,8 @@
  *        flash led is still available for use on pin 4 and does not flash when accessing sd card
  * 
  *     
- *     - created using the Arduino IDE with ESP32 module installed   (https://dl.espressif.com/dl/package_esp32_index.json)
- *       No additional libraries required
- * 
- *     ESP32 support for Arduino IDE: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+ *     Created using the Arduino IDE with ESP32 module installed, no additional libraries required
+ *        ESP32 support for Arduino IDE: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
  * 
  *     Info on the esp32cam board:  https://randomnerdtutorials.com/esp32-cam-video-streaming-face-recognition-arduino-ide/
  *            
@@ -31,7 +29,6 @@
 #include "esp_camera.h"       // https://github.com/espressif/esp32-camera
 #include <WiFi.h>
 #include <WebServer.h>
-#include "fd_forward.h"       // required for converting frame to RGB?
 
 
 // ---------------------------------------------------------------
@@ -42,7 +39,7 @@
   const char* ssid     = "<your wifi network name here>";
   const char* password = "<your wifi password here>";
 
-  const char* stitle = "ESP32Cam-demo";              // title of this sketch
+  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
   const char* sversion = "13Nov20";                      // Sketch version
 
   const bool debugInfo = 1;                              // show additional debug info. on serial port (1=enabled)
@@ -50,21 +47,21 @@
   // Camera related
   const bool flashRequired = 1;                          // If flash to be used when capturing image (1 = yes)
   const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA;    // Image resolution:   
-                                                         //               default = "const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_XGA"
+                                                         //               default = "const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA"
                                                          //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 
                                                          //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 
                                                          //               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
-  int cameraImageExposure = 0;                           // Camera exposure (0 - 1200), if gain and exposure set to zero then auto adjust is enabled
+  int cameraImageExposure = 0;                           // Camera exposure (0 - 1200)   If gain and exposure both set to zero then auto adjust is enabled
   int cameraImageGain = 0;                               // Image gain (0 - 30)
 
-  const int TimeBetweenStatus = 600;                     // speed of flashing system running ok status light (milliseconds)
+  const int TimeBetweenStatus = 600;                     // speed of system running ok status light (milliseconds)
 
   const int indicatorLED = 33;                           // onboard status LED pin (33)
 
   const int brightLED = 4;                               // onboard flash LED pin (4)
 
-  const int iopinA = 13;                                 // general io pin
-  const int iopinB = 12;                                 // general io pin (must be low at boot)
+  const int iopinA = 13;                                 // general io pin 13
+  const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
   
   const int serialSpeed = 115200;                        // Serial data speed to use
 
@@ -88,12 +85,11 @@ WebServer server(80);                       // serve web pages on port 80
   uint32_t lastCamera = millis();           // timer for periodic image capture
   bool sdcardPresent;                       // flag if an sd card is detected
   int imageCounter;                         // image file name on sd card counter
-  String tReply;                            // temp text store
 
 // camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
 //     see: https://randomnerdtutorials.com/esp32-cam-camera-pin-gpios/
   #define CAMERA_MODEL_AI_THINKER
-  #define PWDN_GPIO_NUM     32      // power to camera on/off
+  #define PWDN_GPIO_NUM     32      // power to camera (on/off)
   #define RESET_GPIO_NUM    -1      // -1 = not used
   #define XCLK_GPIO_NUM      0
   #define SIOD_GPIO_NUM     26      // i2c sda
@@ -148,7 +144,7 @@ void setup() {
     Serial.print("\nWiFi connected, ");
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
-    server.begin();
+    server.begin();                               // start web server
     digitalWrite(indicatorLED,HIGH);              // small indicator led off
 
   // define the web pages (i.e. call these procedures when url is requested)
@@ -156,7 +152,7 @@ void setup() {
     server.on("/stream", handleStream);           // stream live video
     server.on("/photo", handlePhoto);             // save image to sd card
     server.on("/img", handleImg);                 // show image from sd card
-    server.on("/rgb", readRGBImage);              // capture image and convert to RGB
+    server.on("/rgb", readRGBImage);              // demo converting image to RGB
     server.onNotFound(handleNotFound);            // invalid url requested
 
   // set up camera
@@ -247,14 +243,14 @@ void loop() {
 
 
 
-//  //  Capture an image and save to sd card every 5 seconds 
+//  //  Capture an image and save to sd card every 5 seconds (i.e. time lapse)
 //      if ((unsigned long)(millis() - lastCamera) >= 5000) { 
 //        lastCamera = millis();     // reset timer
 //        storeImage();              // save an image to sd card
 //      }
  
     
-  // flash status LED to show sketch is running 
+  // flash status LED to show sketch is running ok
     if ((unsigned long)(millis() - lastStatus) >= TimeBetweenStatus) { 
       lastStatus = millis();                                               // reset timer
       digitalWrite(indicatorLED,!digitalRead(indicatorLED));               // flip indicator led status
@@ -465,6 +461,7 @@ bool storeImage() {
 // ----------------------------------------------------------------
 //       -root web page requested    i.e. http://x.x.x.x/
 // ----------------------------------------------------------------
+// Control buttons, links etc.
 
 void handleRoot() {
 
@@ -632,7 +629,7 @@ void handlePhoto() {
 
 
 // ----------------------------------------------------------------
-//    -show image from sd card    i.e. http://x.x.x.x/img?img=x
+//  -show images stored on sd card    i.e. http://x.x.x.x/img?img=x
 // ----------------------------------------------------------------
 // default image = most recent
 // returns 1 if image displayed ok
@@ -683,8 +680,11 @@ bool handleImg() {
 // ----------------------------------------------------------------
 //                      -invalid web page requested
 // ----------------------------------------------------------------
+// Note: shows a different way to send the HTML reply
 
 void handleNotFound() {
+
+  String tReply;
 
   // log page request
     if (debugInfo) {
@@ -714,7 +714,7 @@ void handleNotFound() {
 
 
 // ----------------------------------------------------------------
-//       Access image data as RGB - i.e. http://x.x.x.x/rgb
+//      -access image data as RGB - i.e. http://x.x.x.x/rgb
 // ----------------------------------------------------------------
 //    Info. from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
 //    note: Will fail on the highest resolution as it requires more than 4mb to store the data (in psram)
@@ -732,8 +732,8 @@ void readRGBImage() {
   // html header
     client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");         // basic html header
     
-  MessageRGB(client,"LIVE IMAGE AS RGB DATA");                                       // reply to send to web client and serial port
-  MessageRGB(client,"Starting RGB procedure at millis=" + String(millis()));
+  MessageRGB(client,"LIVE IMAGE AS RGB DATA");                                                             // 'MessageRGB' sends the String to both serial port and web page
+  MessageRGB(client,"Starting RGB procedure at millis=" + String(millis())); // so you can see how long it takes to execute this code
 
 
 
@@ -764,10 +764,13 @@ void readRGBImage() {
 
 
   //   ****** examples of reading the resulting RGB data *****
-
-    uint32_t resultsToShow = 50;                                   // how much data to display
-
+ 
+    // Note: You can send the entire image with the command:   client.write(rgb, ARRAY_LENGTH);
+    //       If this is all that is sent then it will download to the client as a raw RGB file which you can then view using this
+    //       Processing sketch: https://github.com/alanesq/esp32cam-demo/blob/master/Misc/displayRGB.pde
+     
     // display some of the resulting data
+        uint32_t resultsToShow = 50;                                // how much data to display
         MessageRGB(client,"R , G , B");
         for (uint32_t i = 0; i < resultsToShow-2; i+=3) {
           MessageRGB(client,String(rgb[i+2]) + "," + String(rgb[i+1]) + "," + String(rgb[i+0]));               // Red , Green , Blue
@@ -790,8 +793,8 @@ void readRGBImage() {
         aBlue = aBlue / (fb->width * fb->height);
         MessageRGB(client,"Average Blue = " + String(aBlue));
         MessageRGB(client,"Average Green = " + String(aGreen));
-        MessageRGB(client,"Average Red = " + String(aRed));
-
+        MessageRGB(client,"Average Red = " + String(aRed));   
+        
 
   //   *******************************************************
   
@@ -814,7 +817,7 @@ void readRGBImage() {
 // send line of text to both serial port and web page
 void MessageRGB(WiFiClient &client, String theText) {
       client.print(theText + "<br>\n");      
-      if (debugInfo || theText.indexOf('error') > 0) Serial.println (theText);      
+      if (debugInfo || theText.indexOf('error') > 0) Serial.println(theText);      
 }
 
 
