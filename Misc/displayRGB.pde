@@ -1,12 +1,16 @@
+/* 
 
-// PROCESSING file to read a raw rgb data file and display it
+       PROCESSING file to read a raw rgb data file and display it
 
-//                       Alanesq - 13Nov20
+                             Alanesq - 13Nov20
 
-// ----------------------------------------------------------
+       for info on coding with Processing see: https://thecodingtrain.com/
 
 
-// Settings
+// ---------------------------------------------------------- */
+
+
+// General Settings
 
 // image file to read (raw RGB)
   String fileName = "q.rgb";
@@ -17,6 +21,7 @@
 
 
 // ----------------------------------------------------------
+
 
 // Misc variables 
 
@@ -32,10 +37,11 @@ void setup() {
     rgbFile = loadBytes(fileName);
     print(fileName + " file size = ");
     println(rgbFile.length);
+    println("Drawing image...");
   
-  size(640,480);        // screen size
+  size(640,480);        // display screen size
   background(0);        // background colour of screen (0 = black)
-  noLoop();             // do not keep redrawing the screen
+  noLoop();             // do not keep looping the draw procedure
   
 }  // setup
 
@@ -47,15 +53,15 @@ void draw() {
   
   int xPos;
   int yPos;
-  
-  // work through the RGB file plotting each pixel on the screen
+    
+  // work through the RGB file plotting each individual colour pixel on the screen
   for(int i = 0; i < (rgbFile.length - 2); i+=3) {
       // Calculate x and y location in image  
         xPos = (i / 3) % resX;
         yPos = floor( (i / 3) / resX);
       stroke(rgbFile[i+2] & 0xff,rgbFile[i+1] & 0xff,rgbFile[i+0] & 0xff);
       point(resX-xPos,yPos);
-    }
+   }
 
  println("Finished");
 
