@@ -43,7 +43,7 @@
   const char* password = "<your wifi password here>";
 
   const char* stitle = "ESP32Cam-demo";              // title of this sketch
-  const char* sversion = "12Nov20";                      // Sketch version
+  const char* sversion = "13Nov20";                      // Sketch version
 
   const bool debugInfo = 1;                              // show additional debug info. on serial port (1=enabled)
 
@@ -88,6 +88,7 @@ WebServer server(80);                       // serve web pages on port 80
   uint32_t lastCamera = millis();           // timer for periodic image capture
   bool sdcardPresent;                       // flag if an sd card is detected
   int imageCounter;                         // image file name on sd card counter
+  String tReply;                            // temp text store
 
 // camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
 //     see: https://randomnerdtutorials.com/esp32-cam-camera-pin-gpios/
@@ -690,21 +691,21 @@ void handleNotFound() {
       Serial.print("Invalid page requested");
     }
   
-  String message = "File Not Found\n\n";
-  message += "URI: ";
-  message += server.uri();
-  message += "\nMethod: ";
-  message += ( server.method() == HTTP_GET ) ? "GET" : "POST";
-  message += "\nArguments: ";
-  message += server.args();
-  message += "\n";
+  tReply = "File Not Found\n\n";
+  tReply += "URI: ";
+  tReply += server.uri();
+  tReply += "\nMethod: ";
+  tReply += ( server.method() == HTTP_GET ) ? "GET" : "POST";
+  tReply += "\nArguments: ";
+  tReply += server.args();
+  tReply += "\n";
 
   for ( uint8_t i = 0; i < server.args(); i++ ) {
-    message += " " + server.argName ( i ) + ": " + server.arg ( i ) + "\n";
+    tReply += " " + server.argName ( i ) + ": " + server.arg ( i ) + "\n";
   }
 
-  server.send ( 404, "text/plain", message );
-  message = "";      // clear variable
+  server.send ( 404, "text/plain", tReply );
+  tReply = "";      // clear variable
   
 }  // handleNotFound
 
@@ -719,64 +720,62 @@ void handleNotFound() {
 //    note: Will fail on the highest resolution as it requires more than 4mb to store the data (in psram)
 
 void readRGBImage() {
+
+  WiFiClient client = server.client();                 // open link with client
+
+  // log page request including clients IP address
+    if (debugInfo) {
+      IPAddress cip = client.remoteIP();
+      Serial.printf("RGB requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+    }
+
+  // html header
+    client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");         // basic html header
     
-  String tReply = "LIVE IMAGE AS RGB DATA: ";      // reply to send to web client and serial port
-  if (debugInfo) Serial.println("Starting RGB procedure at millis=" + String(millis()));
+  MessageRGB(client,"LIVE IMAGE AS RGB DATA");                                       // reply to send to web client and serial port
+  MessageRGB(client,"Starting RGB procedure at millis=" + String(millis()));
 
 
-  // capture a live image (jpg)
-    camera_fb_t * fb = NULL;
-    fb = esp_camera_fb_get();  
-    if (!fb) {                                                              // check for error when capturing image
-      tReply+=" -Error capturing image from camera- ";  
-      Serial.println ("Error capturing image from camera");
-    }
-    tReply+="(Image resolution=" + String(fb->width) + "x" + String(fb->height) + ")";         // display image resolution         
 
-    
-  // allocate memory to store rgb data (in psram)
-    if (!psramFound()) {                                                    // check the esp32 module has a psram chip
-      tReply+=" -Error no psram found- ";
-      Serial.println ("Error: no psram found");
-    }
-    if (debugInfo) Serial.println("Free psram before rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
-    void *ptrVal = NULL;                                                    // create a pointer for memory location to store the data
-    uint32_t ARRAY_LENGTH = fb->width * fb->height * 3;                     // calculate memory required to store the RGB data (i.e. number of pixels in the jpg image x 3)
-    if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM) <  ARRAY_LENGTH) {      // check there is enough free memory in psram to store the RGB data
-      tReply+=" -Error not enough free psram to store the rgb data- ";     
-      if (debugInfo) Serial.println("Error: not enough free psram to store the rgb data");
-    }
-    ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);             // allocate memory space for the rgb data 
-    uint8_t *rgb = (uint8_t *)ptrVal;                                       // create the 'rgb' array pointer to the allocated memory space
-    if (debugInfo) Serial.println("Free psram after rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
-
+  //   ****** main code for converting captured image to RGB *****
   
-  // convert the captured jpg image (fb) to rgb data (stored in 'rgb' array)
-    bool jpeg_converted = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);     
-    if (!jpeg_converted) {                                                  // check for error converting image
-      tReply+=" -Error converting image to RGB- "; 
-      Serial.println (" -Error converting image to RGB- ");
-    }
+    // capture a live image from camera (jpg)
+      camera_fb_t * fb = NULL;
+      fb = esp_camera_fb_get();  
+      if (!fb) MessageRGB(client," -error capturing image from camera- ");  
+      MessageRGB(client,"Image resolution=" + String(fb->width) + "x" + String(fb->height));                // display image resolution         
+  
+      
+    // allocate memory to store rgb data (in psram)
+      if (!psramFound()) MessageRGB(client," -error no psram found- ");
+      MessageRGB(client,"Free psram before rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
+      void *ptrVal = NULL;                                                    // create a pointer for memory location to store the data
+      uint32_t ARRAY_LENGTH = fb->width * fb->height * 3;                     // calculate memory required to store the RGB data (i.e. number of pixels in the jpg image x 3)
+      if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM) <  ARRAY_LENGTH) MessageRGB(client," -error: not enough free psram to store the rgb data- ");
+      ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);             // allocate memory space for the rgb data 
+      uint8_t *rgb = (uint8_t *)ptrVal;                                       // create the 'rgb' array pointer to the allocated memory space
+      MessageRGB(client,"Free psram after rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
+  
+    
+    // convert the captured jpg image (fb) to rgb data (stored in 'rgb' array)
+      bool jpeg_converted = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);     
+      if (!jpeg_converted) MessageRGB(client," -error converting image to RGB- "); 
 
 
 
-
-  // examples of reading the resulting RGB data
+  //   ****** examples of reading the resulting RGB data *****
 
     uint32_t resultsToShow = 50;                                   // how much data to display
 
     // display some of the resulting data
-        for (uint32_t i = 0; i < resultsToShow; i++) {
-          if (i%3 == 0) tReply+="B";                               // 1st byte in series of three
-          else if (i%3 == 1) tReply+="G";                          // 2nd byte in series of three
-          else if (i%3 == 2) tReply+="R";                          // 3rd byte in series of three
-          tReply+= String(rgb[i]) + ",";                           // the value associated with this colour
+        MessageRGB(client,"R , G , B");
+        for (uint32_t i = 0; i < resultsToShow-2; i+=3) {
+          MessageRGB(client,String(rgb[i+2]) + "," + String(rgb[i+1]) + "," + String(rgb[i+0]));               // Red , Green , Blue
           // // how to calculate the x and y coordinate of the pixel
           //   uint16_t x = i % fb->width;
           //   uint16_t y = floor(i / fb->width);
         }
         
-  
     // find the average values for each colour over entire image
         uint32_t aRed = 0;
         uint32_t aGreen = 0;
@@ -789,25 +788,34 @@ void readRGBImage() {
         aRed = aRed / (fb->width * fb->height);                      // divide total by number of pixels to give the average value
         aGreen = aGreen / (fb->width * fb->height);
         aBlue = aBlue / (fb->width * fb->height);
-        tReply+=" - Average Blue = " + String(aBlue);
-        tReply+=", Average Green = " + String(aGreen);
-        tReply+=", Average Red = " + String(aRed);
+        MessageRGB(client,"Average Blue = " + String(aBlue));
+        MessageRGB(client,"Average Green = " + String(aGreen));
+        MessageRGB(client,"Average Red = " + String(aRed));
 
-        
 
-        
+  //   *******************************************************
+  
+
+  MessageRGB(client,"Finishing RGB procedure at millis=" + String(millis()));
+
+  // end html
+    client.write("</body></html>\n");
+    delay(3);
+    client.stop();     
+
   // finished with the data so free up the space used in psram 
     esp_camera_fb_return(fb);
     heap_caps_free(ptrVal);
 
-  if (debugInfo) {                                                   // send results to serial port
-    Serial.println("Finishing RGB procedure at millis=" + String(millis()));
-    Serial.println(tReply);   
-  }
-  
-  server.send ( 404, "text/plain", tReply);                          // send results via web page
-  
 }  // readRGBImage
+
+
+
+// send line of text to both serial port and web page
+void MessageRGB(WiFiClient &client, String theText) {
+      client.print(theText + "<br>\n");      
+      if (debugInfo || theText.indexOf('error') > 0) Serial.println (theText);      
+}
 
 
 // ******************************************************************************************************************
