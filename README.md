@@ -63,6 +63,7 @@ I have heard reports of these modules getting very warm when in use although I h
 
 GPIO:
 io pins available for use are 13 and 12 (12 must not be high at boot)
+pin16 can be used but it has a 10k pullup resistor connected to it on this board for some reason so only good as an input
 You could also use 1 and 3 if you do not use Serial or 14,2&15 if not using SD Card
 Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
 
