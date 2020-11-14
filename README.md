@@ -3,8 +3,8 @@
 
 This can be used as a starting point sketch for your projects using the esp32cam development board, it has the following features
  *        web server with live video streaming and control buttons
- *        sd card support (using 1bit mode to free some io pins)
- *        io pins available for use are 12 and 13 (12 must be low at boot)
+ *        sd card support (using 1-bit mode - data pins are usually 2,4,12&13 but using 1bit mode only uses pin 2)
+ *        io pins available for use are 12 and 13 (12 must not be high at boot)
  *        flash led is still available for use on pin 4 when using an sd card
  *        Can read the image as RGB data  (i.e. 3 bytes per pixel for red green and blue value)
  
@@ -60,5 +60,10 @@ https://github.com/alanesq/CameraWifiMotion
 In the Misc folder there is a version of the sketch which includes NTP (Real time) support
 
 I have heard reports of these modules getting very warm when in use although I have not experienced this myself, I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
+
+GPIO:
+io pins available for use are 13 and 12 (12 must not be high at boot)
+You could also use 1 and 3 if you do not use Serial or 14,2&15 if not using SD Card
+Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
 
 
