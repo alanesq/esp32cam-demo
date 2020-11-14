@@ -40,7 +40,7 @@
   const char* password = "<your wifi password here>";
 
   const char* stitle = "ESP32Cam-demo";                  // title of this sketch
-  const char* sversion = "13Nov20";                      // Sketch version
+  const char* sversion = "14Nov20";                      // Sketch version
 
   const bool debugInfo = 1;                              // show additional debug info. on serial port (1=enabled)
 
@@ -198,7 +198,7 @@ void setup() {
             entry.close();
         }
         root.close();
-        Serial.printf("Image file count = %d",imageCounter);
+        Serial.printf("Image file count = %d \n",imageCounter);
     }
    
   // define io pins 
@@ -206,15 +206,17 @@ void setup() {
     digitalWrite(indicatorLED,HIGH);          // led off = High
     pinMode(brightLED, OUTPUT);               // flash LED
     digitalWrite(brightLED,LOW);              // led off = Low
-    pinMode(iopinA, OUTPUT);                  // pin 13 - free io pin, can be input or output
-    pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be input or output (must be low at boot)
+    pinMode(iopinA, OUTPUT);                  // pin 13 - free io pin, can be used for input or output
+    pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be used for input or output (must not be high at boot)
 
+  // check the esp32cam board has a psram chip installed (extra memory used for storing captured images)
+  //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, SPIFFS must be enabled
   if (!psramFound()) {
     Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
     framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_CIF;
   }
 
-  Serial.println("\n\nStarted...");
+  Serial.println("\nSetup complete...");
   
 }  // setup
 
@@ -237,19 +239,18 @@ void loop() {
 
 
   
-  //    <<< your code here >>>
+  //                           <<< YOUR CODE HERE >>>
 
 
 
 
 
-//  //  Capture an image and save to sd card every 5 seconds (i.e. time lapse)
+//  //  demo to Capture an image and save to sd card every 5 seconds (i.e. time lapse)
 //      if ((unsigned long)(millis() - lastCamera) >= 5000) { 
 //        lastCamera = millis();     // reset timer
 //        storeImage();              // save an image to sd card
 //      }
  
-    
   // flash status LED to show sketch is running ok
     if ((unsigned long)(millis() - lastStatus) >= TimeBetweenStatus) { 
       lastStatus = millis();                                               // reset timer
@@ -291,7 +292,8 @@ bool setupCameraHardware() {
     config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
     config.pixel_format = PIXFORMAT_JPEG;         // Options =  YUV422, GRAYSCALE, RGB565, JPEG, RGB888
     config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 
-                                                  //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
+                                                  //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 
+                                                  //              1600x1200 (UXGA)
     config.jpeg_quality = 5;                      // 0-63 lower number means higher quality
     config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
                  
@@ -311,19 +313,19 @@ bool setupCameraHardware() {
 // ----------------------------------------------------------------
 //                      -Change camera settings
 // ----------------------------------------------------------------
-// Adjust image properties (e.g. brightness)
+// Adjust image properties (brightness etc.)
 // Defaults to auto adjustments if exposure and gain are both set to zero
-// Note: White balance is disabled when manual settings applied to assist when using RGB data to compare colours
-// Returns TRUE if successful
+// - Returns TRUE if successful
 
 bool cameraImageSettings() { 
    
     sensor_t *s = esp_camera_sensor_get();       
     if (s == NULL) {
-      Serial.println("Error: problem getting camera sensor settings");
+      Serial.println("Error: problem reading camera sensor settings");
       return 0;
     } 
 
+    // if both set to zero enable auto adjust
     if (cameraImageExposure == 0 && cameraImageGain == 0) {              
       // enable auto adjust
         s->set_gain_ctrl(s, 1);                       // auto gain on 
@@ -332,7 +334,7 @@ bool cameraImageSettings() {
     } else {
       // Apply manual settings
         s->set_gain_ctrl(s, 0);                       // auto gain off 
-        s->set_awb_gain(s, 0);                        // Auto White Balance enable (0 or 1)
+        s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1)
         s->set_exposure_ctrl(s, 0);                   // auto exposure off 
         s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
         s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
@@ -716,8 +718,14 @@ void handleNotFound() {
 // ----------------------------------------------------------------
 //      -access image data as RGB - i.e. http://x.x.x.x/rgb
 // ----------------------------------------------------------------
-//    Info. from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
-//    note: Will fail on the highest resolution as it requires more than 4mb to store the data (in psram)
+// Notes:
+//        You can send the entire image over the web with the command:   client.write(rgb, ARRAY_LENGTH);
+//          If this is all that is sent then it will download to the client as a raw RGB file which you can then view using this
+//          Processing sketch: https://github.com/alanesq/esp32cam-demo/blob/master/Misc/displayRGB.pde
+//        You may want to disable auto white balance when experimenting with RGB otherwise the camera is always trying to adjust the 
+//          image colours to mainly white.   (disable in the 'camera settings' procedure).
+//        It will fail on the highest resolution (1600x1200) as it requires more than the 4mb of available psram to store the data (1600x1200x3 bytes)
+//        I discovered how to do this from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
 
 void readRGBImage() {
 
@@ -764,19 +772,15 @@ void readRGBImage() {
 
 
   //   ****** examples of reading the resulting RGB data *****
- 
-    // Note: You can send the entire image with the command:   client.write(rgb, ARRAY_LENGTH);
-    //       If this is all that is sent then it will download to the client as a raw RGB file which you can then view using this
-    //       Processing sketch: https://github.com/alanesq/esp32cam-demo/blob/master/Misc/displayRGB.pde
-     
+      
     // display some of the resulting data
         uint32_t resultsToShow = 50;                                // how much data to display
         MessageRGB(client,"R , G , B");
         for (uint32_t i = 0; i < resultsToShow-2; i+=3) {
           MessageRGB(client,String(rgb[i+2]) + "," + String(rgb[i+1]) + "," + String(rgb[i+0]));               // Red , Green , Blue
-          // // how to calculate the x and y coordinate of the pixel
-          //   uint16_t x = i % fb->width;
-          //   uint16_t y = floor(i / fb->width);
+          // // calculate the x and y coordinate of the current pixel
+          //   uint16_t x = (i / 3) % fb->width;
+          //   uint16_t y = floor( (i / 3) / fb->width);
         }
         
     // find the average values for each colour over entire image
