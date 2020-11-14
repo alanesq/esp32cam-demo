@@ -4,12 +4,16 @@
  *                                    Github: https://github.com/alanesq/ESP32Cam-demo
  *     
  *     Starting point sketch for projects using the esp32cam development board with the following features
- *        web server with live video streaming
- *        sd card support (using 1bit mode to free some io pins)
- *        io pins available for use are 13 and 12 (12 must be low at boot)
- *        flash led is still available for use on pin 4 and does not flash when accessing sd card
+ *        web server with live video streaming and RGB data from camera demonstrated.
+ *        sd card support using 1-bit mode (data pins are usually 2,4,12&13 but using 1bit mode only uses pin 2)
+ *        flash led is still available for use (pin 4) and does not flash when accessing sd card
  * 
- *     
+ *     GPIO:
+ *        io pins available for use are 13 and 12 (12 must not be high at boot)
+ *        pin16 can be used but it has a 10k pullup resistor connected to it on this board for some reason so only good as an input
+ *        You could also use 1 and 3 if you do not use Serial or 14,2&15 if not using SD Card
+ *        Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
+ *   
  *     Created using the Arduino IDE with ESP32 module installed, no additional libraries required
  *        ESP32 support for Arduino IDE: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
  * 
@@ -62,6 +66,7 @@
 
   const int iopinA = 13;                                 // general io pin 13
   const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
+  const int iopinC = 16;                                 // input only pin 16 (has a 10k pullup resistor)
   
   const int serialSpeed = 115200;                        // Serial data speed to use
 
@@ -153,6 +158,7 @@ void setup() {
     server.on("/photo", handlePhoto);             // save image to sd card
     server.on("/img", handleImg);                 // show image from sd card
     server.on("/rgb", readRGBImage);              // demo converting image to RGB
+    server.on("/test", handleTest);               // Testing procedure
     server.onNotFound(handleNotFound);            // invalid url requested
 
   // set up camera
@@ -208,6 +214,7 @@ void setup() {
     digitalWrite(brightLED,LOW);              // led off = Low
     pinMode(iopinA, OUTPUT);                  // pin 13 - free io pin, can be used for input or output
     pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be used for input or output (must not be high at boot)
+    pinMode(iopinC, INPUT);                   // pin 16 - free input only pin
 
   // check the esp32cam board has a psram chip installed (extra memory used for storing captured images)
   //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, SPIFFS must be enabled
@@ -546,11 +553,14 @@ void handleRoot() {
       else client.write("<p>No SD Card detected</p>\n");
 
     // io pin details
-      if (digitalRead(iopinA) == LOW) client.write("<p>Pin 13 is Low</p>\n");
-      else client.write("<p>Pin 13 is High</p>\n");
+      if (digitalRead(iopinA) == LOW) client.write("<p>Output Pin 13 is Low</p>\n");
+      else client.write("<p>Output Pin 13 is High</p>\n");
       
-      if (digitalRead(iopinB) == LOW) client.write("<p>Pin 12 is Low</p>\n");
-      else client.write("<p>Pin 12 is High</p>\n");
+      if (digitalRead(iopinB) == LOW) client.write("<p>Output Pin 12 is Low</p>\n");
+      else client.write("<p>Output Pin 12 is High</p>\n");
+      
+      if (digitalRead(iopinC) == LOW) client.write("<p>Input Pin 16 is Low</p>\n");
+      else client.write("<p>Input Pin 16 is High</p>\n");
 
 //    // touch input on the two gpio pins 
 //      client.printf("<p>Touch on pin 12: %d </p>\n", touchRead(T5) );
@@ -624,9 +634,6 @@ void handlePhoto() {
     client.stop();
 
 }  // handlePhoto
-
-
-
 
 
 
@@ -882,6 +889,46 @@ void handleStream(){
 
   
 }  // handleStream
+
+// ******************************************************************************************************************
+
+
+// ----------------------------------------------------------------
+//       -test procedure    i.e. http://x.x.x.x/test
+// ----------------------------------------------------------------
+
+void handleTest() {
+
+  WiFiClient client = server.client();                                                        // open link with client
+
+  // log page request including clients IP address
+    if (debugInfo) {
+      IPAddress cip = client.remoteIP();
+      Serial.printf("Test requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+    }
+
+  // html header
+    client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");         // basic html header
+
+
+
+
+  // html body
+    client.print("<p>Test Page</p>\n");
+
+
+
+
+
+
+
+     
+  // end html
+    client.write("</body></html>\n");
+    delay(3);
+    client.stop();
+
+}  // handleTest
 
 
 // ******************************************************************************************************************
