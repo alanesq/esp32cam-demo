@@ -9,10 +9,12 @@
  *        flash led is still available for use (pin 4) and does not flash when accessing sd card
  * 
  *     GPIO:
- *        io pins available for use are 13 and 12 (12 must not be high at boot)
- *        pin16 can be used but it has a 10k pullup resistor connected to it on this board for some reason so only good as an input
- *        You could also use 1 and 3 if you do not use Serial or 14,2&15 if not using SD Card
+ *        You can use io pins 13 and 12 for input or output (but 12 must not be high at boot)
+ *        pin 16 is used for psram but you may get away with using it as input for a button etc.
+ *        You could also use pins 1 & 3 for if you do not use Serial
+ *        Pins 14, 2 & 15 should be ok to use if you are not using an SD Card
  *        Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
+ *        More info:   https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
  *   
  *     Created using the Arduino IDE with ESP32 module installed, no additional libraries required
  *        ESP32 support for Arduino IDE: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
