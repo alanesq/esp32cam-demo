@@ -2,13 +2,14 @@
 <p align="center"><img src="/images/esp32cam.jpeg" width="80%"/></p>
 
 <pre>
-This can be used as a starting point sketch for your projects using the esp32cam development board, it has the following features
- *        web server with live video streaming and control buttons
- *        sd card support (using 1-bit mode - data pins are usually 2,4,12&13 but using 1bit mode only uses pin 2)
- *        io pins available for use are 12 and 13 (12 must not be high at boot)
- *        flash led is still available for use on pin 4 when using an sd card
- *        Can read the image as RGB data  (i.e. 3 bytes per pixel for red green and blue value)
- 
+This can be used as a starting point sketch for your projects using the esp32cam development board, 
+it has the following features:
+-web server with live video streaming and control buttons
+-sd card support (using 1-bit mode - data pins are usually 2,4,12&13 but using 1bit mode only uses pin 2)
+-io pins available for use are 12 and 13 (12 must not be high at boot)
+-flash led is still available for use on pin 4 when using an sd card
+-Can read the image as RGB data  (i.e. 3 bytes per pixel for red green and blue value)
+ </pre>
 I have tried to make the sketch as easy to follow/modify as possible with lots of comments etc. and no additional libraries used, as I found it quiet confusing as an ameteur trying to do much with this module and difficult to find easy to understand examples/explanations of what I wanted to do, so I am publishing this sketch in the hope it will encourage/help others to have a try with these powerful and VERY affordable modules.
 
 BTW - Even if you do not require the camera I think these modules have some uses in many projects as they are very cheap, have a built in sd card reader, 
@@ -37,15 +38,16 @@ Will capture an image and save it to the sd card
 
 There is a procedure which demonstarates how to get RGB data from an image which will allow for processing the images as data (http://x.x.x.x/rgb).
 
-
+<pre>
 URLs:
 http://x.x.x.x/              Hello message
 http://x.x.x.x/photo         Capture an image and save to sd card
 http://x.x.x.x/stream        Show live streaming video
 http://x.x.x.x/img           Show most recent image saved to sd card
 http://x.x.x.x/img?img=1     Show image number 1 on sd card
-http://x.x.x.x/rgb           Captures an image and converts to RGB data (will not work with the highest resolution images as there is not enough memory)
-
+http://x.x.x.x/rgb           Captures an image and converts to RGB data (will not work with the highest 
+                             resolution images as there is not enough memory)
+</pre>
 
 ----------------
 
@@ -71,5 +73,3 @@ You could also use 1 and 3 if you do not use Serial or 14,2&15 if not using SD C
 Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
 More info: https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
 
-
-</pre>
