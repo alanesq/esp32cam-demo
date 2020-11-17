@@ -1,6 +1,7 @@
 <h1>ESP32Cam-demo sketch for use with the Arduino IDE</h1>
 <p align="center"><img src="/images/esp32cam.jpeg" width="80%"/></p>
 
+<pre>
 This can be used as a starting point sketch for your projects using the esp32cam development board, it has the following features
  *        web server with live video streaming and control buttons
  *        sd card support (using 1-bit mode - data pins are usually 2,4,12&13 but using 1bit mode only uses pin 2)
@@ -71,3 +72,4 @@ Other possible pins you could solder directly to the esp32 module?    17, 9, 10,
 More info: https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
 
 
+</pre>
