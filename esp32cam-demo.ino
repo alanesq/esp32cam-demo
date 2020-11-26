@@ -11,7 +11,7 @@
  *     GPIO:
  *        You can use io pins 13 and 12 for input or output (but 12 must not be high at boot)
  *        pin 16 is used for psram but you may get away with using it as input for a button etc.
- *        You could also use pins 1 & 3 for if you do not use Serial
+ *        You could also use pins 1 & 3 if you do not use Serial
  *        Pins 14, 2 & 15 should be ok to use if you are not using an SD Card
  *        Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
  *        More info:   https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
@@ -42,11 +42,11 @@
 // ---------------------------------------------------------------
 
   // Wifi settings (enter your wifi network details)
-  const char* ssid     = "<your wifi network name here>";
-  const char* password = "<your wifi password here>";
+   const char* ssid     = "<your wifi network name here>";
+   const char* password = "<your wifi password here>";
 
   const char* stitle = "ESP32Cam-demo";                  // title of this sketch
-  const char* sversion = "14Nov20";                      // Sketch version
+  const char* sversion = "26Nov20";                      // Sketch version
 
   const bool debugInfo = 1;                              // show additional debug info. on serial port (1=enabled)
 
@@ -732,13 +732,14 @@ void handleNotFound() {
 //          If this is all that is sent then it will download to the client as a raw RGB file which you can then view using this
 //          Processing sketch: https://github.com/alanesq/esp32cam-demo/blob/master/Misc/displayRGB.pde
 //        You may want to disable auto white balance when experimenting with RGB otherwise the camera is always trying to adjust the 
-//          image colours to mainly white.   (disable in the 'camera settings' procedure).
+//          image colours to mainly white.   (disable in the 'cameraImageSettings' procedure).
 //        It will fail on the highest resolution (1600x1200) as it requires more than the 4mb of available psram to store the data (1600x1200x3 bytes)
-//        I discovered how to do this from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
+// - I discovered how to read the RGB data from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
 
 void readRGBImage() {
 
-  WiFiClient client = server.client();                 // open link with client
+  uint32_t tTimer;                                                                                           // used for timing operations
+  WiFiClient client = server.client();                                                                       // open link with client
 
   // log page request including clients IP address
     if (debugInfo) {
@@ -747,46 +748,46 @@ void readRGBImage() {
     }
 
   // html header
-    client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");         // basic html header
+    client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");          // basic html header
     
-  MessageRGB(client,"LIVE IMAGE AS RGB DATA");                                                             // 'MessageRGB' sends the String to both serial port and web page
-  MessageRGB(client,"Starting RGB procedure at millis=" + String(millis())); // so you can see how long it takes to execute this code
-
-
-
-  //   ****** main code for converting captured image to RGB *****
+  MessageRGB(client,"LIVE IMAGE AS RGB DATA");                                                              // 'MessageRGB' sends the String to both serial port and web page
   
-    // capture a live image from camera (jpg)
+  //   ****** the main code for converting an image to RGB data *****
+    
+    // capture a live image from camera (as a jpg)
       camera_fb_t * fb = NULL;
+      tTimer = millis();                                                                                    // store time that image capture started
       fb = esp_camera_fb_get();  
+      MessageRGB(client, "Image capture took " + String(millis() - tTimer) + " milliseconds");              // report time it took to capture an image
       if (!fb) MessageRGB(client," -error capturing image from camera- ");  
       MessageRGB(client,"Image resolution=" + String(fb->width) + "x" + String(fb->height));                // display image resolution         
-  
+
       
-    // allocate memory to store rgb data (in psram)
+    // allocate memory to store the rgb data (in psram, 3 bytes per pixel)
       if (!psramFound()) MessageRGB(client," -error no psram found- ");
       MessageRGB(client,"Free psram before rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
-      void *ptrVal = NULL;                                                    // create a pointer for memory location to store the data
-      uint32_t ARRAY_LENGTH = fb->width * fb->height * 3;                     // calculate memory required to store the RGB data (i.e. number of pixels in the jpg image x 3)
+      void *ptrVal = NULL;                                                                                 // create a pointer for memory location to store the data
+      uint32_t ARRAY_LENGTH = fb->width * fb->height * 3;                                                  // calculate memory required to store the RGB data (i.e. number of pixels in the jpg image x 3)
       if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM) <  ARRAY_LENGTH) MessageRGB(client," -error: not enough free psram to store the rgb data- ");
-      ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);             // allocate memory space for the rgb data 
-      uint8_t *rgb = (uint8_t *)ptrVal;                                       // create the 'rgb' array pointer to the allocated memory space
+      ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);                                          // allocate memory space for the rgb data 
+      uint8_t *rgb = (uint8_t *)ptrVal;                                                                    // create the 'rgb' array pointer to the allocated memory space
       MessageRGB(client,"Free psram after rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
   
     
-    // convert the captured jpg image (fb) to rgb data (stored in 'rgb' array)
+    // convert the captured jpg image (fb) to rgb data (store in 'rgb' array)
+      tTimer = millis();                                                                                   // store time that image conversion process started
       bool jpeg_converted = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);     
       if (!jpeg_converted) MessageRGB(client," -error converting image to RGB- "); 
-
+      MessageRGB(client, "Conversion from jpg to RGB took " + String(millis() - tTimer) + " milliseconds");// report how long the conversion took
 
 
   //   ****** examples of reading the resulting RGB data *****
       
     // display some of the resulting data
-        uint32_t resultsToShow = 50;                                // how much data to display
+        uint32_t resultsToShow = 60;                                                                       // how much data to display
         MessageRGB(client,"R , G , B");
         for (uint32_t i = 0; i < resultsToShow-2; i+=3) {
-          MessageRGB(client,String(rgb[i+2]) + "," + String(rgb[i+1]) + "," + String(rgb[i+0]));               // Red , Green , Blue
+          MessageRGB(client,String(rgb[i+2]) + "," + String(rgb[i+1]) + "," + String(rgb[i+0]));           // Red , Green , Blue
           // // calculate the x and y coordinate of the current pixel
           //   uint16_t x = (i / 3) % fb->width;
           //   uint16_t y = floor( (i / 3) / fb->width);
@@ -796,12 +797,12 @@ void readRGBImage() {
         uint32_t aRed = 0;
         uint32_t aGreen = 0;
         uint32_t aBlue = 0;
-        for (uint32_t i = 0; i < (ARRAY_LENGTH - 2); i+=3) {         // go through all data and add up totals
+        for (uint32_t i = 0; i < (ARRAY_LENGTH - 2); i+=3) {                                               // go through all data and add up totals
           aBlue+=rgb[i];
           aGreen+=rgb[i+1];
           aRed+=rgb[i+2];
         }    
-        aRed = aRed / (fb->width * fb->height);                      // divide total by number of pixels to give the average value
+        aRed = aRed / (fb->width * fb->height);                                                            // divide total by number of pixels to give the average value
         aGreen = aGreen / (fb->width * fb->height);
         aBlue = aBlue / (fb->width * fb->height);
         MessageRGB(client,"Average Blue = " + String(aBlue));
@@ -810,9 +811,7 @@ void readRGBImage() {
         
 
   //   *******************************************************
-  
 
-  MessageRGB(client,"Finishing RGB procedure at millis=" + String(millis()));
 
   // end html
     client.write("</body></html>\n");
@@ -892,6 +891,64 @@ void handleStream(){
   
 }  // handleStream
 
+
+// ******************************************************************************************************************
+
+
+// ----------------------------------------------------------------
+//                        request a web page
+// ----------------------------------------------------------------
+// Requests a web page and returns the result as a String
+//     parameters = ip address, page to request, port to use (usually 80)     e.g.   "alanesq.com","/index.htm",80
+
+String requestpage(const char* ip, String page, int port){
+
+  if (debugInfo) Serial.print("requesting web page: ");
+  if (debugInfo) Serial.println(page);
+  //log_system_message("requesting web page");     // system message
+
+  // Connect to the site 
+    WiFiClient client;
+    if (!client.connect(ip, port)) {
+      if (debugInfo) Serial.println("Connection failed :-(");
+      //log_system_message("web connection failed");     // system message
+      return "connection failed";
+    }  
+    if (debugInfo) Serial.println("Connected to host - sending request...");
+    
+    client.print(String("GET " + page + " HTTP/1.1\r\n") +
+                 "Host: " + ip + "\r\n" + 
+                 "Connection: close\r\n\r\n");
+  
+    if (debugInfo) Serial.println("Request sent - waiting for reply...");
+  
+    //Wait up to 2 seconds for server to respond then read response
+    int i = 0;
+    while ((!client.available()) && (i < 200)) {
+      delay(10);
+      i++;
+    }
+
+    // if reply received
+    //    info on receiving serial data:  https://forum.arduino.cc/index.php?topic=396450.
+    String wpage = "no reply received";
+    if (client.available()) {   
+      client.setTimeout(1200);          // timeout for readString() command
+      wpage = client.readString();      // just read all incoming data until timeout is reached - info on receiving serial data:  https://forum.arduino.cc/index.php?topic=396450.0
+      if (debugInfo) {
+        Serial.println("--------received web page-----------");
+        Serial.println(wpage);
+        Serial.println("------------------------------------");
+        Serial.flush();     // wait for data to finish sending
+      }
+    }
+    client.stop();    // close connection
+    if (debugInfo) Serial.println("Connection closed.");
+    
+  return wpage;
+}
+
+
 // ******************************************************************************************************************
 
 
@@ -916,7 +973,7 @@ void handleTest() {
 
 
   // html body
-    client.print("<p>Test Page</p>\n");
+    client.print("<h1>Test Page</h1>\n");
 
 
 
