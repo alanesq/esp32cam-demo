@@ -35,6 +35,7 @@
 #include "esp_camera.h"       // https://github.com/espressif/esp32-camera
 #include <WiFi.h>
 #include <WebServer.h>
+#include <HTTPClient.h>       // used by requestWebPage()
 
 
 // ---------------------------------------------------------------
@@ -226,7 +227,7 @@ void setup() {
   }
 
   Serial.println("\nSetup complete...");
-  
+
 }  // setup
 
 
@@ -491,7 +492,7 @@ void handleRoot() {
     //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1"); 
       if (server.hasArg("button1")) {
         digitalWrite(iopinA,!digitalRead(iopinA));             // toggle output pin on/off
-        if (debugInfo) Serial.println("Button 1 pressed");
+        if (debugInfo) Serial.println("Button 1 pressed");       
       }
   
     // if button2 was pressed (toggle io pin B)
@@ -892,6 +893,37 @@ void handleStream(){
 }  // handleStream
 
 
+// ----------------------------------------------------------------
+//             -request a web page (wifi client)
+// ----------------------------------------------------------------
+// usage example:     String q = requestWebPage("http://192.168.1.176:80/index.htm");
+// original code from: https://techtutorialsx.com/2017/05/19/esp32-http-get-requests/
+
+String requestWebPage(String urlRequested) {
+  
+  if ((WiFi.status() != WL_CONNECTED)) return "ERROR: Network not connected";
+  
+    HTTPClient http;
+    String payload;
+ 
+    http.begin(urlRequested);                                 //Specify the URL
+    int httpCode = http.GET();                                //Make the request
+ 
+    if (httpCode > 0) {                                       //Check for the returning code
+        payload = http.getString();
+        if (debugInfo) Serial.println(httpCode);
+        if (debugInfo) Serial.println(payload);
+      }
+    else {
+      Serial.println("Error on HTTP request");
+    }
+ 
+    http.end(); //Free the resources
+
+    return payload;
+}
+
+
 // ******************************************************************************************************************
 
 
@@ -913,10 +945,11 @@ void handleTest() {
     client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");         // basic html header
 
 
-
-
   // html body
     client.print("<h1>Test Page</h1>\n");
+
+
+
 
 
 
