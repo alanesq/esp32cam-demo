@@ -9,6 +9,7 @@ it has the following features:
 -io pins available for use are 12 and 13 (12 must not be high at boot)
 -flash led is still available for use on pin 4 when using an sd card
 -Can read the image as RGB data  (i.e. 3 bytes per pixel for red green and blue value)
+-Act as web client (reading the web page in to a string) - see requestWebPage()
  </pre>
 I have tried to make the sketch as easy to follow/modify as possible with lots of comments etc. and no additional libraries used, as I found it quiet confusing as an ameteur trying to do much with this module and difficult to find easy to understand examples/explanations of what I wanted to do, so I am publishing this sketch in the hope it will encourage/help others to have a try with these powerful and VERY affordable modules.
 
