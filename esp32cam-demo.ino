@@ -896,63 +896,6 @@ void handleStream(){
 
 
 // ----------------------------------------------------------------
-//                        request a web page
-// ----------------------------------------------------------------
-// Requests a web page and returns the result as a String
-//     parameters = ip address, page to request, port to use (usually 80)     e.g.   "alanesq.com","/index.htm",80
-
-String requestpage(const char* ip, String page, int port){
-
-  if (debugInfo) Serial.print("requesting web page: ");
-  if (debugInfo) Serial.println(page);
-  //log_system_message("requesting web page");     // system message
-
-  // Connect to the site 
-    WiFiClient client;
-    if (!client.connect(ip, port)) {
-      if (debugInfo) Serial.println("Connection failed :-(");
-      //log_system_message("web connection failed");     // system message
-      return "connection failed";
-    }  
-    if (debugInfo) Serial.println("Connected to host - sending request...");
-    
-    client.print(String("GET " + page + " HTTP/1.1\r\n") +
-                 "Host: " + ip + "\r\n" + 
-                 "Connection: close\r\n\r\n");
-  
-    if (debugInfo) Serial.println("Request sent - waiting for reply...");
-  
-    //Wait up to 2 seconds for server to respond then read response
-    int i = 0;
-    while ((!client.available()) && (i < 200)) {
-      delay(10);
-      i++;
-    }
-
-    // if reply received
-    //    info on receiving serial data:  https://forum.arduino.cc/index.php?topic=396450.
-    String wpage = "no reply received";
-    if (client.available()) {   
-      client.setTimeout(1200);          // timeout for readString() command
-      wpage = client.readString();      // just read all incoming data until timeout is reached - info on receiving serial data:  https://forum.arduino.cc/index.php?topic=396450.0
-      if (debugInfo) {
-        Serial.println("--------received web page-----------");
-        Serial.println(wpage);
-        Serial.println("------------------------------------");
-        Serial.flush();     // wait for data to finish sending
-      }
-    }
-    client.stop();    // close connection
-    if (debugInfo) Serial.println("Connection closed.");
-    
-  return wpage;
-}
-
-
-// ******************************************************************************************************************
-
-
-// ----------------------------------------------------------------
 //       -test procedure    i.e. http://x.x.x.x/test
 // ----------------------------------------------------------------
 
