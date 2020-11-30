@@ -74,3 +74,4 @@ You could also use 1 and 3 if you do not use Serial or 14,2&15 if not using SD C
 Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
 More info: https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
 
+                                                                https://github.com/alanesq/esp32cam-demo
