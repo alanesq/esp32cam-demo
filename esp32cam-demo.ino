@@ -49,7 +49,7 @@
   const char* stitle = "ESP32Cam-demo";                  // title of this sketch
   const char* sversion = "26Nov20";                      // Sketch version
 
-  const bool debugInfo = 1;                              // show additional debug info. on serial port (1=enabled)
+  const bool serialDebug = 1;                            // show additional debug info. on serial port (1=enabled)
 
   // Camera related
   const bool flashRequired = 1;                          // If flash to be used when capturing image (1 = yes)
@@ -424,9 +424,9 @@ void showError(int errorNo) {
 bool storeImage() {
 
   if (sdcardPresent) {
-    if (debugInfo) Serial.printf("Storing image #%d to sd card \n", imageCounter);
+    if (serialDebug) Serial.printf("Storing image #%d to sd card \n", imageCounter);
   } else {
-    if (debugInfo) Serial.println("Storing image requested but there is no sd card");
+    if (serialDebug) Serial.println("Storing image requested but there is no sd card");
     return 0;           // no sd card available so exit procedure
   }
 
@@ -450,7 +450,7 @@ bool storeImage() {
       flashLED(4);
     } else {
       if (file.write(fb->buf, fb->len)) {                                         // File created ok so save image to it
-        if (debugInfo) Serial.println("Image saved to sd card"); 
+        if (serialDebug) Serial.println("Image saved to sd card"); 
         tResult = 1;                                                              // set sucess flag
         imageCounter ++;                                                          // increment image counter
       } else {
@@ -480,7 +480,7 @@ void handleRoot() {
   WiFiClient client = server.client();                       // open link with client
 
   // log the page request including clients IP address
-    if (debugInfo) {
+    if (serialDebug) {
       IPAddress cip = client.remoteIP();
       Serial.printf("Root page requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
     }
@@ -492,19 +492,19 @@ void handleRoot() {
     //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1"); 
       if (server.hasArg("button1")) {
         digitalWrite(iopinA,!digitalRead(iopinA));             // toggle output pin on/off
-        if (debugInfo) Serial.println("Button 1 pressed");       
+        if (serialDebug) Serial.println("Button 1 pressed");       
       }
   
     // if button2 was pressed (toggle io pin B)
       if (server.hasArg("button2")) {
         digitalWrite(iopinB,!digitalRead(iopinB));             // toggle output pin on/off
-        if (debugInfo) Serial.println("Button 2 pressed");
+        if (serialDebug) Serial.println("Button 2 pressed");
       }
   
     // if button3 was pressed (toggle flash LED)
       if (server.hasArg("button3")) {
         digitalWrite(brightLED,!digitalRead(brightLED));       // toggle flash LED on/off
-        if (debugInfo) Serial.println("Button 3 pressed");
+        if (serialDebug) Serial.println("Button 3 pressed");
       }
 
     // if exposure was adjusted - cameraImageExposure
@@ -513,7 +513,7 @@ void handleRoot() {
           if (Tvalue != NULL) {
             int val = Tvalue.toInt();
             if (val >= 0 && val <= 1200 && val != cameraImageExposure) { 
-              if (debugInfo) Serial.printf("Exposure changed to %d\n", val);
+              if (serialDebug) Serial.printf("Exposure changed to %d\n", val);
               cameraImageExposure = val;
               cameraImageSettings();           // Apply camera image settings
             }
@@ -526,7 +526,7 @@ void handleRoot() {
             if (Tvalue != NULL) {
               int val = Tvalue.toInt();
               if (val >= 0 && val <= 31 && val != cameraImageGain) { 
-                if (debugInfo) Serial.printf("Gain changed to %d\n", val);
+                if (serialDebug) Serial.printf("Gain changed to %d\n", val);
                 cameraImageGain = val;
                 cameraImageSettings();          // Apply camera image settings
               }
@@ -612,7 +612,7 @@ void handlePhoto() {
   WiFiClient client = server.client();                                                        // open link with client
 
   // log page request including clients IP address
-    if (debugInfo) {
+    if (serialDebug) {
       IPAddress cip = client.remoteIP();
       Serial.printf("Photo requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
     }
@@ -651,7 +651,7 @@ bool handleImg() {
     WiFiClient client = server.client();                 // open link with client
 
   // log page request including clients IP address
-    if (debugInfo) {
+    if (serialDebug) {
       IPAddress cip = client.remoteIP();
       Serial.printf("Image display requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
       if (imageCounter == 0) Serial.println("Error: no images to display");
@@ -666,7 +666,7 @@ bool handleImg() {
         if (imgToShow < 1 || imgToShow > imageCounter) imgToShow = imageCounter;    // validate image number
       }
 
-    if (debugInfo) Serial.printf("Displaying image #%d from sd card", imgToShow);   
+    if (serialDebug) Serial.printf("Displaying image #%d from sd card", imgToShow);   
  
     String tFileName = "/img/" + String(imgToShow) + ".jpg";
     fs::FS &fs = SD_MMC;                                 // sd card file system
@@ -675,7 +675,7 @@ bool handleImg() {
         size_t sent = server.streamFile(timg, "image/jpeg");     // send the image
         timg.close();
     } else {
-      if (debugInfo) Serial.println("Error: image file not found");
+      if (serialDebug) Serial.println("Error: image file not found");
       WiFiClient client = server.client();                       // open link with client
       client.write("<!DOCTYPE html> <html> <body>\n");
       client.write("<p>Error: Image not found</p?\n");
@@ -699,7 +699,7 @@ void handleNotFound() {
   String tReply;
 
   // log page request
-    if (debugInfo) {
+    if (serialDebug) {
       Serial.print("Invalid page requested");
     }
   
@@ -743,7 +743,7 @@ void readRGBImage() {
   WiFiClient client = server.client();                                                                       // open link with client
 
   // log page request including clients IP address
-    if (debugInfo) {
+    if (serialDebug) {
       IPAddress cip = client.remoteIP();
       Serial.printf("RGB requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
     }
@@ -830,7 +830,7 @@ void readRGBImage() {
 // send line of text to both serial port and web page
 void MessageRGB(WiFiClient &client, String theText) {
       client.print(theText + "<br>\n");      
-      if (debugInfo || theText.indexOf('error') > 0) Serial.println(theText);      
+      if (serialDebug || theText.indexOf('error') > 0) Serial.println(theText);      
 }
 
 
@@ -847,7 +847,7 @@ void handleStream(){
   WiFiClient client = server.client();          // open link with client
 
   // log page request including clients IP address
-    if (debugInfo) {
+    if (serialDebug) {
       IPAddress cip = client.remoteIP();
       Serial.printf("Video stream requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
     }
@@ -885,7 +885,7 @@ void handleStream(){
       esp_camera_fb_return(fb);                   // return image so memory can be released
   }
   
-  if (debugInfo) Serial.println("Video stream stopped");
+  if (serialDebug) Serial.println("Video stream stopped");
   delay(3);
   client.stop();
 
@@ -893,35 +893,79 @@ void handleStream(){
 }  // handleStream
 
 
-// ----------------------------------------------------------------
-//             -request a web page (wifi client)
-// ----------------------------------------------------------------
-// usage example:     String q = requestWebPage("http://192.168.1.176:80/index.htm");
-// original code from: https://techtutorialsx.com/2017/05/19/esp32-http-get-requests/
+// ******************************************************************************************************************
 
-String requestWebPage(String urlRequested) {
+
+// ----------------------------------------------------------------
+//                        request a web page
+// ----------------------------------------------------------------
+// requests a web page and returns reply as a string
+//  parameters = ip address, page to request, port to use (usually 80), maximum chars to receive     e.g. "alanesq.com","/index.htm",80,600
+
+String requestWebPage(String ip, String page, int port, int maxChars){
+
+  if (!page.startsWith("/")) page = "/" + page;           // make sure page begins with "/" 
+
+  if (serialDebug) {
+    Serial.print("requesting web page: ");
+    Serial.print(ip);
+    Serial.println(page);
+  }
+     
+    WiFiClient client;
+
+    // Connect to the site 
+      if (!client.connect(ip.c_str() , port)) {                                      
+        if (serialDebug) Serial.println("Web client connection failed");   
+        return "web client connection failed";
+      } 
+      if (serialDebug) Serial.println("Connected to host - sending request...");
+    
+    // send request - A basic request looks something like: "GET /index.html HTTP/1.1\r\nHost: 192.168.0.4:8085\r\n\r\n"
+      client.print("GET " + page + " HTTP/1.1\r\n" +
+                   "Host: " + ip + "\r\n" + 
+                   "Connection: close\r\n\r\n");
   
-  if ((WiFi.status() != WL_CONNECTED)) return "ERROR: Network not connected";
+      if (serialDebug) Serial.println("Request sent - waiting for reply...");
   
-    HTTPClient http;
-    String payload;
- 
-    http.begin(urlRequested);                                 //Specify the URL
-    int httpCode = http.GET();                                //Make the request
- 
-    if (httpCode > 0) {                                       //Check for the returning code
-        payload = http.getString();
-        if (debugInfo) Serial.println(httpCode);
-        if (debugInfo) Serial.println(payload);
+    // Wait for server to respond then read response
+      int maxWaitTime = 3000;                                                // max time to wait for reply (ms)
+      int i = 0;
+      while ((!client.available()) && (i < (maxWaitTime / 10) )) {
+        delay(10);
+        i++;
       }
-    else {
-      Serial.println("Error on HTTP request");
-    }
- 
-    http.end(); //Free the resources
 
-    return payload;
+    // if reply received read data
+      String wpage = "";
+      // read response in to wpage
+        while (client.available() > 0 && maxChars > 0) {
+          #if defined ESP8266
+            delay(2);                            // just reads 255s on esp8266 if this delay is not included (not sure about esp32S?)
+          #endif
+          wpage += char(client.read());          // read one character
+          maxChars--;
+        }
+        
+////    alternative way to read the data
+//      int rTimeout = 1500;                       // timeout waiting for reply data (ms)
+//      client.setTimeout(rTimeout);               // timeout for readString() command
+//      String wpage = client.readString();        // just read all incoming data until timeout is reached
+
+      
+    if (serialDebug) {
+      Serial.println("--------received web page-----------");
+      Serial.println(wpage);
+      Serial.println("------------------------------------");
+      Serial.flush();     // wait for data to finish sending
+    }
+    
+    client.stop();    // close connection
+    if (serialDebug) Serial.println("Connection closed");
+    
+  return wpage;
 }
+
 
 
 // ******************************************************************************************************************
@@ -936,7 +980,7 @@ void handleTest() {
   WiFiClient client = server.client();                                                        // open link with client
 
   // log page request including clients IP address
-    if (debugInfo) {
+    if (serialDebug) {
       IPAddress cip = client.remoteIP();
       Serial.printf("Test requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
     }
