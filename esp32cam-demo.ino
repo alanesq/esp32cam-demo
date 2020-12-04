@@ -47,7 +47,7 @@
    const char* password = "<your wifi password here>";
 
   const char* stitle = "ESP32Cam-demo";                  // title of this sketch
-  const char* sversion = "26Nov20";                      // Sketch version
+  const char* sversion = "04Dec20";                      // Sketch version
 
   const bool serialDebug = 1;                            // show additional debug info. on serial port (1=enabled)
 
@@ -69,7 +69,7 @@
 
   const int iopinA = 13;                                 // general io pin 13
   const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
-  const int iopinC = 16;                                 // input only pin 16 (has a 10k pullup resistor)
+  const int iopinC = 16;                                 // input only pin 16 (used for PSRam but you may get away with using as input for a button etc.)
   
   const int serialSpeed = 115200;                        // Serial data speed to use
 
