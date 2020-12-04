@@ -31,6 +31,9 @@
  * 
  *******************************************************************************************************************/
 
+ #if !defined ESP32
+  #error This sketch is only for an ESP32Cam module
+#endif
 
 #include "esp_camera.h"       // https://github.com/espressif/esp32-camera
 #include <WiFi.h>
@@ -43,8 +46,8 @@
 // ---------------------------------------------------------------
 
   // Wifi settings (enter your wifi network details)
-   const char* ssid     = "<your wifi network name here>";
-   const char* password = "<your wifi password here>";
+  const char* ssid     = "<your wifi network name here>";
+  const char* password = "<your wifi password here>";
 
   const char* stitle = "ESP32Cam-demo";                  // title of this sketch
   const char* sversion = "04Dec20";                      // Sketch version
@@ -69,7 +72,7 @@
 
   const int iopinA = 13;                                 // general io pin 13
   const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
-  const int iopinC = 16;                                 // input only pin 16 (used for PSRam but you may get away with using as input for a button etc.)
+  const int iopinC = 16;                                 // input only pin 16 (used by PSRam but you may get away with using it as input)
   
   const int serialSpeed = 115200;                        // Serial data speed to use
 
