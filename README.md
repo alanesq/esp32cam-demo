@@ -6,8 +6,10 @@ This can be used as a starting point sketch for your projects using the esp32cam
 it has the following features:
 -web server with live video streaming and control buttons
 -sd card support (using 1-bit mode - data pins are usually 2,4,12&13 but using 1bit mode only uses pin 2)
+-stroes image in spiffs if no sd card present
 -io pins available for use are 12 and 13 (12 must not be high at boot)
 -flash led is still available for use on pin 4 when using an sd card
+-PWM control of flash brighness
 -Can read the image as RGB data  (i.e. 3 bytes per pixel for red green and blue value)
 -Act as web client (reading the web page in to a string) - see requestWebPage()
  </pre>
