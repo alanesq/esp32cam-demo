@@ -7,6 +7,8 @@
  *        web server with live video streaming and RGB data from camera demonstrated.
  *        sd card support using 1-bit mode (data pins are usually 2,4,12&13 but using 1bit mode only uses pin 2)
  *        flash led is still available for use (pin 4) and does not flash when accessing sd card
+ *        Stores image in Spiffs if no sd card present
+ *        PWM control of the illumination/flash LED
  * 
  *     GPIO:
  *        You can use io pins 13 and 12 for input or output (but 12 must not be high at boot)
@@ -258,25 +260,8 @@ void setup() {
     if (serialDebug) Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
     framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_CIF;
   }
-  
-  // configure PWM for brightness control of the illumination led
-  // Note: Using this more long winded pwm setup as timer0 is already used by the camera (and channel 0)
-    ledc_timer_config_t timer_conf;
-        timer_conf.duty_resolution = LEDC_TIMER_8_BIT;          // 8 bits gives a brightness range of 0 to 255
-        timer_conf.freq_hz = 1000;                              // frequency of the pwm (timer 3 and 4 are 1000x slowed down?)
-        timer_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
-        timer_conf.timer_num = LEDC_TIMER_3;                    // which timer to use (0 to 3)
-    ledc_timer_config(&timer_conf);
-    ledc_channel_config_t ledc_conf;
-        ledc_conf.channel = LEDC_CHANNEL_5;                     // led channel to use (0 to 15)
-        ledc_conf.duty = 0;                                     // 0=off, 1024=fully on
-        ledc_conf.gpio_num = brightLED;                         // gpio pin
-        ledc_conf.intr_type = LEDC_INTR_DISABLE;
-        ledc_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
-        ledc_conf.timer_sel = LEDC_TIMER_3;                     // timer to use (0 to 3)
-    ledc_channel_config(&ledc_conf);
-    
-  illuminationBrightness(0);                                    // set illumination led brightness to off
+
+  illuminationSetup();                        // configure the PWM for the illumination/flash LED
     
   if (serialDebug) Serial.println("\nSetup complete...");
 
@@ -324,19 +309,6 @@ void loop() {
 
 
 // ******************************************************************************************************************
-
-
-// ----------------------------------------------------------------
-//                  Set illumination LED brightness
-// ----------------------------------------------------------------
-
-void illuminationBrightness(int duty) {
-
-        ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_5, duty);
-        ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_5);
-        illuminationLEDstatus = duty;           // store current brightness
-
-}
 
 
 // ----------------------------------------------------------------
@@ -454,8 +426,48 @@ bool cameraImageSettings() {
 
 
 // ----------------------------------------------------------------
+//             Set up pwm for the illumination led
+// ----------------------------------------------------------------
+// configure PWM for brightness control of the illumination led
+// Note: Using this more long winded pwm setup as timer0 is already used by the camera (and channel 0)
+//       more info: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/ledc.html
+
+void illuminationSetup() {
+  
+    ledc_timer_config_t timer_conf;
+        timer_conf.duty_resolution = LEDC_TIMER_8_BIT;          // 8 bits gives a brightness range of 0 to 255
+        timer_conf.freq_hz = 1000;                              // frequency of the pwm (timer 3 and 4 are 1000x slowed down?)
+        timer_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+        timer_conf.timer_num = LEDC_TIMER_3;                    // which timer to use (0 to 3)
+    ledc_timer_config(&timer_conf);
+    ledc_channel_config_t ledc_conf;
+        ledc_conf.channel = LEDC_CHANNEL_5;                     // led channel to use (0 to 15)
+        ledc_conf.duty = 0;                                     // 0=off, 255=fully on
+        ledc_conf.gpio_num = brightLED;                         // gpio pin
+        ledc_conf.intr_type = LEDC_INTR_DISABLE;
+        ledc_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+        ledc_conf.timer_sel = LEDC_TIMER_3;                     // timer to use (0 to 3)
+    ledc_channel_config(&ledc_conf);
+
+    illuminationBrightness(0);                                  // set brightness to off
+    
+} // illuminationSetup
+
+
+// ******************************************************************************************************************
+
+
+// ----------------------------------------------------------------
 //                        Misc small procedures
 // ----------------------------------------------------------------
+
+
+//  Set the illumination LED brightness (PWM)
+void illuminationBrightness(int duty) {
+        ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_5, duty);
+        ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_5);
+        illuminationLEDstatus = duty;     // store current brightness
+}
 
 
 // flash the indicator led 'reps' number of times
@@ -479,14 +491,13 @@ void showError(int errorNo) {
 }
 
 
-
 // ******************************************************************************************************************
 
 
 // ----------------------------------------------------------------
 //     Capture image from camera and save to spiffs or sd card
 // ----------------------------------------------------------------
-// returns 0 if failed, 1 if stored in spiffs only, 2 if stored on sd card
+// returns 0 if failed, 1 if stored in spiffs, 2 if stored on sd card
 
 byte storeImage() {
 
@@ -555,14 +566,14 @@ byte storeImage() {
           flashLED(4);
           // return 0;
         }
-        file.close();                // close image file on sd card
+        file.close();              // close image file on sd card
       }
     }
     
   esp_camera_fb_return(fb);        // return frame so memory can be released
   
-  if (sdcardPresent) return 2;
-  else return 1;
+  if (sdcardPresent) return 2;     // saved to sd card 
+  else return 1;                   // saved in spiffs
 
 } // storeImage
 
@@ -667,6 +678,9 @@ void handleRoot() {
       
       if (digitalRead(iopinC) == LOW) client.write("<p>Input Pin 16 is Low</p>\n");
       else client.write("<p>Input Pin 16 is High</p>\n");
+
+    // illumination led brightness
+      client.printf("<p>Illumination led set to %d</p>\n", illuminationLEDstatus);
 
 //    // touch input on the two gpio pins 
 //      client.printf("<p>Touch on pin 12: %d </p>\n", touchRead(T5) );
@@ -1117,6 +1131,7 @@ void handleTest() {
     client.print("<h1>Test Page</h1>\n");
 
 
+  // -------------------------------------------------------------------
 
 
 
@@ -1125,6 +1140,8 @@ void handleTest() {
 
 
 
+  // -------------------------------------------------------------------
+  
      
   // end html
     client.write("</body></html>\n");
