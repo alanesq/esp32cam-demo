@@ -35,10 +35,16 @@
   #error This sketch is only for an ESP32Cam module
 #endif
 
+
 #include "esp_camera.h"       // https://github.com/espressif/esp32-camera
 #include <WiFi.h>
 #include <WebServer.h>
 #include <HTTPClient.h>       // used by requestWebPage()
+#include "driver/ledc.h"      // used to configure pwm on illumination led
+
+// spiffs used to store images without an sd card
+  #include <SPIFFS.h>
+  #include <FS.h>             // gives file access on spiffs
 
 
 // ---------------------------------------------------------------
@@ -49,10 +55,10 @@
   const char* ssid     = "<your wifi network name here>";
   const char* password = "<your wifi password here>";
 
-  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
-  const char* sversion = "04Dec20";                      // Sketch version
+  const char* stitle = "ESP32Cam-demo-pwm";                  // title of this sketch
+  const char* sversion = "10Dec20";                      // Sketch version
 
-  const bool serialDebug = 1;                            // show additional debug info. on serial port (1=enabled)
+  const bool serialDebug = 1;                            // show info. on serial port (1=enabled)
 
   // Camera related
   const bool flashRequired = 1;                          // If flash to be used when capturing image (1 = yes)
@@ -72,7 +78,7 @@
 
   const int iopinA = 13;                                 // general io pin 13
   const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
-  const int iopinC = 16;                                 // input only pin 16 (used by PSRam but you may get away with using it as input)
+  const int iopinC = 16;                                 // input only pin 16 (used by PSRam but you may get away with using it)
   
   const int serialSpeed = 115200;                        // Serial data speed to use
 
@@ -90,12 +96,14 @@ WebServer server(80);                       // serve web pages on port 80
 #include <SPI.h>                       
 #include <FS.h>                             // gives file access 
 #define SD_CS 5                             // sd chip select pin = 5
-  
+
 // Define global variables:
   uint32_t lastStatus = millis();           // last time status light changed status (to flash all ok led)
   uint32_t lastCamera = millis();           // timer for periodic image capture
   bool sdcardPresent;                       // flag if an sd card is detected
   int imageCounter;                         // image file name on sd card counter
+  int illuminationLEDstatus;                // current brightness setting of the illumination led
+  String spiffsFilename = "/image.jpg";     // image name to use when storing in spiffs
 
 // camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
 //     see: https://randomnerdtutorials.com/esp32-cam-camera-pin-gpios/
@@ -129,12 +137,14 @@ WebServer server(80);                       // serve web pages on port 80
 
 void setup() {
   
-  Serial.begin(serialSpeed);                     // Start serial communication 
+  if (serialDebug) {
+    Serial.begin(serialSpeed);                     // Start serial communication 
   
-  Serial.println("\n\n\n");                      // line feeds
-  Serial.println("-----------------------------------");
-  Serial.printf("Starting - %s - %s \n", stitle, sversion);  
-  Serial.println("-----------------------------------");
+    Serial.println("\n\n\n");                      // line feeds
+    Serial.println("-----------------------------------");
+    Serial.printf("Starting - %s - %s \n", stitle, sversion);  
+    Serial.println("-----------------------------------");
+  }
 
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);     // Turn-off the 'brownout detector'
 
@@ -144,17 +154,21 @@ void setup() {
 
   // Connect to wifi
     digitalWrite(indicatorLED,LOW);               // small indicator led on
-    Serial.print("\nConnecting to ");
-    Serial.print(ssid);
-    Serial.print("\n   ");
+    if (serialDebug) {
+      Serial.print("\nConnecting to ");
+      Serial.print(ssid);
+      Serial.print("\n   ");
+    }
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
-        Serial.print(".");
+        if (serialDebug) Serial.print(".");
     }
-    Serial.print("\nWiFi connected, ");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
+    if (serialDebug) {
+      Serial.print("\nWiFi connected, ");
+      Serial.print("IP address: ");
+      Serial.println(WiFi.localIP());
+    }
     server.begin();                               // start web server
     digitalWrite(indicatorLED,HIGH);              // small indicator led off
 
@@ -168,27 +182,43 @@ void setup() {
     server.onNotFound(handleNotFound);            // invalid url requested
 
   // set up camera
-      Serial.print(("\nInitialising camera: "));
-      if (setupCameraHardware()) Serial.println("OK");
+      if (serialDebug) Serial.print(("\nInitialising camera: "));
+      if (setupCameraHardware()) {
+        if (serialDebug) Serial.println("OK");
+      }
       else {
-        Serial.println("Error!");
+        if (serialDebug) Serial.println("Error!");
         showError(2);                              // critical error so stop and flash led
       }
+
+  // Spiffs - for storing images without an sd card
+  //       see: https://circuits4you.com/2018/01/31/example-of-esp8266-flash-file-system-spiffs/
+    if (!SPIFFS.begin(true)) {
+      if (serialDebug) Serial.println(("An Error has occurred while mounting SPIFFS - restarting"));
+      delay(5000);
+      ESP.restart();                               // restart and try again
+      delay(5000);
+    } else {
+      if (serialDebug) {
+        Serial.print(("SPIFFS mounted successfully: "));
+        Serial.printf("total bytes: %d , used: %d \n", SPIFFS.totalBytes(), SPIFFS.usedBytes());
+      }
+    }
 
   // SD Card - if one is detected set 'sdcardPresent' High
       if (!SD_MMC.begin("/sdcard", true)) {        // if loading sd card fails     
         // note: ('/sdcard", true)' = 1bit mode - see: https://www.reddit.com/r/esp32/comments/d71es9/a_breakdown_of_my_experience_trying_to_talk_to_an/
-        Serial.println("No SD Card detected"); 
+        if (serialDebug) Serial.println("No SD Card detected"); 
         sdcardPresent = 0;                        // flag no sd card available
       } else {
         uint8_t cardType = SD_MMC.cardType();
         if (cardType == CARD_NONE) {              // if invalid card found
-            Serial.println("SD Card type detect failed"); 
+            if (serialDebug) Serial.println("SD Card type detect failed"); 
             sdcardPresent = 0;                    // flag no sd card available
         } else {
           // valid sd card detected
           uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
-          Serial.printf("SD Card found, free space = %dMB \n", SDfreeSpace);  
+          if (serialDebug) Serial.printf("SD Card found, free space = %dMB \n", SDfreeSpace);  
           sdcardPresent = 1;                      // flag sd card available
         }
       }
@@ -198,7 +228,9 @@ void setup() {
     imageCounter = 0;
     if (sdcardPresent) {
       int tq=fs.mkdir("/img");                    // create the '/img' folder on sd card (in case it is not already there)
-      if (!tq) Serial.println("Unable to create IMG folder on sd card");
+      if (!tq) {
+        if (serialDebug) Serial.println("Unable to create IMG folder on sd card");
+      }
 
       // open the image folder and step through all files in it
         File root = fs.open("/img");            
@@ -210,14 +242,12 @@ void setup() {
             entry.close();
         }
         root.close();
-        Serial.printf("Image file count = %d \n",imageCounter);
+        if (serialDebug) Serial.printf("Image file count = %d \n",imageCounter);
     }
    
   // define io pins 
     pinMode(indicatorLED, OUTPUT);            // defined again as sd card config can reset it
     digitalWrite(indicatorLED,HIGH);          // led off = High
-    pinMode(brightLED, OUTPUT);               // flash LED
-    digitalWrite(brightLED,LOW);              // led off = Low
     pinMode(iopinA, OUTPUT);                  // pin 13 - free io pin, can be used for input or output
     pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be used for input or output (must not be high at boot)
     pinMode(iopinC, INPUT);                   // pin 16 - free input only pin
@@ -225,11 +255,30 @@ void setup() {
   // check the esp32cam board has a psram chip installed (extra memory used for storing captured images)
   //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, SPIFFS must be enabled
   if (!psramFound()) {
-    Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
+    if (serialDebug) Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
     framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_CIF;
   }
-
-  Serial.println("\nSetup complete...");
+  
+  // configure PWM for brightness control of the illumination led
+  // Note: Using this more long winded pwm setup as timer0 is already used by the camera (and channel 0)
+    ledc_timer_config_t timer_conf;
+        timer_conf.duty_resolution = LEDC_TIMER_8_BIT;          // 8 bits gives a brightness range of 0 to 255
+        timer_conf.freq_hz = 1000;                              // frequency of the pwm (timer 3 and 4 are 1000x slowed down?)
+        timer_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+        timer_conf.timer_num = LEDC_TIMER_3;                    // which timer to use (0 to 3)
+    ledc_timer_config(&timer_conf);
+    ledc_channel_config_t ledc_conf;
+        ledc_conf.channel = LEDC_CHANNEL_5;                     // led channel to use (0 to 15)
+        ledc_conf.duty = 0;                                     // 0=off, 1024=fully on
+        ledc_conf.gpio_num = brightLED;                         // gpio pin
+        ledc_conf.intr_type = LEDC_INTR_DISABLE;
+        ledc_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+        ledc_conf.timer_sel = LEDC_TIMER_3;                     // timer to use (0 to 3)
+    ledc_channel_config(&ledc_conf);
+    
+  illuminationBrightness(0);                                    // set illumination led brightness to off
+    
+  if (serialDebug) Serial.println("\nSetup complete...");
 
 }  // setup
 
@@ -278,6 +327,19 @@ void loop() {
 
 
 // ----------------------------------------------------------------
+//                  Set illumination LED brightness
+// ----------------------------------------------------------------
+
+void illuminationBrightness(int duty) {
+
+        ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_5, duty);
+        ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_5);
+        illuminationLEDstatus = duty;           // store current brightness
+
+}
+
+
+// ----------------------------------------------------------------
 //                        Configure the camera
 // ----------------------------------------------------------------
 // returns TRUE if sucessful
@@ -311,7 +373,9 @@ bool setupCameraHardware() {
     config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
                  
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
-    if (camerr != ESP_OK) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
+    if (camerr != ESP_OK) {
+      if (serialDebug) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
+    }
 
     cameraImageSettings();                        // apply custom camera settings  
     
@@ -334,7 +398,7 @@ bool cameraImageSettings() {
    
     sensor_t *s = esp_camera_sensor_get();       
     if (s == NULL) {
-      Serial.println("Error: problem reading camera sensor settings");
+      if (serialDebug) Serial.println("Error: problem reading camera sensor settings");
       return 0;
     } 
 
@@ -420,51 +484,85 @@ void showError(int errorNo) {
 
 
 // ----------------------------------------------------------------
-//           Capture image from camera and save to sd card
+//     Capture image from camera and save to spiffs or sd card
 // ----------------------------------------------------------------
-// returns TRUE if sucessful
+// returns 0 if failed, 1 if stored in spiffs only, 2 if stored on sd card
 
-bool storeImage() {
+byte storeImage() {
 
   if (sdcardPresent) {
     if (serialDebug) Serial.printf("Storing image #%d to sd card \n", imageCounter);
   } else {
-    if (serialDebug) Serial.println("Storing image requested but there is no sd card");
-    return 0;           // no sd card available so exit procedure
+    if (serialDebug) Serial.println("Storing image to SIFFS only");
   }
 
   fs::FS &fs = SD_MMC;                              // sd card file system
-  bool tResult = 0;                                 // result flag
 
   // capture live image from camera
-  if (flashRequired) digitalWrite(brightLED,HIGH);  // turn flash on
+  int currentBrightness = illuminationLEDstatus;
+  if (flashRequired) illuminationBrightness(255);   // turn flash on
   camera_fb_t *fb = esp_camera_fb_get();            // capture image frame from camera
-  digitalWrite(brightLED,LOW);                      // turn flash off
+  if (flashRequired) illuminationBrightness(currentBrightness);     // return flash to previous state
   if (!fb) {
-    Serial.println("Error: Camera capture failed");
+    if (serialDebug) Serial.println("Error: Camera capture failed");
     flashLED(3);
+    // return 0
   }
+
+  // save the image to Spiffs
+    if (!sdcardPresent) {
+      SPIFFS.remove(spiffsFilename);                       // delete old image file if it exists
+      File file = SPIFFS.open(spiffsFilename, FILE_WRITE);
+      if (!file) {
+        if (serialDebug) Serial.println("Failed to create file in Spiffs");
+        return 0;
+      }
+      else {
+        if (file.write(fb->buf, fb->len)) {  
+          if (serialDebug)  {
+            Serial.print("The picture has been saved as " + spiffsFilename);
+            Serial.print(" - Size: ");
+            Serial.print(file.size());
+            Serial.println(" bytes");
+          }
+        } else {
+          if (serialDebug) Serial.println("Error: writing image to Spiffs...will format and try again");
+          if (!SPIFFS.format()) Serial.println("Error: Unable to format Spiffs");   
+          file = SPIFFS.open(spiffsFilename, FILE_WRITE);
+          if (!file.write(fb->buf, fb->len)) {
+            if (serialDebug) Serial.println("Error: Still unable to write image to Spiffs");
+            return 0;
+          }
+        }
+      file.close();      
+      }
+    }
   
   // save the image to sd card
-    String SDfilename = "/img/" + String(imageCounter + 1) + ".jpg";              // build the image file name
-    File file = fs.open(SDfilename, FILE_WRITE);                                  // create file on sd card
-    if (!file) {
-      Serial.println("Error: Failed to create file on sd-card: " + SDfilename);
-      flashLED(4);
-    } else {
-      if (file.write(fb->buf, fb->len)) {                                         // File created ok so save image to it
-        if (serialDebug) Serial.println("Image saved to sd card"); 
-        tResult = 1;                                                              // set sucess flag
-        imageCounter ++;                                                          // increment image counter
-      } else {
-        Serial.println("Error: failed to save image to sd card");
+    if (sdcardPresent) {
+      String SDfilename = "/img/" + String(imageCounter + 1) + ".jpg";              // build the image file name
+      File file = fs.open(SDfilename, FILE_WRITE);                                  // create file on sd card
+      if (!file) {
+        if (serialDebug) Serial.println("Error: Failed to create file on sd-card: " + SDfilename);
         flashLED(4);
+        // return 0
+      } else {
+        if (file.write(fb->buf, fb->len)) {                                         // File created ok so save image to it
+          if (serialDebug) Serial.println("Image saved to sd card"); 
+          imageCounter ++;                                                          // increment image counter
+        } else {
+          if (serialDebug) Serial.println("Error: failed to save image to sd card");
+          flashLED(4);
+          // return 0;
+        }
+        file.close();                // close image file on sd card
       }
-      file.close();                // close image file on sd card
     }
-    esp_camera_fb_return(fb);        // return frame so memory can be released
     
-    return tResult;                  // return image save sucess flag
+  esp_camera_fb_return(fb);        // return frame so memory can be released
+  
+  if (sdcardPresent) return 2;
+  else return 1;
 
 } // storeImage
 
@@ -506,7 +604,9 @@ void handleRoot() {
   
     // if button3 was pressed (toggle flash LED)
       if (server.hasArg("button3")) {
-        digitalWrite(brightLED,!digitalRead(brightLED));       // toggle flash LED on/off
+        if (illuminationLEDstatus == 0) illuminationBrightness(30);          // turn led on dim
+        else if (illuminationLEDstatus == 30) illuminationBrightness(255);   // turn led on full
+        else illuminationBrightness(0);                                      // turn led off
         if (serialDebug) Serial.println("Button 3 pressed");
       }
 
@@ -607,7 +707,7 @@ void handleRoot() {
 
 
 // ----------------------------------------------------------------
-//       -photo save to sd card    i.e. http://x.x.x.x/photo
+//    -photo save to sd card/spiffs    i.e. http://x.x.x.x/photo
 // ----------------------------------------------------------------
 
 void handlePhoto() {
@@ -620,15 +720,18 @@ void handlePhoto() {
       Serial.printf("Photo requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
     }
 
-  // save an image to sd card
-    bool sRes = storeImage();              // save an image to sd card (store sucess or failed flag)
+  // save an image to sd card or spiffs
+    byte sRes = storeImage();              // save an image to sd card or spiffs (store sucess or failed flag - 0=fail, 1=spiffs only, 2=spiffs and sd card)
     
   // html header
     client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");         // basic html header
 
   // html body
-    if (sRes == 1) {
+    if (sRes == 2) {
         client.printf("<p>Image saved to sd card as image number %d </p>\n", imageCounter);
+        client.write("<a href='/img'>View Image</a>\n");                // link to the image   
+    } else if (sRes == 1) {
+        client.write("<p>Image saved in Spiffs</p>\n");
         client.write("<a href='/img'>View Image</a>\n");                // link to the image   
     } else {
         client.write("<p>Error: Failed to save image to sd card</p>\n");     
@@ -644,7 +747,7 @@ void handlePhoto() {
 
 
 // ----------------------------------------------------------------
-//  -show images stored on sd card    i.e. http://x.x.x.x/img?img=x
+// -show images stored on sd card or SPIFFS   i.e. http://x.x.x.x/img?img=x
 // ----------------------------------------------------------------
 // default image = most recent
 // returns 1 if image displayed ok
@@ -669,22 +772,42 @@ bool handleImg() {
         if (imgToShow < 1 || imgToShow > imageCounter) imgToShow = imageCounter;    // validate image number
       }
 
-    if (serialDebug) Serial.printf("Displaying image #%d from sd card", imgToShow);   
- 
-    String tFileName = "/img/" + String(imgToShow) + ".jpg";
-    fs::FS &fs = SD_MMC;                                 // sd card file system
-    File timg = fs.open(tFileName, "r");
-    if (timg) {
-        size_t sent = server.streamFile(timg, "image/jpeg");     // send the image
-        timg.close();
-    } else {
-      if (serialDebug) Serial.println("Error: image file not found");
-      WiFiClient client = server.client();                       // open link with client
-      client.write("<!DOCTYPE html> <html> <body>\n");
-      client.write("<p>Error: Image not found</p?\n");
-      delay(3);
-      client.stop();
+    // if stored on sd card
+    if (sdcardPresent) {
+      if (serialDebug) Serial.printf("Displaying image #%d from sd card", imgToShow);   
+   
+      String tFileName = "/img/" + String(imgToShow) + ".jpg";
+      fs::FS &fs = SD_MMC;                                 // sd card file system
+      File timg = fs.open(tFileName, "r");
+      if (timg) {
+          size_t sent = server.streamFile(timg, "image/jpeg");     // send the image
+          timg.close();
+      } else {
+        if (serialDebug) Serial.println("Error: image file not found");
+        WiFiClient client = server.client();                       // open link with client
+        client.write("<!DOCTYPE html> <html> <body>\n");
+        client.write("<p>Error: Image not found</p?\n");
+        delay(3);
+        client.stop();
+      }
     }
+
+    // if stored in SPIFFS
+    if (!sdcardPresent) {
+      if (serialDebug) Serial.println("Displaying image from spiffs");   
+      File f = SPIFFS.open(spiffsFilename, "r");                         // read file from spiffs
+          if (!f) {
+            if (serialDebug) Serial.println("Error reading " + spiffsFilename);
+          }
+          else {
+              size_t sent = server.streamFile(f, "image/jpeg");     // send file to web page
+              if (!sent) {
+                if (serialDebug) Serial.println("Error sending " + spiffsFilename);
+              }
+              f.close();               
+          }      
+    }
+    
     
 }  // handleImg
 
@@ -702,9 +825,7 @@ void handleNotFound() {
   String tReply;
 
   // log page request
-    if (serialDebug) {
-      Serial.print("Invalid page requested");
-    }
+    if (serialDebug) Serial.print("Invalid page requested");
   
   tReply = "File Not Found\n\n";
   tReply += "URI: ";
