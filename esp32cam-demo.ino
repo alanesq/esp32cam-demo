@@ -13,10 +13,13 @@
  *     GPIO:
  *        You can use io pins 13 and 12 for input or output (but 12 must not be high at boot)
  *        pin 16 is used for psram but you may get away with using it as input for a button etc.
- *        You could also use pins 1 & 3 if you do not use Serial
+ *        You could also use pins 1 & 3 if you do not use Serial (disable serialDebug in the settings below)
  *        Pins 14, 2 & 15 should be ok to use if you are not using an SD Card
  *        Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
  *        More info:   https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
+ *        
+ *     You can use a MCP23017 io expander chip to give 16 gpio lines by enabling 'useMCP23017' in the setup section and connecting
+ *        the i2c pins to 12 and 13 on the esp32cam module.  Note: this requires the adafruit MCP23017 library to be installed.
  *   
  *     Created using the Arduino IDE with ESP32 module installed, no additional libraries required
  *        ESP32 support for Arduino IDE: https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
@@ -57,30 +60,32 @@
   const char* ssid     = "<your wifi network name here>";
   const char* password = "<your wifi password here>";
 
-  const char* stitle = "ESP32Cam-demo-pwm";                  // title of this sketch
-  const char* sversion = "10Dec20";                      // Sketch version
+  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
+  const char* sversion = "12Dec20";                      // Sketch version
 
-  const bool serialDebug = 1;                            // show info. on serial port (1=enabled)
+  const bool serialDebug = 1;                            // show info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
+
+  #define useMCP23017 0                                  // if MCP23017 IO expander chip is being used (on pins 12 and 13)
 
   // Camera related
-  const bool flashRequired = 1;                          // If flash to be used when capturing image (1 = yes)
-  const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA;    // Image resolution:   
+    const bool flashRequired = 1;                        // If flash to be used when capturing image (1 = yes)
+    const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA;  // Image resolution:   
                                                          //               default = "const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA"
                                                          //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 
                                                          //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 
                                                          //               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
-  int cameraImageExposure = 0;                           // Camera exposure (0 - 1200)   If gain and exposure both set to zero then auto adjust is enabled
-  int cameraImageGain = 0;                               // Image gain (0 - 30)
+    int cameraImageExposure = 0;                         // Camera exposure (0 - 1200)   If gain and exposure both set to zero then auto adjust is enabled
+    int cameraImageGain = 0;                             // Image gain (0 - 30)
 
-  const int TimeBetweenStatus = 600;                     // speed of system running ok status light (milliseconds)
+  const int TimeBetweenStatus = 600;                     // speed of flashing system running ok status light (milliseconds)
 
-  const int indicatorLED = 33;                           // onboard status LED pin (33)
+  const int indicatorLED = 33;                           // onboard small LED pin (33)
 
-  const int brightLED = 4;                               // onboard flash LED pin (4)
+  const int brightLED = 4;                               // onboard Illumination/flash LED pin (4)
 
   const int iopinA = 13;                                 // general io pin 13
   const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
-  const int iopinC = 16;                                 // input only pin 16 (used by PSRam but you may get away with using it)
+  const int iopinC = 16;                                 // input only pin 16 (used by PSRam but you may get away with using it for a button)
   
   const int serialSpeed = 115200;                        // Serial data speed to use
 
@@ -99,6 +104,14 @@ WebServer server(80);                       // serve web pages on port 80
 #include <FS.h>                             // gives file access 
 #define SD_CS 5                             // sd chip select pin = 5
 
+// MCP23017 IO expander
+  #if useMCP23017 == 1
+    #include <Wire.h>
+    #include "Adafruit_MCP23017.h"
+    Adafruit_MCP23017 mcp;
+    // Wire.setClock(1700000); // set frequency to 1.7mhz
+  #endif
+  
 // Define global variables:
   uint32_t lastStatus = millis();           // last time status light changed status (to flash all ok led)
   uint32_t lastCamera = millis();           // timer for periodic image capture
@@ -261,7 +274,18 @@ void setup() {
     framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_CIF;
   }
 
-  illuminationSetup();                        // configure the PWM for the illumination/flash LED
+  // MCP23017 io expander (requires adafruit MCP23017 library)
+  #if useMCP23017 == 1
+    Wire.begin(12,13);             // use pins 12 and 13 for i2c
+    mcp.begin(&Wire);              // use default address 0
+    mcp.pinMode(0, OUTPUT);        // Define GPA0 (physical pin 21) as output pin
+    mcp.pinMode(8, INPUT);         // Define GPB0 (physical pin 1) as input pin
+    mcp.pullUp(8, HIGH);           // turn on a 100K pullup internally
+    // change pin state with   mcp.digitalWrite(0, HIGH);
+    // read pin state with     mcp.digitalRead(8)
+  #endif
+
+  illuminationSetup();                        // configure PWM for the illumination/flash LED
     
   if (serialDebug) Serial.println("\nSetup complete...");
 
@@ -355,7 +379,6 @@ bool setupCameraHardware() {
 }
 
 
-
 // ******************************************************************************************************************
 
 
@@ -433,23 +456,26 @@ bool cameraImageSettings() {
 //       more info: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/ledc.html
 
 void illuminationSetup() {
-  
-    ledc_timer_config_t timer_conf;
-        timer_conf.duty_resolution = LEDC_TIMER_8_BIT;          // 8 bits gives a brightness range of 0 to 255
-        timer_conf.freq_hz = 1000;                              // frequency of the pwm (timer 3 and 4 are 1000x slowed down?)
-        timer_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
-        timer_conf.timer_num = LEDC_TIMER_3;                    // which timer to use (0 to 3)
-    ledc_timer_config(&timer_conf);
-    ledc_channel_config_t ledc_conf;
-        ledc_conf.channel = LEDC_CHANNEL_5;                     // led channel to use (0 to 15)
-        ledc_conf.duty = 0;                                     // 0=off, 255=fully on
-        ledc_conf.gpio_num = brightLED;                         // gpio pin
-        ledc_conf.intr_type = LEDC_INTR_DISABLE;
-        ledc_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
-        ledc_conf.timer_sel = LEDC_TIMER_3;                     // timer to use (0 to 3)
-    ledc_channel_config(&ledc_conf);
 
-    illuminationBrightness(0);                                  // set brightness to off
+    // set up the timer
+      ledc_timer_config_t timer_conf;
+          timer_conf.duty_resolution = LEDC_TIMER_8_BIT;          // 8 bits gives a brightness range of 0 to 255
+          timer_conf.freq_hz = 1000;                              // frequency of the pwm 
+          timer_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+          timer_conf.timer_num = LEDC_TIMER_3;                    // which timer to use (0 to 3)
+      ledc_timer_config(&timer_conf);
+
+    // set up the channel
+      ledc_channel_config_t ledc_conf;
+          ledc_conf.channel = LEDC_CHANNEL_5;                     // led channel to use (0 to 15)
+          ledc_conf.duty = 0;                                     // 0=off, 255=fully on
+          ledc_conf.gpio_num = brightLED;                         // gpio pin
+          ledc_conf.intr_type = LEDC_INTR_DISABLE;
+          ledc_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
+          ledc_conf.timer_sel = LEDC_TIMER_3;                     // timer to use (0 to 3)
+      ledc_channel_config(&ledc_conf);
+
+    illuminationBrightness(0);                                    // set brightness to off
     
 } // illuminationSetup
 
@@ -481,7 +507,6 @@ void flashLED(int reps) {
 }
 
 
-
 // critical error - stop sketch and continually flash error code on indicator led
 void showError(int errorNo) {
   while(1) {
@@ -501,27 +526,22 @@ void showError(int errorNo) {
 
 byte storeImage() {
 
-  if (sdcardPresent) {
-    if (serialDebug) Serial.printf("Storing image #%d to sd card \n", imageCounter);
-  } else {
-    if (serialDebug) Serial.println("Storing image to SIFFS only");
-  }
-
   fs::FS &fs = SD_MMC;                              // sd card file system
 
-  // capture live image from camera
-  int currentBrightness = illuminationLEDstatus;
-  if (flashRequired) illuminationBrightness(255);   // turn flash on
-  camera_fb_t *fb = esp_camera_fb_get();            // capture image frame from camera
-  if (flashRequired) illuminationBrightness(currentBrightness);     // return flash to previous state
-  if (!fb) {
-    if (serialDebug) Serial.println("Error: Camera capture failed");
-    flashLED(3);
-    // return 0
-  }
+  // capture the image from camera
+    int currentBrightness = illuminationLEDstatus;
+    if (flashRequired) illuminationBrightness(255);   // turn flash on
+    camera_fb_t *fb = esp_camera_fb_get();            // capture image frame from camera
+    if (flashRequired) illuminationBrightness(currentBrightness);     // return flash to previous state
+    if (!fb) {
+      if (serialDebug) Serial.println("Error: Camera capture failed");
+      flashLED(3);   // stop and display error code on LED
+      // return 0
+    }
 
-  // save the image to Spiffs
+  // save image to Spiffs
     if (!sdcardPresent) {
+      if (serialDebug) Serial.println("Storing image to SIFFS only");
       SPIFFS.remove(spiffsFilename);                       // delete old image file if it exists
       File file = SPIFFS.open(spiffsFilename, FILE_WRITE);
       if (!file) {
@@ -538,7 +558,9 @@ byte storeImage() {
           }
         } else {
           if (serialDebug) Serial.println("Error: writing image to Spiffs...will format and try again");
-          if (!SPIFFS.format()) Serial.println("Error: Unable to format Spiffs");   
+          if (!SPIFFS.format()) {
+            if (serialDebug) Serial.println("Error: Unable to format Spiffs");   
+          }
           file = SPIFFS.open(spiffsFilename, FILE_WRITE);
           if (!file.write(fb->buf, fb->len)) {
             if (serialDebug) Serial.println("Error: Still unable to write image to Spiffs");
@@ -551,11 +573,12 @@ byte storeImage() {
   
   // save the image to sd card
     if (sdcardPresent) {
+      if (serialDebug) Serial.printf("Storing image #%d to sd card \n", imageCounter);
       String SDfilename = "/img/" + String(imageCounter + 1) + ".jpg";              // build the image file name
       File file = fs.open(SDfilename, FILE_WRITE);                                  // create file on sd card
       if (!file) {
         if (serialDebug) Serial.println("Error: Failed to create file on sd-card: " + SDfilename);
-        flashLED(4);
+        flashLED(4);    // stop and display error code on LED
         // return 0
       } else {
         if (file.write(fb->buf, fb->len)) {                                         // File created ok so save image to it
@@ -563,7 +586,7 @@ byte storeImage() {
           imageCounter ++;                                                          // increment image counter
         } else {
           if (serialDebug) Serial.println("Error: failed to save image to sd card");
-          flashLED(4);
+          flashLED(4);   // stop and display error code on LED
           // return 0;
         }
         file.close();              // close image file on sd card
@@ -723,6 +746,7 @@ void handleRoot() {
 // ----------------------------------------------------------------
 //    -photo save to sd card/spiffs    i.e. http://x.x.x.x/photo
 // ----------------------------------------------------------------
+// Capture an image from camera and save to spiffs or sd card
 
 void handlePhoto() {
 
@@ -763,12 +787,13 @@ void handlePhoto() {
 // ----------------------------------------------------------------
 // -show images stored on sd card or SPIFFS   i.e. http://x.x.x.x/img?img=x
 // ----------------------------------------------------------------
-// default image = most recent
+// Display a previously stored image, default image = most recent
 // returns 1 if image displayed ok
 
 bool handleImg() {
 
     WiFiClient client = server.client();                 // open link with client
+    bool pRes = 0; 
 
   // log page request including clients IP address
     if (serialDebug) {
@@ -796,6 +821,7 @@ bool handleImg() {
       if (timg) {
           size_t sent = server.streamFile(timg, "image/jpeg");     // send the image
           timg.close();
+          pRes = 1;                                                // flag sucess
       } else {
         if (serialDebug) Serial.println("Error: image file not found");
         WiFiClient client = server.client();                       // open link with client
@@ -817,12 +843,13 @@ bool handleImg() {
               size_t sent = server.streamFile(f, "image/jpeg");     // send file to web page
               if (!sent) {
                 if (serialDebug) Serial.println("Error sending " + spiffsFilename);
+              } else {
+                pRes = 1;                                           // flag sucess
               }
               f.close();               
           }      
     }
-    
-    
+    return pRes;
 }  // handleImg
 
 
@@ -1078,9 +1105,6 @@ String requestWebPage(String ip, String page, int port, int maxChars){
       String wpage = "";
       // read response in to wpage
         while (client.available() > 0 && maxChars > 0) {
-          #if defined ESP8266
-            delay(2);                            // just reads 255s on esp8266 if this delay is not included (not sure about esp32S?)
-          #endif
           wpage += char(client.read());          // read one character
           maxChars--;
         }
@@ -1137,6 +1161,28 @@ void handleTest() {
 
 
 
+
+
+
+
+
+
+
+
+
+
+  // demo useage of the mcp23017 io chip 
+    #if useMCP23017 == 1
+      while(1) {
+          mcp.digitalWrite(0, HIGH);
+          int q = mcp.digitalRead(8);
+          client.print("<p>HIGH, input =" + String(q) + "</p>");
+          delay(1000);
+          mcp.digitalWrite(0, LOW);
+          client.print("<p>LOW</p>");
+          delay(1000);
+      }
+    #endif
 
 
 
