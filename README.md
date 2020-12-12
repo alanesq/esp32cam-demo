@@ -2,15 +2,15 @@
 <p align="center"><img src="/images/esp32cam.jpeg" width="80%"/></p>
 
 <pre>
-This can be used as a starting point sketch for your projects using the esp32cam development board, 
+This can be used as a starting point sketch for projects using the esp32cam development board, 
 it has the following features:
 -web server with live video streaming and control buttons
--sd card support (using 1-bit mode - data pins are usually 2,4,12&13 but using 1bit mode only uses pin 2)
--stores image in spiffs if no sd card present
--io pins available for use are 12 and 13 (12 must not be high at boot)
+-sd card support (using 1-bit mode - data pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2)
+-stores captured image in spiffs if no sd card is present
+-io pins available for use are 12 and 13 (12 must not be pulled high at boot)
 -Option to connect a MCP23017 chip to pins 12 and 13 to give you 16 gpio pins to use (this requires the Adafruit MCP23017 library)
 -flash led is still available for use on pin 4 when using an sd card
--PWM control of flash brighness
+-PWM control of flash/illumination lED brighness implemented (i.e. to give brighness control)
 -Can read the image as RGB data  (i.e. 3 bytes per pixel for red green and blue value)
 -Act as web client (reading the web page in to a string) - see requestWebPage()
  </pre>
@@ -65,13 +65,12 @@ Notes
 
 This looks like it may contain useful info. on another way of getting RGB data from the camera: https://eloquentarduino.github.io/2020/01/image-recognition-with-esp32-and-arduino/
 
-These modules require a good 5volt power supply.  I find it best to put a good sized smoothing capacitor across the 5volts.
-If you get strange error messages, random reboots, wifi dropping etc. first thing to do is make sure it is not a power problem.
+These modules require a good power supply.  I find it best to put a good sized smoothing capacitor across the supply as the wifi especially can put lots 
+of spikes on the line.
+If you get strange error messages, random reboots, wifi dropping out etc. first thing to do is make sure it is not just a power problem.
 
 BTW - You may like to have a look at the security camera sketch I have created as this has lots more going on including FTP, email, OTA updates
 https://github.com/alanesq/CameraWifiMotion
-
-In the Misc folder there is a version of the sketch which includes NTP (Real time) support
 
 I have heard reports of these modules getting very warm when in use although I have not experienced this myself, I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
 
