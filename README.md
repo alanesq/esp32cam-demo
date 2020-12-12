@@ -8,6 +8,7 @@ it has the following features:
 -sd card support (using 1-bit mode - data pins are usually 2,4,12&13 but using 1bit mode only uses pin 2)
 -stores image in spiffs if no sd card present
 -io pins available for use are 12 and 13 (12 must not be high at boot)
+-Option to connect a MCP23017 chip to pins 12 and 13 to give you 16 gpio pins to use (this requires the Adafruit MCP23017 library)
 -flash led is still available for use on pin 4 when using an sd card
 -PWM control of flash brighness
 -Can read the image as RGB data  (i.e. 3 bytes per pixel for red green and blue value)
@@ -80,7 +81,9 @@ pin 16 is used for psram but you may get away with using it as input for a butto
 You could also use 1 and 3 if you do not use Serial or 14,2&15 if not using SD Card
 Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
 More info: https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
-Another option (which I have not actually tried yet) would be to attach a MCP23017 Bidirectional 16-Bit I/O Expander (possibly need to use the serial tx and rx pins) which would then give you 16 gpio pins to play with :-)
+You can use a MCP23017 io expander chip to give 16 gpio lines by enabling 'useMCP23017' in the setup section and connecting
+  the i2c pins to 12 and 13 on the esp32cam module.  Note: this requires the adafruit MCP23017 library to be installed.
+    
 
 
                                                                 https://github.com/alanesq/esp32cam-demo
