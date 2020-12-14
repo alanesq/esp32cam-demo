@@ -15,7 +15,6 @@
  *        pin 16 is used for psram but you may get away with using it as input for a button etc.
  *        You could also use pins 1 & 3 if you do not use Serial (disable serialDebug in the settings below)
  *        Pins 14, 2 & 15 should be ok to use if you are not using an SD Card
- *        Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
  *        More info:   https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
  *        
  *     You can use a MCP23017 io expander chip to give 16 gpio lines by enabling 'useMCP23017' in the setup section and connecting
