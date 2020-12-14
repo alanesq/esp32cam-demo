@@ -78,7 +78,7 @@ GPIO:
 io pins available for use are 13 and 12 (12 must not be high at boot)
 pin 16 is used for psram but you may get away with using it as input for a button etc.
 You could also use 1 and 3 if you do not use Serial or 14,2&15 if not using SD Card
-Other possible pins you could solder directly to the esp32 module?    17, 9, 10, 11, 6, 7, 8
+Other possible pins you could solder directly to the esp32 module?   7, 8 , 9, 10, 11 & 17
 More info: https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
 You can use a MCP23017 io expander chip to give 16 gpio lines by enabling 'useMCP23017' in the setup section and connecting
   the i2c pins to 12 and 13 on the esp32cam module.  Note: this requires the adafruit MCP23017 library to be installed.
