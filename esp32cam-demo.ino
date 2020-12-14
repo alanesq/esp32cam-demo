@@ -27,7 +27,7 @@
  *     Info on the esp32cam board:  https://randomnerdtutorials.com/esp32-cam-video-streaming-face-recognition-arduino-ide/
  *            
  *     To see a more advanced sketch along the same format as this one have a look at https://github.com/alanesq/CameraWifiMotion
- *        which includes email support, FTP, OTA updates, time from NTP servers and motion detection
+ *        which includes email support, FTP, OTA updates and motion detection
  * 
  * 
  *     esp32cam-demo is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the 
@@ -40,28 +40,23 @@
   #error This sketch is only for an ESP32Cam module
 #endif
 
-
 #include "esp_camera.h"       // https://github.com/espressif/esp32-camera
-#include <WiFi.h>
-#include <WebServer.h>
-#include <HTTPClient.h>       // used by requestWebPage()
-#include "driver/ledc.h"      // used to configure pwm on illumination led
 
-// spiffs used to store images without an sd card
-  #include <SPIFFS.h>
-  #include <FS.h>             // gives file access on spiffs
+
+// ******************************************************************************************************************
 
 
 // ---------------------------------------------------------------
-//                          -SETTINGS
+//                           -SETTINGS
 // ---------------------------------------------------------------
+
 
   // Wifi settings (enter your wifi network details)
   const char* ssid     = "<your wifi network name here>";
   const char* password = "<your wifi password here>";
 
   const char* stitle = "ESP32Cam-demo";                  // title of this sketch
-  const char* sversion = "12Dec20";                      // Sketch version
+  const char* sversion = "13Dec20";                      // Sketch version
 
   const bool serialDebug = 1;                            // show info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
 
@@ -89,36 +84,10 @@
   
   const int serialSpeed = 115200;                        // Serial data speed to use
 
-
-  
-// ******************************************************************************************************************
-
-
-WebServer server(80);                       // serve web pages on port 80
-
-#include "soc/soc.h"                        // Used to disable brownout detection 
-#include "soc/rtc_cntl_reg.h"      
-
-#include "SD_MMC.h"                         // sd card - see https://randomnerdtutorials.com/esp32-cam-take-photo-save-microsd-card/
-#include <SPI.h>                       
-#include <FS.h>                             // gives file access 
-#define SD_CS 5                             // sd chip select pin = 5
-
-// MCP23017 IO expander
-  #if useMCP23017 == 1
-    #include <Wire.h>
-    #include "Adafruit_MCP23017.h"
-    Adafruit_MCP23017 mcp;
-    // Wire.setClock(1700000); // set frequency to 1.7mhz
-  #endif
-  
-// Define global variables:
-  uint32_t lastStatus = millis();           // last time status light changed status (to flash all ok led)
-  uint32_t lastCamera = millis();           // timer for periodic image capture
-  bool sdcardPresent;                       // flag if an sd card is detected
-  int imageCounter;                         // image file name on sd card counter
-  int illuminationLEDstatus;                // current brightness setting of the illumination led
-  String spiffsFilename = "/image.jpg";     // image name to use when storing in spiffs
+  // NTP - Internet time
+    const char* ntpServer = "pool.ntp.org";
+    const long  gmtOffset_sec = 0;
+    const int   daylightOffset_sec = 3600;
 
 // camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
 //     see: https://randomnerdtutorials.com/esp32-cam-camera-pin-gpios/
@@ -140,7 +109,50 @@ WebServer server(80);                       // serve web pages on port 80
   #define HREF_GPIO_NUM     23      // href_pin
   #define PCLK_GPIO_NUM     22      // pixel_clock_pin
 
-  camera_config_t config;        
+  camera_config_t config;     
+
+
+  
+// ******************************************************************************************************************
+
+
+#include <WiFi.h>
+#include <WebServer.h>
+#include <HTTPClient.h>       // used by requestWebPage()
+#include "driver/ledc.h"      // used to configure pwm on illumination led
+
+// spiffs used to store images without an sd card
+  #include <SPIFFS.h>
+  #include <FS.h>             // gives file access on spiffs
+
+WebServer server(80);                       // serve web pages on port 80
+
+// Used to disable brownout detection 
+  #include "soc/soc.h"                       
+  #include "soc/rtc_cntl_reg.h"      
+
+// sd-card
+  #include "SD_MMC.h"                         // sd card - see https://randomnerdtutorials.com/esp32-cam-take-photo-save-microsd-card/
+  #include <SPI.h>                       
+  #include <FS.h>                             // gives file access 
+  #define SD_CS 5                             // sd chip select pin = 5
+
+// MCP23017 IO expander on pins 12 and 13 (optional)
+  #if useMCP23017 == 1
+    #include <Wire.h>
+    #include "Adafruit_MCP23017.h"
+    Adafruit_MCP23017 mcp;
+    // Wire.setClock(1700000); // set frequency to 1.7mhz
+  #endif
+  
+// Define some global variables:
+  uint32_t lastStatus = millis();           // last time status light changed status (to flash all ok led)
+  uint32_t lastCamera = millis();           // timer for periodic image capture
+  bool sdcardPresent;                       // flag if an sd card is detected
+  int imageCounter;                         // image file name on sd card counter
+  uint32_t illuminationLEDstatus;           // current brightness setting of the illumination led
+  String spiffsFilename = "/image.jpg";     // image name to use when storing in spiffs
+ 
   
   
 // ******************************************************************************************************************
@@ -163,7 +175,7 @@ void setup() {
 
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);     // Turn-off the 'brownout detector'
 
-  // Define small indicator led
+  // small indicator led on rear of esp32cam board
     pinMode(indicatorLED, OUTPUT);
     digitalWrite(indicatorLED,HIGH);
 
@@ -195,6 +207,13 @@ void setup() {
     server.on("/rgb", readRGBImage);              // demo converting image to RGB
     server.on("/test", handleTest);               // Testing procedure
     server.onNotFound(handleNotFound);            // invalid url requested
+
+  // NTP - internet time
+    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+    if (serialDebug) {
+      Serial.print("Current time: ");
+      Serial.println(localTime());
+    }
 
   // set up camera
       if (serialDebug) Serial.print(("\nInitialising camera: "));
@@ -239,7 +258,7 @@ void setup() {
       }
       fs::FS &fs = SD_MMC;                        // sd card file system
 
-  // discover the number of image files stored in '/img' folder of the sd card and set image file counter accordingly
+  // discover the number of image files already stored in '/img' folder of the sd card and set image file counter accordingly
     imageCounter = 0;
     if (sdcardPresent) {
       int tq=fs.mkdir("/img");                    // create the '/img' folder on sd card (in case it is not already there)
@@ -260,7 +279,7 @@ void setup() {
         if (serialDebug) Serial.printf("Image file count = %d \n",imageCounter);
     }
    
-  // define io pins 
+  // define i/o pins 
     pinMode(indicatorLED, OUTPUT);            // defined again as sd card config can reset it
     digitalWrite(indicatorLED,HIGH);          // led off = High
     pinMode(iopinA, OUTPUT);                  // pin 13 - free io pin, can be used for input or output
@@ -285,7 +304,7 @@ void setup() {
     // read pin state with     mcp.digitalRead(8)
   #endif
 
-  illuminationSetup();                        // configure PWM for the illumination/flash LED
+  illuminationSetup();             // configure PWM for the illumination/flash LED
     
   if (serialDebug) Serial.println("\nSetup complete...");
 
@@ -316,8 +335,9 @@ void loop() {
 
 
 
+
 //  //  demo to Capture an image and save to sd card every 5 seconds (i.e. time lapse)
-//      if ((unsigned long)(millis() - lastCamera) >= 5000) { 
+//      if ( ((unsigned long)(millis() - lastCamera) >= 5000) && sdcardPresent ) { 
 //        lastCamera = millis();     // reset timer
 //        storeImage();              // save an image to sd card
 //      }
@@ -383,7 +403,7 @@ bool setupCameraHardware() {
 
 
 // ----------------------------------------------------------------
-//                      -Change camera settings
+//                   -Change camera image settings
 // ----------------------------------------------------------------
 // Adjust image properties (brightness etc.)
 // Defaults to auto adjustments if exposure and gain are both set to zero
@@ -468,7 +488,7 @@ void illuminationSetup() {
     // set up the channel
       ledc_channel_config_t ledc_conf;
           ledc_conf.channel = LEDC_CHANNEL_5;                     // led channel to use (0 to 15)
-          ledc_conf.duty = 0;                                     // 0=off, 255=fully on
+          // ledc_conf.duty = 0;                                     // 0=off, 255=fully on
           ledc_conf.gpio_num = brightLED;                         // gpio pin
           ledc_conf.intr_type = LEDC_INTR_DISABLE;
           ledc_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
@@ -489,10 +509,21 @@ void illuminationSetup() {
 
 
 //  Set the illumination LED brightness (PWM)
-void illuminationBrightness(int duty) {
+void illuminationBrightness(uint32_t duty) {
         ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_5, duty);
         ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_5);
         illuminationLEDstatus = duty;     // store current brightness
+}
+
+
+// returns the current real time as a String
+//   see: https://randomnerdtutorials.com/esp32-date-time-ntp-client-server-arduino/
+String localTime() {
+  struct tm timeinfo;
+  char ttime[40];
+  if(!getLocalTime(&timeinfo)) return"Failed to obtain time";
+  strftime(ttime,40,  "%A, %B %d %Y %H:%M:%S", &timeinfo);
+  return ttime;
 }
 
 
@@ -541,7 +572,7 @@ byte storeImage() {
 
   // save image to Spiffs
     if (!sdcardPresent) {
-      if (serialDebug) Serial.println("Storing image to SIFFS only");
+      if (serialDebug) Serial.println("Storing image to spiffs only");
       SPIFFS.remove(spiffsFilename);                       // delete old image file if it exists
       File file = SPIFFS.open(spiffsFilename, FILE_WRITE);
       if (!file) {
@@ -557,9 +588,10 @@ byte storeImage() {
             Serial.println(" bytes");
           }
         } else {
-          if (serialDebug) Serial.println("Error: writing image to Spiffs...will format and try again");
+          if (serialDebug) Serial.println("Error: writing image to spiffs...will format and try again");
           if (!SPIFFS.format()) {
-            if (serialDebug) Serial.println("Error: Unable to format Spiffs");   
+            if (serialDebug) Serial.println("Error: Unable to format Spiffs"); 
+            return 0;
           }
           file = SPIFFS.open(spiffsFilename, FILE_WRITE);
           if (!file.write(fb->buf, fb->len)) {
@@ -608,7 +640,7 @@ byte storeImage() {
 // ----------------------------------------------------------------
 //       -root web page requested    i.e. http://x.x.x.x/
 // ----------------------------------------------------------------
-// Control buttons, links etc.
+// web page with control buttons, links etc.
 
 void handleRoot() {
 
@@ -705,6 +737,9 @@ void handleRoot() {
     // illumination led brightness
       client.printf("<p>Illumination led set to %d</p>\n", illuminationLEDstatus);
 
+    // Current real time
+      client.print("<p>Current time: " + localTime() + "</p>\n");
+
 //    // touch input on the two gpio pins 
 //      client.printf("<p>Touch on pin 12: %d </p>\n", touchRead(T5) );
 //      client.printf("<p>Touch on pin 13: %d </p>\n", touchRead(T4) );
@@ -746,7 +781,7 @@ void handleRoot() {
 // ----------------------------------------------------------------
 //    -photo save to sd card/spiffs    i.e. http://x.x.x.x/photo
 // ----------------------------------------------------------------
-// Capture an image from camera and save to spiffs or sd card
+// web page to capture an image from camera and save to spiffs or sd card
 
 void handlePhoto() {
 
@@ -785,7 +820,7 @@ void handlePhoto() {
 
 
 // ----------------------------------------------------------------
-// -show images stored on sd card or SPIFFS   i.e. http://x.x.x.x/img?img=x
+// -display image stored on sd card or SPIFFS   i.e. http://x.x.x.x/img?img=x
 // ----------------------------------------------------------------
 // Display a previously stored image, default image = most recent
 // returns 1 if image displayed ok
@@ -893,6 +928,7 @@ void handleNotFound() {
 // ----------------------------------------------------------------
 //      -access image data as RGB - i.e. http://x.x.x.x/rgb
 // ----------------------------------------------------------------
+//Demonstration on how to access raw RGB data from the camera
 // Notes:
 //        You can send the entire image over the web with the command:   client.write(rgb, ARRAY_LENGTH);
 //          If this is all that is sent then it will download to the client as a raw RGB file which you can then view using this
@@ -1064,12 +1100,17 @@ void handleStream(){
 // ----------------------------------------------------------------
 //                        request a web page
 // ----------------------------------------------------------------
-// requests a web page and returns reply as a string
-//  parameters = ip address, page to request, port to use (usually 80), maximum chars to receive     e.g. "alanesq.com","/index.htm",80,600
+//     parameters = ip address, page to request, port to use (usually 80), maximum chars to receive, ignore all in reply before this text 
+//          e.g. String q = requestWebPage("192.168.1.166","/log",80,600,"");
 
-String requestWebPage(String ip, String page, int port, int maxChars){
+String requestWebPage(String ip, String page, int port, int maxChars, String cuttoffText = ""){
 
-  if (!page.startsWith("/")) page = "/" + page;           // make sure page begins with "/" 
+  int maxWaitTime = 3000;                 // max time to wait for reply (ms)
+
+  char received[maxChars + 1];            // temp store for incoming character data
+  int received_counter = 0;               // number of characters which have been received
+
+  if (!page.startsWith("/")) page = "/" + page;     // make sure page begins with "/" 
 
   if (serialDebug) {
     Serial.print("requesting web page: ");
@@ -1093,39 +1134,42 @@ String requestWebPage(String ip, String page, int port, int maxChars){
   
       if (serialDebug) Serial.println("Request sent - waiting for reply...");
   
-    // Wait for server to respond then read response
-      int maxWaitTime = 3000;                                                // max time to wait for reply (ms)
-      int i = 0;
-      while ((!client.available()) && (i < (maxWaitTime / 10) )) {
+    // Wait for a response
+      uint32_t ttimer = millis();
+      while ( !client.available() && (uint32_t)(millis() - ttimer) < maxWaitTime ) {
         delay(10);
-        i++;
       }
 
-    // if reply received read data
-      String wpage = "";
-      // read response in to wpage
-        while (client.available() > 0 && maxChars > 0) {
-          wpage += char(client.read());          // read one character
-          maxChars--;
-        }
-        
-////    alternative way to read the data
-//      int rTimeout = 1500;                       // timeout waiting for reply data (ms)
-//      client.setTimeout(rTimeout);               // timeout for readString() command
-//      String wpage = client.readString();        // just read all incoming data until timeout is reached
-
-      
+    // read the response
+      while ( client.available() && received_counter < maxChars ) {
+        #if defined ESP8266
+          delay(2);                          // it just reads 255s on esp8266 if this delay is not included
+        #endif        
+        received[received_counter] = char(client.read());     // read one character
+        received_counter+=1;
+      }
+      received[received_counter] = '\0';     // end of string marker
+            
     if (serialDebug) {
       Serial.println("--------received web page-----------");
-      Serial.println(wpage);
+      Serial.println(received);
       Serial.println("------------------------------------");
-      Serial.flush();     // wait for data to finish sending
+      Serial.flush();     // wait for serial data to finish sending
     }
     
     client.stop();    // close connection
     if (serialDebug) Serial.println("Connection closed");
+
+    // if cuttoffText was supplied then only return the text following this 
+      if (cuttoffText != "") {
+        char* locus = strstr(received,cuttoffText.c_str());    // locus = pointer to the found text
+        if (locus) {                                           // if text was found
+          if (serialDebug) Serial.println("The text '" + cuttoffText + "' was found in reply");
+          return locus;                                        // return the reply text following 'cuttoffText'
+        } else if (serialDebug) Serial.println("The text '" + cuttoffText + "' WAS NOT found in reply");
+      }
     
-  return wpage;
+  return received;        // return the full reply text
 }
 
 
@@ -1156,8 +1200,6 @@ void handleTest() {
 
 
   // -------------------------------------------------------------------
-
-
 
 
 
