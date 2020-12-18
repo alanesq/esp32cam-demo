@@ -2,10 +2,11 @@
 <p align="center"><img src="/images/esp32cam.jpeg" width="80%"/></p>
 
 LATEST NEWS!!!
-There is now a motherboard available for the esp32cam which make it prety much as easy to use as any other esp development board. 
+There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
 Search eBay for "esp32cam mb" - see http://www.hpcba.com/en/latest/source/DevelopmentBoard/HK-ESP32-CAM-MB.html 
-It looks like older esp32cam modules the reset button has no effect on them so on these you have to plug the USB in whilst holding the program button to 
-upload a sketch also on mine I find I have to use the lowest upload speed or it fails to upload.
+It looks like older esp32cam modules the reset button has no effect on them (I am guessing this is a feature on newer modules) so on 
+these you have to plug the USB in whilst holding the program button to upload a sketch also I find I have to use the lowest upload 
+speed or it fails to upload.  The wifi is very poor whilst in the motherboard (I find this happens if you have something near the antenna on the esp32cam modules) but if I rest my thumb above the antenna I find the signal works great).  
 
 <pre>
 This can be used as a starting point sketch for projects using the esp32cam development board, 
