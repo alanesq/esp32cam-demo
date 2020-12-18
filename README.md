@@ -20,11 +20,7 @@ BTW - Even if you do not require the camera I think these modules have some uses
 bright LED and the 4mb psram could prove useful for storing large amounts of temp data etc?   (see the RGB section of the code to see how it can be used).
  
  
-LATEST NEWS!!!
---------------
-It seems there is now a motherboard available for the esp32cam which should make it as easy to use as any other esp development board :-)
-Search eBay for "esp32cam mb" - see http://www.hpcba.com/en/latest/source/DevelopmentBoard/HK-ESP32-CAM-MB.html
-So this info. is no longer relevent:   The module is not the easiest to use as it does not have a usb socket on board so you will need an in circuit programmer to program it, these can be bought on eBay very cheaply or you can use an Arduino as one: https://pre-processing.com/how-to-configure-the-esp32-cam-with-arduino-uno/
+The module is not the easiest to use as it does not have a usb socket on board so you will need an in circuit programmer to program it, these can be bought on eBay very cheaply or you can use an Arduino as one: https://pre-processing.com/how-to-configure-the-esp32-cam-with-arduino-uno/
 I built myself a simple "shield" which I can plug the esp32cam module in to and program it using a couple of toggle switches to the ESP32Cam on and off and select programming mode, this makes using these boards much more convenient.
 BTW: Turns out Bitluni has created one here: https://www.hackster.io/news/bitluni-aims-to-simplify-esp32-cam-development-with-the-cam-prog-usb-programming-add-on-board-a3ba3193b618
 
