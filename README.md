@@ -99,6 +99,4 @@ https://github.com/alanesq/CameraWifiMotion
 I have heard reports of these modules getting very warm when in use although I have not experienced this myself, 
 I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
 
-
-
-                                                                https://github.com/alanesq/esp32cam-demo
+                                                      https://github.com/alanesq/esp32cam-demo
