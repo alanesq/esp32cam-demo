@@ -73,14 +73,16 @@ https://github.com/alanesq/CameraWifiMotion
 
 I have heard reports of these modules getting very warm when in use although I have not experienced this myself, I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
 
-GPIO:
-io pins available for use are 13 and 12 (12 must not be high at boot)
-pin 16 is used for psram but you may get away with using it as input for a button etc.
-You could also use 1 and 3 if you do not use Serial or 14,2&15 if not using SD Card
+GPIO PINS:
+Main io pins available for general use are 13 and 12 (12 must not be high at boot)
+14, 2 & 15 should also be available if you are not using the SD Card
+You can use 1 and 3 if you do not use Serial
 More info: https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
-You can use a MCP23017 io expander chip to give 16 gpio lines by enabling 'useMCP23017' in the setup section and connecting
-  the i2c pins to 12 and 13 on the esp32cam module.  Note: this requires the adafruit MCP23017 library to be installed.
-    
-
+BTW-You can use an MCP23017 io expander chip on pins 12 and 13 to give you 16 general purpose gpio pins
+Note: If using an sd card you this will normally stop you using pins 12, 13 and the led on 4 
+but if you put it in to 1-bit mode it allows you to carry on using these pins
+The command to use 1-bit mode in the Arduino IDE is:  SD_MMC.begin("/sdcard", true)
+see an example of its use here: https://github.com/alanesq/esp32cam-demo
+pin 16 is used for psram but you may get away with using it as input for a button etc.?
 
                                                                 https://github.com/alanesq/esp32cam-demo
