@@ -74,7 +74,7 @@ Note: If using an sd card you this will normally stop you using pins 12, 13 and 
 but if you put it in to 1-bit mode it allows you to carry on using these pins. 
 The command to use 1-bit mode in the Arduino IDE is:  SD_MMC.begin("/sdcard", true)
 see an example of its use here: https://github.com/alanesq/esp32cam-demo
-pin 16 is used for psram but you may get away with using it as input for a button etc.?
+Pin 16 is used for psram but you may get away with using it as input for a button etc.?
 
 
 ----------------
