@@ -65,13 +65,13 @@ http://x.x.x.x/rgb           Captures an image and converts to RGB data (will no
                              resolution images as there is not enough memory)
                                            
 GPIO PINS:
-The main io pins available for general use are 13 and 12 (12 must not be high at boot)
-14, 2 & 15 should also be available if you are not using the SD Card
-You can use 1 and 3 if you do not use Serial
+The main io pins available for general use are 13 and 12 (12 must not be high at boot),
+14, 2 & 15 should also be available if you are not using the SD Card. 
+You can use 1 and 3 if you do not use Serial. 
 More info: https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
-BTW-You can use an MCP23017 io expander chip on pins 12 and 13 to give you 16 general purpose gpio pins
-Note: If using an sd card you this will normally stop you using pins 12, 13 and the led on 4 
-but if you put it in to 1-bit mode it allows you to carry on using these pins
+BTW-You can use an MCP23017 io expander chip on pins 12 and 13 to give you 16 general purpose gpio pins.  
+Note: If using an sd card you this will normally stop you using pins 12, 13 and the led on 4, 
+but if you put it in to 1-bit mode it allows you to carry on using these pins. 
 The command to use 1-bit mode in the Arduino IDE is:  SD_MMC.begin("/sdcard", true)
 see an example of its use here: https://github.com/alanesq/esp32cam-demo
 pin 16 is used for psram but you may get away with using it as input for a button etc.?
