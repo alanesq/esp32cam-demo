@@ -1,7 +1,6 @@
 <h1>ESP32Cam-demo sketch for use with the Arduino IDE</h1>
 <p align="center"><img src="/images/esp32cam.jpeg" width="80%"/></p>
 
-<pre>
 LATEST NEWS!!!
 There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
 Search eBay for "esp32cam mb" - see http://www.hpcba.com/en/latest/source/DevelopmentBoard/HK-ESP32-CAM-MB.html 
@@ -99,6 +98,6 @@ https://github.com/alanesq/CameraWifiMotion
 I have heard reports of these modules getting very warm when in use although I have not experienced this myself, 
 I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
 
-</pre>
+
 
                                                                 https://github.com/alanesq/esp32cam-demo
