@@ -2,15 +2,15 @@
 <p align="center"><img src="/images/esp32cam.jpeg" width="80%"/></p>
 
 LATEST NEWS!!!
-There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
-Search eBay for "esp32cam mb" - see http://www.hpcba.com/en/latest/source/DevelopmentBoard/HK-ESP32-CAM-MB.html 
+<br>There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
+<br>Search eBay for "esp32cam mb" - see http://www.hpcba.com/en/latest/source/DevelopmentBoard/HK-ESP32-CAM-MB.html 
 It looks like the esp32cam suplied with them are not standard and have one of the GND pins modified to act as a reset pin?
-So on esp32cam modules without this feature you have to plug the USB in whilst holding the program button to upload a sketch 
+<br>So on esp32cam modules without this feature you have to plug the USB in whilst holding the program button to upload a sketch 
 also I find I have to use the lowest upload speed or it fails to upload.  The wifi is very poor whilst in the motherboard 
-(I find this happens if you have something near the antenna on the esp32cam modules) but if I rest my thumb above the antenna 
-I find the signal works ok).  Many of the ebay listing include an external antenna and I would suggest this would b a good option 
+<br>(I find this happens if you have something near the antenna on the esp32cam modules) but if I rest my thumb above the antenna 
+<br>I find the signal works ok).  Many of the ebay listing include an external antenna and I would suggest this would b a good option 
 if ordering one.  
-So they are far from perfect but still for the price I think well worth having.
+<br>So they are far from perfect but still for the price I think well worth having.
 
 This can be used as a starting point sketch for projects using the esp32cam development board, 
 it has the following features:
