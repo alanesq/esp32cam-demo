@@ -46,7 +46,6 @@ Will capture an image and save it to the sd card
 
 There is a procedure which demonstarates how to get RGB data from an image which will allow for processing the images as data (http://x.x.x.x/rgb).
 
-<pre>
 URLs:
 http://x.x.x.x/              Hello message
 http://x.x.x.x/photo         Capture an image and save to sd card
@@ -55,8 +54,7 @@ http://x.x.x.x/img           Show most recent image saved to sd card
 http://x.x.x.x/img?img=1     Show image number 1 on sd card
 http://x.x.x.x/rgb           Captures an image and converts to RGB data (will not work with the highest 
                              resolution images as there is not enough memory)
-                             
-                             
+                                           
 GPIO PINS:
 The main io pins available for general use are 13 and 12 (12 must not be high at boot)
 14, 2 & 15 should also be available if you are not using the SD Card
@@ -69,7 +67,6 @@ The command to use 1-bit mode in the Arduino IDE is:  SD_MMC.begin("/sdcard", tr
 see an example of its use here: https://github.com/alanesq/esp32cam-demo
 pin 16 is used for psram but you may get away with using it as input for a button etc.?
 
-</pre>
 
 ----------------
 
@@ -87,6 +84,6 @@ https://github.com/alanesq/CameraWifiMotion
 
 I have heard reports of these modules getting very warm when in use although I have not experienced this myself, I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
 
-
+</pre>
 
                                                                 https://github.com/alanesq/esp32cam-demo
