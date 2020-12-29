@@ -11,15 +11,12 @@ also I find I have to use the lowest upload speed or it fails to upload.  The wi
 I find the signal works ok).  Many of the ebay listing include an external antenna and I would suggest this would b a good option 
 if ordering one.  
 So they are far from perfect but still for the price I think well worth having.
-<br><br>
+
 This can be used as a starting point sketch for projects using the esp32cam development board, 
 it has the following features:
-
-Web server with live video streaming and control buttons
-
-SD card support (using 1-bit mode - data pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2)
-
-Stores captured image in spiffs if no sd card is present
+<br>Web server with live video streaming and control buttons
+<br>SD card support (using 1-bit mode - data pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2)
+<br>Stores captured image in spiffs if no sd card is present
 
 IO pins available for use are 12 and 13 (12 must not be pulled high at boot)
 
