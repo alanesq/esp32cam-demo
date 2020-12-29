@@ -11,7 +11,7 @@ also I find I have to use the lowest upload speed or it fails to upload.  The wi
 I find the signal works ok).  Many of the ebay listing include an external antenna and I would suggest this would b a good option 
 if ordering one.  
 So they are far from perfect but still for the price I think well worth having.
-
+<br><br>
 This can be used as a starting point sketch for projects using the esp32cam development board, 
 it has the following features:
 
