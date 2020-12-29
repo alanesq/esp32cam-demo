@@ -14,15 +14,25 @@ So they are far from perfect but still for the price I think well worth having.
 
 This can be used as a starting point sketch for projects using the esp32cam development board, 
 it has the following features:
--web server with live video streaming and control buttons
--sd card support (using 1-bit mode - data pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2)
--stores captured image in spiffs if no sd card is present
--io pins available for use are 12 and 13 (12 must not be pulled high at boot)
--Option to connect a MCP23017 chip to pins 12 and 13 to give you 16 gpio pins to use (this requires the Adafruit MCP23017 library)
--flash led is still available for use on pin 4 when using an sd card
--PWM control of flash/illumination lED brighness implemented (i.e. to give brighness control)
--Can read the image as RGB data  (i.e. 3 bytes per pixel for red green and blue value)
--Act as web client (reading the web page in to a string) - see requestWebPage()
+
+Web server with live video streaming and control buttons
+
+SD card support (using 1-bit mode - data pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2)
+
+Stores captured image in spiffs if no sd card is present
+
+IO pins available for use are 12 and 13 (12 must not be pulled high at boot)
+
+Option to connect a MCP23017 chip to pins 12 and 13 to give you 16 gpio pins to use (this requires the Adafruit MCP23017 library)
+
+Flash led is still available for use on pin 4 when using an sd card
+
+PWM control of flash/illumination lED brighness implemented (i.e. to give brighness control)
+
+Can read the image as RGB data  (i.e. 3 bytes per pixel for red green and blue value)
+
+Act as web client (reading the web page in to a string) - see requestWebPage()
+
 
 I have tried to make the sketch as easy to follow/modify as possible with lots of comments etc. and no additional libraries used, 
 as I found it quiet confusing as an ameteur trying to do much with this module and difficult to find easy to understand 
