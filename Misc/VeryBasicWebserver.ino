@@ -1,7 +1,7 @@
 // ----------------------------------------------------------------
 //
 //
-//             ESP32 very basic web server demo - 02Jan21
+//           ESP32 very basic web server demo - 02Jan21
 //
 //               Starting point to experiment with
 //
@@ -19,7 +19,6 @@ bool serialDebug = 1;          // if to enable debugging info on serial port
 
 // ----------------------------------------------------------------
   
-  
 
 #if !defined ESP32
   #error You need to select ESP32 in the Arduino IDE
@@ -34,11 +33,12 @@ bool serialDebug = 1;          // if to enable debugging info on serial port
   WebServer server(80);
 
 
-
 // ----------------------------------------------------------------
 
+  
+// this section runs once at startup 
 
-
+  
 void setup() {
 
   Serial.begin(115200);       // start serial comms at speed 115200
@@ -72,12 +72,12 @@ void setup() {
 // ----------------------------------------------------------------
 
 
+// this section runs repeatedly in a loop
+
 
 void loop() {
-    
-  // put your main code here, to run repeatedly:
 
-  server.handleClient();            // service any web page requests (may not be needed for esp32?)
+  server.handleClient();            // service any web page requests 
 
   delay(100);    // wait 100 milliseconds
   
@@ -88,6 +88,7 @@ void loop() {
 // ----------------------------------------------------------------
 //      -test web page requested     i.e. http://x.x.x.x/
 // ----------------------------------------------------------------
+// demonstrate sending a plain text reply
 
 void handleRoot(){
 
@@ -104,6 +105,7 @@ void handleRoot(){
 // ----------------------------------------------------------------
 //      -test web page requested     i.e. http://x.x.x.x/test
 // ----------------------------------------------------------------
+// demonstrate sending html reply
 
 void handleTest(){
 
@@ -129,7 +131,7 @@ void handleTest(){
 // ----------------------------------------------------------------
 //      -button web page requested     i.e. http://x.x.x.x/button
 // ----------------------------------------------------------------
-// demonstrate use of a html button
+// demonstrate use of a html buttons
 
 void handleButton(){
 
@@ -173,7 +175,7 @@ void handleButton(){
 // ----------------------------------------------------------------
 //                      -invalid web page requested
 // ----------------------------------------------------------------
-// standard invalid page code
+// send this reply to any invalid url requested
 
 void handleNotFound() {
 
@@ -200,7 +202,11 @@ void handleNotFound() {
 }  // handleNotFound
 
 
+
 // ----------------------------------------------------------------------------------------------------------------
+
+
+// Not used in this sketch but provided as an example of how to request an external web page and receive the reply as a string
 
 
 // ----------------------------------------------------------------
