@@ -1,7 +1,7 @@
 // ----------------------------------------------------------------
 //
 //
-//           ESP32 very basic web server demo - 02Jan21
+//       ESP32 / ESp8266  very basic web server demo - 02Jan21
 //
 //               Starting point to experiment with
 //
@@ -20,17 +20,25 @@ bool serialDebug = 1;          // if to enable debugging info on serial port
 // ----------------------------------------------------------------
   
 
-#if !defined ESP32
-  #error You need to select ESP32 in the Arduino IDE
+//#include <arduino.h>         // required by platformio?
+
+#if defined ESP32
+    // esp32
+        byte LEDpin = 2; 
+        #include <WiFi.h>
+        #include <WebServer.h>
+        #include <HTTPClient.h>             // Web server running on port 80
+        WebServer server(80);
+#elif defined ESP8266
+    //Esp8266
+        byte LEDpin = D4; 
+        #include <ESP8266WiFi.h>  
+        #include <ESP8266WebServer.h>  
+        #include "ESP8266HTTPClient.h"    
+        ESP8266WebServer server(80);  
+#else
+      #error "This sketch only works with the ESP8266 or ESP32"
 #endif
-
-//#include <arduino.h>         // required by platformio
-#include <WiFi.h>
-#include <WebServer.h>
-#include <HTTPClient.h>      
-
-// Web server running on port 80
-  WebServer server(80);
 
 
 // ----------------------------------------------------------------
@@ -43,6 +51,10 @@ void setup() {
 
   Serial.begin(115200);       // start serial comms at speed 115200
   Serial.println("\n\nWebserver demo sketch");
+  
+  // onboard LEDs
+    pinMode(LEDpin, OUTPUT);
+    digitalWrite(LEDpin, LOW);   
   
   // Connect to Wifi
     Serial.print("Connecting to ");
@@ -63,8 +75,13 @@ void setup() {
 
   // start web server
     server.begin();    
-    WiFi.setSleep(false);     // stop the wifi being turned off if not used for a while   
-
+    #if defined ESP32
+        WiFi.setSleep(false);                     // stop the wifi being turned off if not used for a while  (esp32)
+    #else
+        WiFi.setSleepMode(WIFI_NONE_SLEEP);       // stop the wifi being turned off if not used for a while  (esp8266)
+    #endif
+    WiFi.mode(WIFI_STA);                          // turn off access point - options are WIFI_AP, WIFI_STA, WIFI_AP_STA or WIFI_OFF 
+        
 }  // setup
 
 
@@ -77,9 +94,10 @@ void setup() {
 
 void loop() {
 
-  server.handleClient();            // service any web page requests 
+  server.handleClient();                         // service any web page requests 
 
-  delay(100);    // wait 100 milliseconds
+  digitalWrite(LEDpin, !digitalRead(LEDpin));    // invert onboard LED status 
+  delay(200);                                    // wait 200 milliseconds
   
 }  // loop
 
@@ -114,13 +132,13 @@ void handleTest(){
   WiFiClient client = server.client();     // open link with client
 
   // html header
-    client.write("<!DOCTYPE html> <html lang='en'> <head> <title>Web Demo</title> </head> <body>\n");         // basic html header
+    client.print("<!DOCTYPE html> <html lang='en'> <head> <title>Web Demo</title> </head> <body>\n");         // basic html header
 
   // html body
     client.print("<h1>Test Page</h1>\n");
 
   // end html
-    client.write("</body></html>\n");
+    client.print("</body></html>\n");
     delay(3);
     client.stop();
   
@@ -153,18 +171,18 @@ void handleButton(){
   WiFiClient client = server.client();     // open link with client
 
   // html header
-    client.write("<!DOCTYPE html> <html lang='en'> <head> <title>Web Demo</title> </head> <body>\n");         // basic html header
-    client.write("<FORM action='/button' method='post'>\n");       // used by the buttons in the html (action = the web page to send it to
+    client.print("<!DOCTYPE html> <html lang='en'> <head> <title>Web Demo</title> </head> <body>\n");         // basic html header
+    client.print("<FORM action='/button' method='post'>\n");       // used by the buttons in the html (action = the web page to send it to
     
   // html body
     client.print("<h1>Button demo page</h1>\n");
     if (server.hasArg("button1")) client.print("Button 1 has been pressed!");
     if (server.hasArg("button2")) client.print("Button 2 has been pressed!");
-    client.write("<br><br><input style='height: 35px;' name='button1' value='Demo button 1' type='submit'> \n");
-    client.write("<br><br><input style='height: 35px;' name='button2' value='Demo button 2' type='submit'> \n");
+    client.print("<br><br><input style='height: 35px;' name='button1' value='Demo button 1' type='submit'> \n");
+    client.print("<br><br><input style='height: 35px;' name='button2' value='Demo button 2' type='submit'> \n");
 
   // end html
-    client.write("</body></html>\n");
+    client.print("</body></html>\n");
     delay(3);
     client.stop();
   
