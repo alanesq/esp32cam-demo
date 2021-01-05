@@ -55,7 +55,7 @@
   const char* password = "<your wifi password here>";
 
   const char* stitle = "ESP32Cam-demo";                  // title of this sketch
-  const char* sversion = "13Dec20";                      // Sketch version
+  const char* sversion = "05Jan21";                      // Sketch version
 
   const bool serialDebug = 1;                            // show info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
 
@@ -84,10 +84,12 @@
   const int serialSpeed = 115200;                        // Serial data speed to use
 
   // NTP - Internet time
-    const char* ntpServer = "pool.ntp.org";
-    const long  gmtOffset_sec = 0;
-    const int   daylightOffset_sec = 3600;
-
+    const char* ntpServer = "uk.pool.ntp.org";
+    const char* TZ_INFO    = "GMT+0BST-1,M3.5.0/01:00:00,M10.5.0/02:00:00";  // enter your time zone (https://remotemonitoringsystems.ca/time-zone-abbreviations.php)
+    long unsigned lastNTPtime;
+    tm timeinfo;
+    time_t now;
+    
 // camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
 //     see: https://randomnerdtutorials.com/esp32-cam-camera-pin-gpios/
   #define CAMERA_MODEL_AI_THINKER
@@ -208,11 +210,14 @@ void setup() {
     server.onNotFound(handleNotFound);            // invalid url requested
 
   // NTP - internet time
-    configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-    if (serialDebug) {
-      Serial.print("Current time: ");
-      Serial.println(localTime());
+    if (serialDebug) Serial.println("\nGetting real time (NTP)");
+    configTime(0, 0, ntpServer);
+    setenv("TZ", TZ_INFO, 1);
+    if (getNTPtime(10)) {  // wait up to 10 sec to sync
+    } else {
+      if (serialDebug) Serial.println("Time not set");
     }
+    lastNTPtime = time(&now);
 
   // set up camera
       if (serialDebug) Serial.print(("\nInitialising camera: "));
@@ -407,6 +412,7 @@ bool setupCameraHardware() {
 // Adjust image properties (brightness etc.)
 // Defaults to auto adjustments if exposure and gain are both set to zero
 // - Returns TRUE if successful
+// BTW - some interesting info on exposure times here: https://github.com/raduprv/esp32-cam_ov2640-timelapse
 
 bool cameraImageSettings() { 
    
@@ -642,6 +648,8 @@ byte storeImage() {
 // web page with control buttons, links etc.
 
 void handleRoot() {
+
+  getNTPtime(2);                                             // refresh current time from NTP server
 
   WiFiClient client = server.client();                       // open link with client
 
@@ -1034,6 +1042,35 @@ void MessageRGB(WiFiClient &client, String theText) {
 }
 
 
+
+// ******************************************************************************************************************
+
+ 
+// ----------------------------------------------------------------
+//                      -get time from ntp server
+// ----------------------------------------------------------------
+
+bool getNTPtime(int sec) {
+
+  {
+    uint32_t start = millis();
+    do {
+      time(&now);
+      localtime_r(&now, &timeinfo);
+      Serial.print(".");
+      delay(10);
+    } while (((millis() - start) <= (1000 * sec)) && (timeinfo.tm_year < (2016 - 1900)));
+    if (timeinfo.tm_year <= (2016 - 1900)) return false;  // the NTP call was not successful
+    Serial.print("now ");  Serial.println(now);
+    char time_output[30];
+    strftime(time_output, 30, "%a  %d-%m-%y %T", localtime(&now));
+    Serial.println(time_output);
+    Serial.println();
+  }
+  return true;
+}
+
+
 // ******************************************************************************************************************
 
 
@@ -1202,28 +1239,30 @@ void handleTest() {
 
 
 
+    
+    
+    
+        // < YOUR TEST CODE GOES HERE> 
 
 
 
 
+    
+    
 
 
-
-
-
-
-  // demo useage of the mcp23017 io chip 
-    #if useMCP23017 == 1
-      while(1) {
-          mcp.digitalWrite(0, HIGH);
-          int q = mcp.digitalRead(8);
-          client.print("<p>HIGH, input =" + String(q) + "</p>");
-          delay(1000);
-          mcp.digitalWrite(0, LOW);
-          client.print("<p>LOW</p>");
-          delay(1000);
-      }
-    #endif
+//  // demo useage of the mcp23017 io chip 
+//    #if useMCP23017 == 1
+//      while(1) {
+//          mcp.digitalWrite(0, HIGH);
+//          int q = mcp.digitalRead(8);
+//          client.print("<p>HIGH, input =" + String(q) + "</p>");
+//          delay(1000);
+//          mcp.digitalWrite(0, LOW);
+//          client.print("<p>LOW</p>");
+//          delay(1000);
+//      }
+//    #endif
 
 
 
