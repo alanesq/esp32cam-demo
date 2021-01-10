@@ -1,20 +1,29 @@
 // ----------------------------------------------------------------
 //
 //
-//       ESP32 / ESp8266  very basic web server demo - 02Jan21
+//       ESP32 / ESp8266  very basic web server demo - 10Jan21
 //
-//               Starting point to experiment with
+//       shows use of AJAX to show updating info on the web page
 //
 //
 // ----------------------------------------------------------------
 
 
-// Wifi settings
-  const char *SSID = "your_wifi_ssid";
-  const char *PWD = "your_wifi_pwd";
+
+//   ---------------------------------------------------------------------------------------------------------
+
+//                              Wifi settings
+
+const char *SSID = "your_wifi_ssid";
+const char *PWD = "your_wifi_pwd";
 
 
-bool serialDebug = 1;          // if to enable debugging info on serial port
+//   ---------------------------------------------------------------------------------------------------------
+
+
+
+bool serialDebug = 1;          // enable debugging info on serial port
+  
 
 
 // ----------------------------------------------------------------
@@ -51,10 +60,11 @@ void setup() {
 
   Serial.begin(115200);       // start serial comms at speed 115200
   Serial.println("\n\nWebserver demo sketch");
+  Serial.println("- Reset reason: " + ESP.getResetReason());
   
   // onboard LEDs
     pinMode(LEDpin, OUTPUT);
-    digitalWrite(LEDpin, LOW);   
+    digitalWrite(LEDpin, HIGH);   
   
   // Connect to Wifi
     Serial.print("Connecting to ");
@@ -64,22 +74,28 @@ void setup() {
       Serial.print(".");
       delay(500);
     }
-    Serial.print("Connected. IP: ");
+    Serial.print("\nConnected - IP: ");
     Serial.println(WiFi.localIP());
 
   // set up web server pages to serve (API resources)
-    server.on("/test", handleTest);               // '/test' URL is requested, run the procedure named 'handleTemp'
-    server.on("/button", handleButton);           // '/button' URL requested
+    server.on("/test", handleTest);               // test URL is requested, run the procedure named 'handleTemp'
+    server.on("/ajax", handleAJAX);               // demo using AJAX to update information on the page (also javascript buttons)
+      server.on("/sendtime", handleSendtime);     // requested by the AJAX web page to request data  
+      server.on("/setLED", handleLED);            // action button clicks on AJAX page     
+    server.on("/button", handleButton);           // demo simple use of buttons
     server.on("/", handleRoot);                   // root web page requested
     server.onNotFound(handleNotFound);            // if invalid url is requested
 
   // start web server
     server.begin();    
-    #if defined ESP32
-        WiFi.setSleep(false);                     // stop the wifi being turned off if not used for a while  (esp32)
-    #else
-        WiFi.setSleepMode(WIFI_NONE_SLEEP);       // stop the wifi being turned off if not used for a while  (esp8266)
-    #endif
+    
+    // stop the wifi being turned off if not used for a while 
+      #if defined ESP32
+        WiFi.setSleep(false); 
+      #else
+        WiFi.setSleepMode(WIFI_NONE_SLEEP); 
+      #endif
+        
     WiFi.mode(WIFI_STA);                          // turn off access point - options are WIFI_AP, WIFI_STA, WIFI_AP_STA or WIFI_OFF 
         
 }  // setup
@@ -96,8 +112,9 @@ void loop() {
 
   server.handleClient();                         // service any web page requests 
 
-  digitalWrite(LEDpin, !digitalRead(LEDpin));    // invert onboard LED status 
-  delay(200);                                    // wait 200 milliseconds
+  //// flash onboard LED
+  //digitalWrite(LEDpin, !digitalRead(LEDpin));    // invert onboard LED status 
+  //delay(200);                                    // wait 200 milliseconds
   
 }  // loop
 
@@ -149,7 +166,7 @@ void handleTest(){
 // ----------------------------------------------------------------
 //      -button web page requested     i.e. http://x.x.x.x/button
 // ----------------------------------------------------------------
-// demonstrate use of a html buttons
+// demonstrate simple use of a html buttons without using Javascript
 
 void handleButton(){
 
@@ -188,6 +205,102 @@ void handleButton(){
   
 }  // handleButton
 
+
+// ----------------------------------------------------------------
+//      -ajax web page requested     i.e. http://x.x.x.x/ajax
+// ----------------------------------------------------------------
+// demonstrate use ofAJAX to refresh info. on web page
+// see:  https://circuits4you.com/2018/02/04/esp8266-ajax-update-part-of-web-page-without-refreshing/
+
+void handleAJAX() {
+
+#define LED 2  //On board LED
+
+  WiFiClient client = server.client();     // open link with client
+
+  // HTML header
+    client.print("\
+      <!DOCTYPE html>\
+      <html>\
+      <body>\
+    ");
+
+  // HTML body
+    client.print("\
+      <div id='demo'>\
+      <h1>Update web page using AJAX</h1>\
+        <button type='button' onclick='sendData(1)'>LED ON</button>\
+        <button type='button' onclick='sendData(0)'>LED OFF</button><BR>\
+      </div>\
+      <div>\
+        Current Millis : <span id='MillisValue'>0</span><br>\
+        LED State is : <span id='LEDState'>NA</span>\
+      </div>\
+    ");
+
+  // Javascript  
+    client.print("\
+      <script>\
+      function sendData(led) {\
+        var xhttp = new XMLHttpRequest();\
+        xhttp.onreadystatechange = function() {\
+          if (this.readyState == 4 && this.status == 200) {\
+            document.getElementById('LEDState').innerHTML =\
+            this.responseText;\
+          }\
+        };\
+        xhttp.open('GET', 'setLED?LEDstate='+led, true);\
+        xhttp.send();\
+      }\
+      setInterval(function() {\
+        getData();\
+      }, 2000);\
+      function getData() {\
+        var xhttp = new XMLHttpRequest();\
+        xhttp.onreadystatechange = function() {\
+          if (this.readyState == 4 && this.status == 200) {\
+            document.getElementById('MillisValue').innerHTML =\
+            this.responseText;\
+          }\
+        };\
+        xhttp.open('GET', 'sendtime', true);\
+        xhttp.send();\
+      }\
+      </script>\
+    ");
+
+  // close HTML
+    client.print("\
+      </body>\
+      </html>\
+    ");
+    delay(3);
+    client.stop();
+  
+}   // handleAJAX
+
+
+// send millis (ajax request)
+void handleSendtime() {
+ String cTime = String(millis());
+ server.send(200, "text/plane", cTime); //Send millis value only to client ajax request
+}
+
+
+// handle button clicks on AJAX web page
+void handleLED() {
+  String ledState = "OFF";
+  String t_state = server.arg("LEDstate");     //Refer  xhttp.open("GET", "setLED?LEDstate="+led, true);
+  Serial.println(t_state);
+  if(t_state == "1") {
+    digitalWrite(LEDpin,LOW);                   //LED ON
+    ledState = "ON";                            //Feedback parameter
+  } else {
+    digitalWrite(LEDpin,HIGH);                  //LED OFF
+    ledState = "OFF";                           //Feedback parameter  
+  }
+  server.send(200, "text/plane", ledState);     //Send web page
+}
 
 
 // ----------------------------------------------------------------
@@ -269,12 +382,11 @@ String requestWebPage(String ip, String page, int port, int maxChars, String cut
       while ( !client.available() && (uint32_t)(millis() - ttimer) < maxWaitTime ) {
         delay(10);
       }
+      if ( ((uint32_t)(millis() - ttimer) > maxWaitTime ) && serialDebug) Serial.println("-Timed out");
 
     // read the response
       while ( client.available() && received_counter < maxChars ) {
-        #if defined ESP8266
-          delay(2);                          // it just reads 255s on esp8266 if this delay is not included
-        #endif        
+        delay(4);      
         received[received_counter] = char(client.read());     // read one character
         received_counter+=1;
       }
