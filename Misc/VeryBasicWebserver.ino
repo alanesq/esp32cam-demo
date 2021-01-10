@@ -9,17 +9,17 @@
 // ----------------------------------------------------------------
 
 
+//   ---------------------------------------------------------------------------------------------------------
+
+//                                      Wifi Settings
+
+const char *SSID = "your_wifi_ssid";
+
+const char *PWD = "your_wifi_pwd";
+
 
 //   ---------------------------------------------------------------------------------------------------------
 
-//                              Wifi settings
-
-        const char *SSID = "your_wifi_ssid";
-        
-        const char *PWD = "your_wifi_pwd";
-
-
-//   ---------------------------------------------------------------------------------------------------------
 
 
 
@@ -37,7 +37,7 @@ bool serialDebug = 1;          // enable debugging info on serial port
         byte LEDpin = 2; 
         #include <WiFi.h>
         #include <WebServer.h>
-        #include <HTTPClient.h>             // Web server running on port 80
+        #include <HTTPClient.h>     
         WebServer server(80);
 #elif defined ESP8266
     //Esp8266
@@ -78,13 +78,13 @@ void setup() {
     Serial.print("\nConnected - IP: ");
     Serial.println(WiFi.localIP());
 
-  // set up web server pages to serve (API resources)
-    server.on("/test", handleTest);               // test URL is requested, run the procedure named 'handleTemp'
-    server.on("/ajax", handleAJAX);               // demo using AJAX to update information on the page (also javascript buttons)
-      server.on("/sendtime", handleSendtime);     // requested by the AJAX web page to request data  
-      server.on("/setLED", handleLED);            // action button clicks on AJAX page     
+  // set up web server pages to serve
+    server.on("/", handleRoot);                   // root web page (i.e. when root page is requested run procedure 'handleroot')
+    server.on("/test", handleTest);               // test web page 
     server.on("/button", handleButton);           // demo simple use of buttons
-    server.on("/", handleRoot);                   // root web page requested
+    server.on("/ajax", handleAJAX);               // demo using AJAX to update information on the page (also javascript buttons)
+      server.on("/senddata", handleSendData);     // requested by the AJAX web page to request current millis value
+      server.on("/setLED", handleLED);            // action when a button is clicked on the AJAX page 
     server.onNotFound(handleNotFound);            // if invalid url is requested
 
   // start web server
@@ -220,26 +220,30 @@ void handleAJAX() {
   // HTML header
     client.print("\
       <!DOCTYPE html>\
-      <html>\
-      <body>\
+      <html lang='en'>\
+        <head>\
+          <title>AJAX Demo</title>\
+        </head>\
+      <body>\n\
     ");
 
   // HTML body
     client.print("\
       <div id='demo'>\
-      <h1>Update web page using AJAX</h1>\
+        <h1>Update web page using AJAX</h1>\
         <button type='button' onclick='sendData(1)'>LED ON</button>\
         <button type='button' onclick='sendData(0)'>LED OFF</button><BR>\
       </div>\
       <div>\
         Current Millis : <span id='MillisValue'>0</span><br>\
-        LED State is : <span id='LEDState'>NA</span>\
-      </div>");
+        Received text : <span id='ReceivedText'>NA</span><br>\
+        LED State is : <span id='LEDState'>NA</span><br>\
+      </div>\n");
 
     
     // Javascript  
     
-        client.print("<script>");
+        client.print("<script>\n");
     
         // triggered when a button is pressed - calls the 'handleLED()' procedure below via '/setled'
         client.print("\
@@ -260,19 +264,22 @@ void handleAJAX() {
                 getData();\
               }, 2000);");
         
-        // 'getdata' = requests the current millis() value - calls the 'handleSendtime()' procedure below via '/sendtime'
+        // 'getdata' = requests data - calls the 'handleSendtime()' procedure below via '/sendtime'
+        //             data is sent as a comma deliminated list (2 items - millis() and some text)
             client.print("\
               function getData() {\
                 var xhttp = new XMLHttpRequest();\
                 xhttp.onreadystatechange = function() {\
                 if (this.readyState == 4 && this.status == 200) {\
-                  document.getElementById('MillisValue').innerHTML = this.responseText;\
+                  var receivedArr = this.responseText.split(',');\
+                  document.getElementById('MillisValue').innerHTML = receivedArr[0];\
+                  document.getElementById('ReceivedText').innerHTML = receivedArr[1];\
                 }\
               };\
-            xhttp.open('GET', 'sendtime', true);\
+            xhttp.open('GET', 'senddata', true);\
             xhttp.send();}");
             
-        client.print("</script>");
+        client.print("</script>\n");
 
         
   // close HTML
@@ -287,11 +294,13 @@ void handleAJAX() {
 }   // handleAJAX
 
 
-// send millis (ajax request)
-//   it just replies with the current Millis value as plain text
-void handleSendtime() {
- String cTime = String(millis());
- server.send(200, "text/plane", cTime); //Send millis value only to client ajax request
+// send data to AJAX web page
+//   it replies with two items comma seperated: the value in millis and some text
+void handleSendData() {
+ String reply = String(millis());                     // item 1 
+ reply += ",";
+ reply += "This text sent by handleSendtime()";       // item 2
+ server.send(200, "text/plane", reply); //Send millis value only to client ajax request
 }
 
 
