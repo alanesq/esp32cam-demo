@@ -13,11 +13,9 @@
 
 //                                      Wifi Settings
 
-#include <wifiSettings.h>       // delete this line, un-comment the below two lines and enter your wifi details
+const char *SSID = "your_wifi_ssid";
 
-//const char *SSID = "your_wifi_ssid";
-
-//const char *PWD = "your_wifi_pwd";
+const char *PWD = "your_wifi_pwd";
 
 
 //   ---------------------------------------------------------------------------------------------------------
