@@ -14,8 +14,9 @@
 
 //                              Wifi settings
 
-const char *SSID = "your_wifi_ssid";
-const char *PWD = "your_wifi_pwd";
+        const char *SSID = "your_wifi_ssid";
+        
+        const char *PWD = "your_wifi_pwd";
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -209,12 +210,10 @@ void handleButton(){
 // ----------------------------------------------------------------
 //      -ajax web page requested     i.e. http://x.x.x.x/ajax
 // ----------------------------------------------------------------
-// demonstrate use ofAJAX to refresh info. on web page
+// demonstrate use of AJAX to refresh info. on web page
 // see:  https://circuits4you.com/2018/02/04/esp8266-ajax-update-part-of-web-page-without-refreshing/
 
 void handleAJAX() {
-
-#define LED 2  //On board LED
 
   WiFiClient client = server.client();     // open link with client
 
@@ -235,45 +234,53 @@ void handleAJAX() {
       <div>\
         Current Millis : <span id='MillisValue'>0</span><br>\
         LED State is : <span id='LEDState'>NA</span>\
-      </div>\
-    ");
+      </div>");
 
-  // Javascript  
-    client.print("\
-      <script>\
-      function sendData(led) {\
-        var xhttp = new XMLHttpRequest();\
-        xhttp.onreadystatechange = function() {\
-          if (this.readyState == 4 && this.status == 200) {\
-            document.getElementById('LEDState').innerHTML =\
-            this.responseText;\
-          }\
-        };\
-        xhttp.open('GET', 'setLED?LEDstate='+led, true);\
-        xhttp.send();\
-      }\
-      setInterval(function() {\
-        getData();\
-      }, 2000);\
-      function getData() {\
-        var xhttp = new XMLHttpRequest();\
-        xhttp.onreadystatechange = function() {\
-          if (this.readyState == 4 && this.status == 200) {\
-            document.getElementById('MillisValue').innerHTML =\
-            this.responseText;\
-          }\
-        };\
-        xhttp.open('GET', 'sendtime', true);\
-        xhttp.send();\
-      }\
-      </script>\
-    ");
+    
+    // Javascript  
+    
+        client.print("<script>");
+    
+        // triggered when a button is pressed - calls the 'handleLED()' procedure below via '/setled'
+        client.print("\
+          function sendData(led) {\
+            var xhttp = new XMLHttpRequest();\
+            xhttp.onreadystatechange = function() {\
+              if (this.readyState == 4 && this.status == 200) {\
+                document.getElementById('LEDState').innerHTML = this.responseText;\
+              }\
+            };\
+            xhttp.open('GET', 'setLED?LEDstate='+led, true);\
+            xhttp.send();\
+          }");
+        
+        // auto triggers 'getData' every 2 seconds
+            client.print("\
+              setInterval(function() {\
+                getData();\
+              }, 2000);");
+        
+        // 'getdata' = requests the current millis() value - calls the 'handleSendtime()' procedure below via '/sendtime'
+            client.print("\
+              function getData() {\
+                var xhttp = new XMLHttpRequest();\
+                xhttp.onreadystatechange = function() {\
+                if (this.readyState == 4 && this.status == 200) {\
+                  document.getElementById('MillisValue').innerHTML = this.responseText;\
+                }\
+              };\
+            xhttp.open('GET', 'sendtime', true);\
+            xhttp.send();}");
+            
+        client.print("</script>");
 
+        
   // close HTML
     client.print("\
       </body>\
       </html>\
     ");
+    
     delay(3);
     client.stop();
   
@@ -281,6 +288,7 @@ void handleAJAX() {
 
 
 // send millis (ajax request)
+//   it just replies with the current Millis value as plain text
 void handleSendtime() {
  String cTime = String(millis());
  server.send(200, "text/plane", cTime); //Send millis value only to client ajax request
@@ -288,6 +296,7 @@ void handleSendtime() {
 
 
 // handle button clicks on AJAX web page
+//    it sets the onboard LED status and replies with it's status as plain text
 void handleLED() {
   String ledState = "OFF";
   String t_state = server.arg("LEDstate");     //Refer  xhttp.open("GET", "setLED?LEDstate="+led, true);
