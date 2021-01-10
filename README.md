@@ -29,6 +29,8 @@ I have tried to make the sketch as easy to follow/modify as possible with lots o
 as I found it quiet confusing as an ameteur trying to do much with this module and difficult to find easy to understand 
 examples/explanations of what I wanted to do, so I am publishing this sketch in the hope it will encourage/help others to have a 
 try with these powerful and VERY affordable modules.
+BTW - For some examples of serving web pages with en ESP module you may like to have a look 
+      at: https://github.com/alanesq/esp32cam-demo/blob/master/Misc/VeryBasicWebserver.ino
 
 BTW - Even if you do not require the camera I think these modules have some uses in many projects as they are very cheap, have a 
 built in sd card reader, 
