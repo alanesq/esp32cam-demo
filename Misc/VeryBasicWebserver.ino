@@ -13,15 +13,14 @@
 
 //                                      Wifi Settings
 
+#include <wifiSettings.h>       // delete this line, un-comment the below two lines and enter your wifi details
 
-const char *SSID = "your_wifi_ssid";
+//const char *SSID = "your_wifi_ssid";
 
-const char *PWD = "your_wifi_pwd";
+//const char *PWD = "your_wifi_pwd";
 
 
 //   ---------------------------------------------------------------------------------------------------------
-
-
 
 
 
@@ -220,33 +219,40 @@ void handleButton(){
 
   // HTML header
   const char HTML_Header[]  = R"=====(
-        <!DOCTYPE html>
-        <html lang='en'>
-          <head>
-            <title>AJAX Demo</title>
-          </head>
-        <body>
+      
+    <!DOCTYPE html>
+    <html lang='en'>
+    <head>
+        <title>AJAX Demo</title>
+    </head>
+    
   )=====";
+
 
   // HTML Body
   const char HTML_Body[] = R"=====(
-      <div id='demo'>
+      
+    <body>
+    <div id='demo'>
         <h1>Update web page using AJAX</h1>
         <button type='button' onclick='sendData(1)'>LED ON</button>
         <button type='button' onclick='sendData(0)'>LED OFF</button><BR>
-      </div>
-      <div>
+    </div>
+    <div>
         Current Millis : <span id='MillisValue'>0</span><br>
         Received text : <span id='ReceivedText'>NA</span><br>
         LED State is : <span id='LEDState'>NA</span><br>
-      </div>
-   )=====";
+    </div>
+    
+  )=====";
 
-   // Javascript
-   //    functions:   sendData - triggered when a html button is pressed
-   //                  getData - refreshes data on page - received as a comma deliminated list - triggers every 2 seconds
-   const char HTML_JavaScript[] = R"=====(
-      <script>
+
+  // Javascript
+  //    functions:   sendData - triggered when a html button is pressed
+  //                  getData - refreshes data on page - received as a comma deliminated list - triggers every 2 seconds
+  const char HTML_JavaScript[] = R"=====(
+      
+    <script>
       
         function sendData(led) {
           var xhttp = new XMLHttpRequest();
@@ -274,8 +280,9 @@ void handleButton(){
             getData();
           }, 2000);
           
-       </script>         
-   )=====";
+    </script>    
+    
+  )=====";
 
    
 void handleAJAX() {
@@ -286,7 +293,7 @@ void handleAJAX() {
   client.print(HTML_Body);
   client.print(HTML_JavaScript);
   
-  client.print("</body></html>\n");          // close HTML
+  client.print("</body></html>\n");        // close HTML
   delay(3);
   client.stop();
   
