@@ -13,12 +13,14 @@
 
 //                                      Wifi Settings
 
+
 const char *SSID = "your_wifi_ssid";
 
 const char *PWD = "your_wifi_pwd";
 
 
 //   ---------------------------------------------------------------------------------------------------------
+
 
 
 
@@ -213,83 +215,80 @@ void handleButton(){
 // demonstrate use of AJAX to refresh info. on web page
 // see:  https://circuits4you.com/2018/02/04/esp8266-ajax-update-part-of-web-page-without-refreshing/
 
+
+// html used in handleAJAX() 
+
+  // HTML header
+  const char HTML_Header[]  = R"=====(
+        <!DOCTYPE html>
+        <html lang='en'>
+          <head>
+            <title>AJAX Demo</title>
+          </head>
+        <body>
+  )=====";
+
+  // HTML Body
+  const char HTML_Body[] = R"=====(
+      <div id='demo'>
+        <h1>Update web page using AJAX</h1>
+        <button type='button' onclick='sendData(1)'>LED ON</button>
+        <button type='button' onclick='sendData(0)'>LED OFF</button><BR>
+      </div>
+      <div>
+        Current Millis : <span id='MillisValue'>0</span><br>
+        Received text : <span id='ReceivedText'>NA</span><br>
+        LED State is : <span id='LEDState'>NA</span><br>
+      </div>
+   )=====";
+
+   // Javascript
+   //    functions:   sendData - triggered when a html button is pressed
+   //                  getData - refreshes data on page - received as a comma deliminated list - triggers every 2 seconds
+   const char HTML_JavaScript[] = R"=====(
+      <script>
+      
+        function sendData(led) {
+          var xhttp = new XMLHttpRequest();
+          xhttp.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) {
+              document.getElementById('LEDState').innerHTML = this.responseText;
+            }
+         };
+         xhttp.open('GET', 'setLED?LEDstate='+led, true);
+         xhttp.send();}
+         
+         function getData() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) {
+              var receivedArr = this.responseText.split(',');
+              document.getElementById('MillisValue').innerHTML = receivedArr[0];
+              document.getElementById('ReceivedText').innerHTML = receivedArr[1];
+            }
+         };
+         xhttp.open('GET', 'senddata', true);
+         xhttp.send();}
+         
+         setInterval(function() {
+            getData();
+          }, 2000);
+          
+       </script>         
+   )=====";
+
+   
 void handleAJAX() {
 
   WiFiClient client = server.client();     // open link with client
-
-  // HTML header
-    client.print("\
-      <!DOCTYPE html>\
-      <html lang='en'>\
-        <head>\
-          <title>AJAX Demo</title>\
-        </head>\
-      <body>\n\
-    ");
-
-  // HTML body
-    client.print("\
-      <div id='demo'>\
-        <h1>Update web page using AJAX</h1>\
-        <button type='button' onclick='sendData(1)'>LED ON</button>\
-        <button type='button' onclick='sendData(0)'>LED OFF</button><BR>\
-      </div>\
-      <div>\
-        Current Millis : <span id='MillisValue'>0</span><br>\
-        Received text : <span id='ReceivedText'>NA</span><br>\
-        LED State is : <span id='LEDState'>NA</span><br>\
-      </div>\n");
-
-    
-    // Javascript  
-    
-        client.print("<script>\n");
-    
-        // triggered when a button is pressed - calls the 'handleLED()' procedure below via '/setled'
-        client.print("\
-          function sendData(led) {\
-            var xhttp = new XMLHttpRequest();\
-            xhttp.onreadystatechange = function() {\
-              if (this.readyState == 4 && this.status == 200) {\
-                document.getElementById('LEDState').innerHTML = this.responseText;\
-              }\
-            };\
-            xhttp.open('GET', 'setLED?LEDstate='+led, true);\
-            xhttp.send();\
-          }");
-        
-        // auto triggers 'getData' every 2 seconds
-            client.print("\
-              setInterval(function() {\
-                getData();\
-              }, 2000);");
-        
-        // 'getdata' = requests data - calls the 'handleSendtime()' procedure below via '/sendtime'
-        //             data is sent as a comma deliminated list (2 items - millis() and some text)
-            client.print("\
-              function getData() {\
-                var xhttp = new XMLHttpRequest();\
-                xhttp.onreadystatechange = function() {\
-                if (this.readyState == 4 && this.status == 200) {\
-                  var receivedArr = this.responseText.split(',');\
-                  document.getElementById('MillisValue').innerHTML = receivedArr[0];\
-                  document.getElementById('ReceivedText').innerHTML = receivedArr[1];\
-                }\
-              };\
-            xhttp.open('GET', 'senddata', true);\
-            xhttp.send();}");
-            
-        client.print("</script>\n");
-
-        
-  // close HTML
-    client.print("\
-      </body>\
-      </html>\
-    ");
-    
-    delay(3);
-    client.stop();
+  
+  client.print(HTML_Header);               // send html           
+  client.print(HTML_Body);
+  client.print(HTML_JavaScript);
+  
+  client.print("</body></html>\n");          // close HTML
+  delay(3);
+  client.stop();
   
 }   // handleAJAX
 
