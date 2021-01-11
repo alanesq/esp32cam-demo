@@ -13,9 +13,11 @@
 
 //                                      Wifi Settings
 
-const char *SSID = "your_wifi_ssid";
+#include <wifiSettings.h>       // delete this line, un-comment the below two lines and enter your wifi details
 
-const char *PWD = "your_wifi_pwd";
+//const char *SSID = "your_wifi_ssid";
+
+//const char *PWD = "your_wifi_pwd";
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -59,6 +61,7 @@ bool serialDebug = 1;          // enable debugging info on serial port
 void setup() {
 
   Serial.begin(115200);       // start serial comms at speed 115200
+  delay(200);
   Serial.println("\n\nWebserver demo sketch");
   Serial.println("- Reset reason: " + ESP.getResetReason());
   
@@ -211,46 +214,45 @@ void handleButton(){
 // ----------------------------------------------------------------
 // demonstrate use of AJAX to refresh info. on web page
 // see:  https://circuits4you.com/2018/02/04/esp8266-ajax-update-part-of-web-page-without-refreshing/
+  
+void handleAJAX() {
 
+  WiFiClient client = server.client();     // open link with client
 
-// html used in handleAJAX() 
-
-  // HTML header
-  const char HTML_Header[]  = R"=====(
-      
-    <!DOCTYPE html>
-    <html lang='en'>
-    <head>
-        <title>AJAX Demo</title>
-    </head>
+  // log page request including clients IP address
+    IPAddress cip = client.remoteIP();
+    Serial.println("Ajax page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]) );
+  
+  
+  //     ------------------- send the html -------------------
+  
+    client.print (R"=====(
     
-  )=====";
+      <!DOCTYPE html>
+      <html lang='en'>
+      <head>
+          <title>AJAX Demo</title>
+      </head>
 
-
-  // HTML Body
-  const char HTML_Body[] = R"=====(
+      <body>
+      <div id='demo'>
+          <h1>Update web page using AJAX</h1>
+          <button type='button' onclick='sendData(1)'>LED ON</button>
+          <button type='button' onclick='sendData(0)'>LED OFF</button><BR>
+      </div>
+      <div>
+          Current Millis : <span id='MillisValue'>0</span><br>
+          Received text : <span id='ReceivedText'>NA</span><br>
+          LED State is : <span id='LEDState'>NA</span><br>
+      </div>
       
-    <body>
-    <div id='demo'>
-        <h1>Update web page using AJAX</h1>
-        <button type='button' onclick='sendData(1)'>LED ON</button>
-        <button type='button' onclick='sendData(0)'>LED OFF</button><BR>
-    </div>
-    <div>
-        Current Millis : <span id='MillisValue'>0</span><br>
-        Received text : <span id='ReceivedText'>NA</span><br>
-        LED State is : <span id='LEDState'>NA</span><br>
-    </div>
-    
-  )=====";
+    )=====");
 
+  //     ------------------- JavaScript -------------------
+       
+    client.print (R"=====(
 
-  // Javascript
-  //    functions:   sendData - triggered when a html button is pressed
-  //                  getData - refreshes data on page - received as a comma deliminated list - triggers every 2 seconds
-  const char HTML_JavaScript[] = R"=====(
-      
-    <script>
+      <script>
       
         function sendData(led) {
           var xhttp = new XMLHttpRequest();
@@ -277,23 +279,17 @@ void handleButton(){
          setInterval(function() {
             getData();
           }, 2000);
-          
-    </script>    
-    
-  )=====";
+            
+      </script>    
 
-   
-void handleAJAX() {
+    )=====");
 
-  WiFiClient client = server.client();     // open link with client
-  
-  client.print(HTML_Header);               // send html           
-  client.print(HTML_Body);
-  client.print(HTML_JavaScript);
-  
-  client.print("</body></html>\n");        // close HTML
-  delay(3);
-  client.stop();
+  //     --------------------------------------------------    
+
+  // close html page
+    client.print("</body></html>\n");        // close HTML
+    delay(3);
+    client.stop();
   
 }   // handleAJAX
 
