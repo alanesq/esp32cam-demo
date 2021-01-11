@@ -1,7 +1,7 @@
 // ----------------------------------------------------------------
 //
 //
-//       ESP32 / ESp8266  very basic web server demo - 10Jan21
+//       ESP32 / ESp8266  very basic web server demo - 11Jan21
 //
 //       shows use of AJAX to show updating info on the web page
 //
@@ -224,66 +224,61 @@ void handleAJAX() {
     Serial.println("Ajax page requested from: " + String(cip[0]) +"." + String(cip[1]) + "." + String(cip[2]) + "." + String(cip[3]) );
   
   
-  //     ------------------- send the html -------------------
+  //     ---------------------- html ----------------------
   
-    client.print (R"=====(
+  client.print (R"=====(
     
-      <!DOCTYPE html>
-      <html lang='en'>
-      <head>
-          <title>AJAX Demo</title>
-      </head>
+    <!DOCTYPE html>
+    <html lang='en'>
+    <head>
+        <title>AJAX Demo</title>
+    </head>
 
-      <body>
-      <div id='demo'>
-          <h1>Update web page using AJAX</h1>
-          <button type='button' onclick='sendData(1)'>LED ON</button>
-          <button type='button' onclick='sendData(0)'>LED OFF</button><BR>
-      </div>
-      <div>
-          Current Millis : <span id='MillisValue'>0</span><br>
-          Received text : <span id='ReceivedText'>NA</span><br>
-          LED State is : <span id='LEDState'>NA</span><br>
-      </div>
+    <body>
+    <div id='demo'>
+        <h1>Update web page using AJAX</h1>
+        <button type='button' onclick='sendData(1)'>LED ON</button>
+        <button type='button' onclick='sendData(0)'>LED OFF</button><BR>
+    </div>
+    <div>
+        Current Millis : <span id='MillisValue'>0</span><br>
+        Received text : <span id='ReceivedText'>NA</span><br>
+        LED State is : <span id='LEDState'>NA</span><br>
+    </div>
       
-    )=====");
+  )=====");
+  
+  //     ------------------- JavaScript -------------------  
 
-  //     ------------------- JavaScript -------------------
+  client.print (R"=====(<script>
+
+      function sendData(led) {
+        var xhttp = new XMLHttpRequest();
+        xhttp.onreadystatechange = function() {
+          if (this.readyState == 4 && this.status == 200) {
+            document.getElementById('LEDState').innerHTML = this.responseText;
+          }
+       };
+       xhttp.open('GET', 'setLED?LEDstate='+led, true);
+       xhttp.send();}
        
-    client.print (R"=====(
-
-      <script>
-      
-        function sendData(led) {
+       function getData() {
           var xhttp = new XMLHttpRequest();
           xhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-              document.getElementById('LEDState').innerHTML = this.responseText;
-            }
-         };
-         xhttp.open('GET', 'setLED?LEDstate='+led, true);
-         xhttp.send();}
-         
-         function getData() {
-            var xhttp = new XMLHttpRequest();
-            xhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-              var receivedArr = this.responseText.split(',');
-              document.getElementById('MillisValue').innerHTML = receivedArr[0];
-              document.getElementById('ReceivedText').innerHTML = receivedArr[1];
-            }
-         };
-         xhttp.open('GET', 'senddata', true);
-         xhttp.send();}
-         
-         setInterval(function() {
-            getData();
-          }, 2000);
-            
-      </script>    
-
-    )=====");
-
+          if (this.readyState == 4 && this.status == 200) {
+            var receivedArr = this.responseText.split(',');
+            document.getElementById('MillisValue').innerHTML = receivedArr[0];
+            document.getElementById('ReceivedText').innerHTML = receivedArr[1];
+          }
+       };
+       xhttp.open('GET', 'senddata', true);
+       xhttp.send();}
+       
+       setInterval(function() {
+          getData();
+        }, 2000);
+          
+  </script>)=====");
   //     --------------------------------------------------    
 
   // close html page
@@ -295,29 +290,29 @@ void handleAJAX() {
 
 
 // send data to AJAX web page
-//   it replies with two items comma seperated: the value in millis and some text
+//   it replies with two items comma separated: the value in millis and some text
 void handleSendData() {
- String reply = String(millis());                     // item 1 
- reply += ",";
- reply += "This text sent by handleSendtime()";       // item 2
- server.send(200, "text/plane", reply); //Send millis value only to client ajax request
+   String reply = String(millis());                     // item 1 
+   reply += ",";
+   reply += "This text sent by handleSendtime()";       // item 2
+   server.send(200, "text/plane", reply); //Send millis value only to client ajax request
 }
 
 
 // handle button clicks on AJAX web page
 //    it sets the onboard LED status and replies with it's status as plain text
 void handleLED() {
-  String ledState = "OFF";
-  String t_state = server.arg("LEDstate");     //Refer  xhttp.open("GET", "setLED?LEDstate="+led, true);
-  Serial.println(t_state);
-  if(t_state == "1") {
-    digitalWrite(LEDpin,LOW);                   //LED ON
-    ledState = "ON";                            //Feedback parameter
-  } else {
-    digitalWrite(LEDpin,HIGH);                  //LED OFF
-    ledState = "OFF";                           //Feedback parameter  
-  }
-  server.send(200, "text/plane", ledState);     //Send web page
+    String ledState = "OFF";
+    String t_state = server.arg("LEDstate");     //Refer  xhttp.open("GET", "setLED?LEDstate="+led, true);
+    Serial.println(t_state);
+    if(t_state == "1") {
+      digitalWrite(LEDpin,LOW);                   //LED ON
+      ledState = "ON";                            //Feedback parameter
+    } else {
+      digitalWrite(LEDpin,HIGH);                  //LED OFF
+      ledState = "OFF";                           //Feedback parameter  
+    }
+    server.send(200, "text/plane", ledState);     //Send web page
 }
 
 
