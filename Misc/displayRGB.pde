@@ -1,6 +1,8 @@
 /* 
 
        PROCESSING file to read a raw rgb data file and display it
+       
+       This would be a file created from the command:   client.write(rgb, ARRAY_LENGTH);
 
                              Alanesq - 13Nov20
 
