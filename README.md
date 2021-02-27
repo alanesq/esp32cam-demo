@@ -1,6 +1,7 @@
 <h1>ESP32Cam-demo sketch for use with the Arduino IDE</h1>
 <p align="center"><img src="/images/esp32cam.jpeg" width="80%"/></p>
 
+<br><br>
 LATEST NEWS!!!
 <br>There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
 <br>Search eBay for "esp32cam mb" - see http://www.hpcba.com/en/latest/source/DevelopmentBoard/HK-ESP32-CAM-MB.html 
@@ -12,6 +13,7 @@ The wifi is very poor whilst in the motherboard (I find this happens if you have
 but if I rest my thumb above the antenna I find the signal works ok). <br> 
 Many of the ebay listing include an external antenna and I would suggest this would b a good option if ordering one.  <br>
 So they are far from perfect but still for the price I think well worth having.
+<br><br>
 
 This can be used as a starting point sketch for projects using the esp32cam development board, 
 it has the following features:
@@ -24,7 +26,6 @@ it has the following features:
 <br>-PWM control of flash/illumination lED brighness implemented (i.e. to give brighness control)
 <br>-Can read the image as RGB data  (i.e. 3 bytes per pixel for red green and blue value)
 <br>-Act as web client (reading the web page in to a string) - see requestWebPage()
-
 
 I have tried to make the sketch as easy to follow/modify as possible with lots of comments etc. and no additional libraries used, 
 as I found it quiet confusing as an ameteur trying to do much with this module and difficult to find easy to understand 
