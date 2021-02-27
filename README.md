@@ -25,7 +25,7 @@ The wifi is very poor whilst in the motherboard (I find this happens if you have
 but if I rest my thumb above the antenna I find the signal works ok). <br> 
 Many of the ebay listing include an external antenna and I would suggest this would b a good option if ordering one.  <br>
 So they are far from perfect but still for the price I think well worth having.
-<br><br>
+<br><br><br>
 
 I have tried to make the sketch as easy to follow/modify as possible with lots of comments etc. and no additional libraries used, 
 as I found it quiet confusing as an ameteur trying to do much with this module and difficult to find easy to understand 
