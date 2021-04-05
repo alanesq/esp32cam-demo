@@ -43,6 +43,9 @@ created using the Arduino IDE with ESP32 module installed
 (See https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/)
 No additional libraries required
 
+
+BTW - If you has an improvements/suggestions to improve this sketch etc. please let me know.
+
 ----------------
 
 How to use:
