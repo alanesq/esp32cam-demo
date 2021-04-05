@@ -44,7 +44,7 @@ created using the Arduino IDE with ESP32 module installed
 No additional libraries required
 
 
-BTW - If you has an improvements/suggestions to improve this sketch etc. please let me know.
+BTW - If you has an ideas/info./suggestions to improve this sketch etc. please let me know.
 
 ----------------
 
