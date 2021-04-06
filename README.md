@@ -4,13 +4,13 @@
 This can be used as a starting point sketch for projects using the esp32cam development board, 
 it has the following features:
 <br>-Web server with live video streaming and control buttons
-<br>-SD card support (using 1-bit mode - data pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2)
-<br>-Stores captured image in spiffs if no sd card is present
-<br>-IO pins available for use are 12 and 13 (12 must not be pulled high at boot)
+<br>-SD card support (using 1-bit mode - gpio pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2)
+<br>-Stores captured image on sd-card or in spiffs if no sd card is present
+<br>-IO pins available for general use are 12 and 13 (12 must not be pulled high at boot)
 <br>-Option to connect a MCP23017 chip to pins 12 and 13 to give you 16 gpio pins to use (this requires the Adafruit MCP23017 library)
-<br>-Flash led is still available for use on pin 4 when using an sd card
+<br>-The flash led is still available for use on pin 4 when using an sd card
 <br>-PWM control of flash/illumination lED brighness implemented (i.e. to give brighness control)
-<br>-Can read the image as RGB data  (i.e. 3 bytes per pixel for red green and blue value)
+<br>-Can read the image as RGB data  (i.e. 3 bytes per pixel for red, green and blue value)
 <br>-Act as web client (reading the web page in to a string) - see requestWebPage()
 
 <br><br>
@@ -75,13 +75,9 @@ as data (http://x.x.x.x/rgb).
 GPIO PINS:
 <br>The main io pins available for general use are 13 and 12 (12 must not be high at boot),
 <br>14, 2 & 15 should also be available if you are not using the SD Card. 
-<br>You can use 1 and 3 if you do not use Serial. 
+<br>You can also use pins 1 and 3 if you do not use Serial. 
 <br>More info: https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
 <br>BTW-You can use an MCP23017 io expander chip on pins 12 and 13 to give you 16 general purpose gpio pins.  
-<br>Note: If using an sd card you this will normally stop you using pins 12, 13 and the led on 4, 
-<br>but if you put it in to 1-bit mode it allows you to carry on using these pins. 
-<br>The command to use 1-bit mode in the Arduino IDE is:  SD_MMC.begin("/sdcard", true)
-<br>see an example of its use here: https://github.com/alanesq/esp32cam-demo
 <br>Pin 16 is used for psram but you may get away with using it as input for a button etc.?
 
 
