@@ -89,6 +89,7 @@ Notes
 You can see an example Processing sketch for displaying the raw rgb data from this sketch<br>
 here: https://github.com/alanesq/esp32cam-demo/blob/master/Misc/displayRGB.pde
 This would read in a file created from the Arduino command:   client.write(rgb, ARRAY_LENGTH);
+You can create such a file by setting the 'sendRGBfile' flag in settings and then accessing the /rgb page
 
 This looks like it may contain useful info. on another way of getting RGB data from the camera: 
    https://eloquentarduino.github.io/2020/01/image-recognition-with-esp32-and-arduino/
