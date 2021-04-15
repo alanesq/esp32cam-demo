@@ -45,17 +45,32 @@
 // ******************************************************************************************************************
 
 
+
+
+//   ---------------------------------------------------------------------------------------------------------
+
+//                                      Wifi Settings
+
+#include <wifiSettings.h>       // delete this line, un-comment the below two lines and enter your wifi details
+
+//const char *SSID = "your_wifi_ssid";
+
+//const char *PWD = "your_wifi_pwd";
+
+
+//   ---------------------------------------------------------------------------------------------------------
+
+
+
+
 // ---------------------------------------------------------------
 //                           -SETTINGS
 // ---------------------------------------------------------------
 
-
-  // Wifi settings (enter your wifi network details)
-  const char* ssid     = "<your wifi network name here>";
-  const char* password = "<your wifi password here>";
-
   const char* stitle = "ESP32Cam-demo";                  // title of this sketch
-  const char* sversion = "05Jan21";                      // Sketch version
+  const char* sversion = "15Apr21";                      // Sketch version
+
+  bool sendRGBfile = 0;                                  // if set '/rgb' will send the rgb data as a file rather than display some on a HTML page
 
   const bool serialDebug = 1;                            // show info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
 
@@ -84,7 +99,7 @@
   const int serialSpeed = 115200;                        // Serial data speed to use
 
   // NTP - Internet time
-    const char* ntpServer = "uk.pool.ntp.org";
+    const char* ntpServer = "pool.ntp.org";
     const char* TZ_INFO    = "GMT+0BST-1,M3.5.0/01:00:00,M10.5.0/02:00:00";  // enter your time zone (https://remotemonitoringsystems.ca/time-zone-abbreviations.php)
     long unsigned lastNTPtime;
     tm timeinfo;
@@ -172,6 +187,7 @@ void setup() {
     Serial.println("-----------------------------------");
     Serial.printf("Starting - %s - %s \n", stitle, sversion);  
     Serial.println("-----------------------------------");
+    // Serial.print("Reset reason: " + ESP.getResetReason());
   }
 
   WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);     // Turn-off the 'brownout detector'
@@ -184,10 +200,10 @@ void setup() {
     digitalWrite(indicatorLED,LOW);               // small indicator led on
     if (serialDebug) {
       Serial.print("\nConnecting to ");
-      Serial.print(ssid);
+      Serial.print(SSID);
       Serial.print("\n   ");
     }
-    WiFi.begin(ssid, password);
+    WiFi.begin(SSID, PWD);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         if (serialDebug) Serial.print(".");
@@ -937,7 +953,7 @@ void handleNotFound() {
 // ----------------------------------------------------------------
 //Demonstration on how to access raw RGB data from the camera
 // Notes:
-//        You can send the entire image over the web with the command:   client.write(rgb, ARRAY_LENGTH);
+//        Set sendRGBfile to 1 in the settings at top of sketch to just send the rgb data as a file
 //          If this is all that is sent then it will download to the client as a raw RGB file which you can then view using this
 //          Processing sketch: https://github.com/alanesq/esp32cam-demo/blob/master/Misc/displayRGB.pde
 //        You may want to disable auto white balance when experimenting with RGB otherwise the camera is always trying to adjust the 
@@ -957,7 +973,7 @@ void readRGBImage() {
     }
 
   // html header
-    client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");          // basic html header
+    //client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");          // basic html header
     
   MessageRGB(client,"LIVE IMAGE AS RGB DATA");                                                              // 'MessageRGB' sends the String to both serial port and web page
   
@@ -989,6 +1005,9 @@ void readRGBImage() {
       if (!jpeg_converted) MessageRGB(client," -error converting image to RGB- "); 
       MessageRGB(client, "Conversion from jpg to RGB took " + String(millis() - tTimer) + " milliseconds");// report how long the conversion took
 
+
+    if (sendRGBfile) client.write(rgb, ARRAY_LENGTH);          // send the rgb data as a file 
+      
 
   //   ****** examples of reading the resulting RGB data *****
       
@@ -1023,7 +1042,7 @@ void readRGBImage() {
 
 
   // end html
-    client.write("</body></html>\n");
+    if (!sendRGBfile) client.write("</body></html>\n");
     delay(3);
     client.stop();     
 
@@ -1037,7 +1056,7 @@ void readRGBImage() {
 
 // send line of text to both serial port and web page
 void MessageRGB(WiFiClient &client, String theText) {
-      client.print(theText + "<br>\n");      
+      if (!sendRGBfile) client.print(theText + "<br>\n");      
       if (serialDebug || theText.indexOf('error') > 0) Serial.println(theText);      
 }
 
