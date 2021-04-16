@@ -953,13 +953,13 @@ void handleNotFound() {
 // ----------------------------------------------------------------
 //Demonstration on how to access raw RGB data from the camera
 // Notes:
-//        Set sendRGBfile to 1 in the settings at top of sketch to just send the rgb data as a file
-//          If this is all that is sent then it will download to the client as a raw RGB file which you can then view using this
-//          Processing sketch: https://github.com/alanesq/esp32cam-demo/blob/master/Misc/displayRGB.pde
-//        You may want to disable auto white balance when experimenting with RGB otherwise the camera is always trying to adjust the 
-//          image colours to mainly white.   (disable in the 'cameraImageSettings' procedure).
-//        It will fail on the highest resolution (1600x1200) as it requires more than the 4mb of available psram to store the data (1600x1200x3 bytes)
-// - I discovered how to read the RGB data from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
+//     Set sendRGBfile to 1 in the settings at top of sketch to just send the rgb data as a file which can then be used with 
+//       the Processing sketch: https://github.com/alanesq/esp32cam-demo/blob/master/Misc/displayRGB.pde
+//       otherwise a web page is displayed showing some sample rgb data usage.
+//     You may want to disable auto white balance when experimenting with RGB otherwise the camera is always trying to adjust the 
+//        image colours to mainly white.   (disable in the 'cameraImageSettings' procedure).
+//     It will fail on the highest resolution (1600x1200) as it requires more than the 4mb of available psram to store the data (1600x1200x3 bytes)
+//     I learned how to read the RGB data from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
 
 void readRGBImage() {
 
