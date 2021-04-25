@@ -28,6 +28,7 @@
  *     To see a more advanced sketch along the same format as this one have a look at https://github.com/alanesq/CameraWifiMotion
  *        which includes email support, FTP, OTA updates and motion detection
  * 
+ *     Sending image to TFT display see:   https://www.survivingwithandroid.com/esp32-cam-tft-display-picture-st7735/
  * 
  *     esp32cam-demo is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the 
  *        implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -40,6 +41,7 @@
 #endif
 
 #include "esp_camera.h"       // https://github.com/espressif/esp32-camera
+// #include "camera_pins.h"
 
 
 // ******************************************************************************************************************
@@ -68,7 +70,7 @@
 // ---------------------------------------------------------------
 
   const char* stitle = "ESP32Cam-demo";                  // title of this sketch
-  const char* sversion = "15Apr21";                      // Sketch version
+  const char* sversion = "25Apr21";                      // Sketch version
 
   bool sendRGBfile = 0;                                  // if set '/rgb' will send the rgb data as a file rather than display some on a HTML page
 
@@ -106,7 +108,8 @@
     time_t now;
     
 // camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
-//     see: https://randomnerdtutorials.com/esp32-cam-camera-pin-gpios/
+// see: https://randomnerdtutorials.com/esp32-cam-camera-pin-gpios/
+// set camera resolution etc. in 'initialiseCamera()' and 'cameraImageSettings()'
   #define CAMERA_MODEL_AI_THINKER
   #define PWDN_GPIO_NUM     32      // power to camera (on/off)
   #define RESET_GPIO_NUM    -1      // -1 = not used
@@ -124,8 +127,6 @@
   #define VSYNC_GPIO_NUM    25      // vsync_pin
   #define HREF_GPIO_NUM     23      // href_pin
   #define PCLK_GPIO_NUM     22      // pixel_clock_pin
-
-  camera_config_t config;     
 
 
   
@@ -237,7 +238,7 @@ void setup() {
 
   // set up camera
       if (serialDebug) Serial.print(("\nInitialising camera: "));
-      if (setupCameraHardware()) {
+      if (initialiseCamera()) {
         if (serialDebug) Serial.println("OK");
       }
       else {
@@ -306,13 +307,6 @@ void setup() {
     pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be used for input or output (must not be high at boot)
     pinMode(iopinC, INPUT);                   // pin 16 - free input only pin
 
-  // check the esp32cam board has a psram chip installed (extra memory used for storing captured images)
-  //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, SPIFFS must be enabled
-  if (!psramFound()) {
-    if (serialDebug) Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
-    framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_CIF;
-  }
-
   // MCP23017 io expander (requires adafruit MCP23017 library)
   #if useMCP23017 == 1
     Wire.begin(12,13);             // use pins 12 and 13 for i2c
@@ -376,11 +370,13 @@ void loop() {
 
 
 // ----------------------------------------------------------------
-//                        Configure the camera
+//                        Initialise the camera
 // ----------------------------------------------------------------
-// returns TRUE if sucessful
+// returns TRUE if successful
 
-bool setupCameraHardware() {
+bool initialiseCamera() {
+  
+    camera_config_t config;
   
     config.ledc_channel = LEDC_CHANNEL_0;
     config.ledc_timer = LEDC_TIMER_0;
@@ -405,9 +401,21 @@ bool setupCameraHardware() {
     config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 
                                                   //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 
                                                   //              1600x1200 (UXGA)
-    config.jpeg_quality = 5;                      // 0-63 lower number means higher quality
+    config.jpeg_quality = 10;                     // 0-63 lower number means higher quality
     config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
-                 
+
+    // check the esp32cam board has a psram chip installed (extra memory used for storing captured images)
+    //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, SPIFFS must be enabled
+    if (!psramFound()) {
+      if (serialDebug) Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
+      config.frame_size = FRAMESIZE_CIF;
+    }
+  
+    //#if defined(CAMERA_MODEL_ESP_EYE)
+    //  pinMode(13, INPUT_PULLUP);
+    //  pinMode(14, INPUT_PULLUP);
+    //#endif  
+  
     esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
     if (camerr != ESP_OK) {
       if (serialDebug) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
@@ -432,7 +440,8 @@ bool setupCameraHardware() {
 
 bool cameraImageSettings() { 
    
-    sensor_t *s = esp_camera_sensor_get();       
+    sensor_t *s = esp_camera_sensor_get();    
+    // something to try?:     if (s->id.PID == OV3660_PID) 
     if (s == NULL) {
       if (serialDebug) Serial.println("Error: problem reading camera sensor settings");
       return 0;
@@ -782,7 +791,7 @@ void handleRoot() {
       client.write("<br>LINKS: \n");
       client.write("<a href='/photo'>Capture an image</a> - \n"); 
       client.write("<a href='/img'>View stored images</a> - \n");      
-      client.write("<a href='/rgb'>Access Image as RGB data</a> - \n");   
+      client.write("<a href='/rgb'>Capture Image as raw RGB data</a> - \n");   
       client.write("<a href='/stream'>Live stream</a><br>\n");       
       
       
