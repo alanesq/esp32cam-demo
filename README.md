@@ -46,6 +46,8 @@ No additional libraries required
 
 BTW - If you has an ideas/info./suggestions to improve this sketch etc. please let me know.
 
+There is a very good Youtube video on using the ESP32Cam board here: https://www.youtube.com/watch?v=FmlxC0goKew&t=610s
+
 ----------------
 
 How to use:
