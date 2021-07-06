@@ -3,6 +3,7 @@
  *                                 ESP32Cam development board demo sketch using Arduino IDE
  *                                 
  *                                 demo using greyscale data 
+ *                                    root web page shows captured greyscale image data
  * 
  * 
  *******************************************************************************************************************/
