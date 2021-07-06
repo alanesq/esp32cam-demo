@@ -411,15 +411,13 @@ client.write("<br>Greyscale data<br>");
   if (!frame)
     return false;
 
-  byte pixel;
-
   // for each pixel in image
   //    only shows first 3 lines of image as otherwise there is an awful lot of data
   //        to show all data use the line:    for (size_t i = 0; i < frame->len; i++) {
   for (size_t i = 0; i < (160 * 3); i++) {
     const uint16_t x = i % WIDTH;                   // x position in image
     const uint16_t y = floor(i / WIDTH);            // y position in image
-    pixel = frame->buf[i];                          // pixel value
+    byte pixel = frame->buf[i];                     // pixel value
 
     // show data
       if (x==0) client.println("<br>");             // new line
