@@ -109,4 +109,8 @@ https://github.com/alanesq/CameraWifiMotion
 I have heard reports of these modules getting very warm when in use although I have not experienced this myself, 
 I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
 
+You can see a demo of accessing greyscale image data here:
+    https://github.com/alanesq/esp32cam-demo/blob/master/Misc/esp32camdemo-greyscale.ino
+    
+
                                                       https://github.com/alanesq/esp32cam-demo
