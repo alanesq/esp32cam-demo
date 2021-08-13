@@ -53,11 +53,9 @@
 
 //                                      Wifi Settings
 
-#include <wifiSettings.h>       // delete this line, un-comment the below two lines and enter your wifi details
+const char *SSID = "your_wifi_ssid";
 
-//const char *SSID = "your_wifi_ssid";
-
-//const char *PWD = "your_wifi_pwd";
+const char *PWD = "your_wifi_pwd";
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -70,11 +68,11 @@
 // ---------------------------------------------------------------
 
   const char* stitle = "ESP32Cam-demo";                  // title of this sketch
-  const char* sversion = "25Apr21";                      // Sketch version
+  const char* sversion = "13Aug21";                      // Sketch version
 
   bool sendRGBfile = 0;                                  // if set '/rgb' will send the rgb data as a file rather than display some on a HTML page
 
-  const bool serialDebug = 1;                            // show info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
+  const bool serialDebug = 1;                            // show debug info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
 
   #define useMCP23017 0                                  // if MCP23017 IO expander chip is being used (on pins 12 and 13)
 
@@ -85,6 +83,7 @@
                                                          //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 
                                                          //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 
                                                          //               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
+    #define PIXFORMAT PIXFORMAT_JPEG;                    // image format, Options =  YUV422, GRAYSCALE, RGB565, JPEG, RGB888                                                                                                       
     int cameraImageExposure = 0;                         // Camera exposure (0 - 1200)   If gain and exposure both set to zero then auto adjust is enabled
     int cameraImageGain = 0;                             // Image gain (0 - 30)
 
@@ -319,11 +318,14 @@ void setup() {
   #endif
 
   illuminationSetup();             // configure PWM for the illumination/flash LED
-    
-  if (serialDebug) Serial.println("\nSetup complete...");
+
+  // startup complete
+    if (serialDebug) Serial.println("\nSetup complete...");
+    illuminationBrightness(100);   // turn flash on
+    delay(200);
+    illuminationBrightness(0);     // turn flash off
 
 }  // setup
-
 
 
 // ******************************************************************************************************************
@@ -397,7 +399,7 @@ bool initialiseCamera() {
     config.pin_pwdn = PWDN_GPIO_NUM;
     config.pin_reset = RESET_GPIO_NUM;
     config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
-    config.pixel_format = PIXFORMAT_JPEG;         // Options =  YUV422, GRAYSCALE, RGB565, JPEG, RGB888
+    config.pixel_format = PIXFORMAT;              // Options =  YUV422, GRAYSCALE, RGB565, JPEG, RGB888
     config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA), 
                                                   //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA), 
                                                   //              1600x1200 (UXGA)
