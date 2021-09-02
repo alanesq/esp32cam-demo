@@ -1,11 +1,8 @@
 
 
-NOTE: reboots if no sd card present with latest esp32 addin<br>
+NOTE: reboots if no sd card present and the LED stays on full all the time with latest esp32 board manager.  I am using version  1.0.6<br>
       known bug: https://github.com/espressif/arduino-esp32/issues/5195<br><br>
       
-Tested with ESP32 board manager version  1.0.6 <br>
-
-
 <h1>ESP32Cam-demo sketch for use with the Arduino IDE</h1>
 <p align="center"><img src="/images/esp32cam.jpeg" width="80%"/></p>
 
