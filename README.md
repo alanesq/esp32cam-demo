@@ -1,3 +1,9 @@
+
+
+NOTE: reboots if no sd card present with latest esp32 addin
+      known bug: https://github.com/espressif/arduino-esp32/issues/5195
+
+
 <h1>ESP32Cam-demo sketch for use with the Arduino IDE</h1>
 <p align="center"><img src="/images/esp32cam.jpeg" width="80%"/></p>
 
