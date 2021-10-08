@@ -2,6 +2,8 @@
  *            
  *                                 ESP32Cam development board demo sketch using Arduino IDE
  *                                    Github: https://github.com/alanesq/ESP32Cam-demo
+ *                                    
+ *                                     Tested with ESP32 board manager version  1.0.6   
  *     
  *     Starting point sketch for projects using the esp32cam development board with the following features
  *        web server with live video streaming and RGB data from camera demonstrated.
@@ -53,9 +55,11 @@
 
 //                                      Wifi Settings
 
-const char *SSID = "your_wifi_ssid";
+#include <wifiSettings.h>       // delete this line, un-comment the below two lines and enter your wifi details
 
-const char *PWD = "your_wifi_pwd";
+//const char *SSID = "your_wifi_ssid";
+
+//const char *PWD = "your_wifi_pwd";
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -68,7 +72,7 @@ const char *PWD = "your_wifi_pwd";
 // ---------------------------------------------------------------
 
   const char* stitle = "ESP32Cam-demo";                  // title of this sketch
-  const char* sversion = "13Aug21";                      // Sketch version
+  const char* sversion = "08Oct21";                      // Sketch version
 
   bool sendRGBfile = 0;                                  // if set '/rgb' will send the rgb data as a file rather than display some on a HTML page
 
@@ -91,7 +95,12 @@ const char *PWD = "your_wifi_pwd";
 
   const int indicatorLED = 33;                           // onboard small LED pin (33)
 
-  const int brightLED = 4;                               // onboard Illumination/flash LED pin (4)
+  // Bright LED
+    const int brightLED = 4;                             // onboard Illumination/flash LED pin (4)
+    int brightLEDbrightness = 0;                         // initial brightness (0 - 255)
+    const int ledFreq = 5000;                            // PWM settings
+    const int ledChannel = 15;                           // needs to be 14 or 15 with esp32cam (timer3?)
+    const int ledRresolution = 8;  
 
   const int iopinA = 13;                                 // general io pin 13
   const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
@@ -182,6 +191,7 @@ void setup() {
   
   if (serialDebug) {
     Serial.begin(serialSpeed);                     // Start serial communication 
+    // Serial.setDebugOutput(true);
   
     Serial.println("\n\n\n");                      // line feeds
     Serial.println("-----------------------------------");
@@ -253,6 +263,7 @@ void setup() {
       ESP.restart();                               // restart and try again
       delay(5000);
     } else {
+      // SPIFFS.format();      // wipe spiffs
       if (serialDebug) {
         Serial.print(("SPIFFS mounted successfully: "));
         Serial.printf("total bytes: %d , used: %d \n", SPIFFS.totalBytes(), SPIFFS.usedBytes());
@@ -317,15 +328,25 @@ void setup() {
     // read pin state with     mcp.digitalRead(8)
   #endif
 
-  illuminationSetup();             // configure PWM for the illumination/flash LED
+  // set up bright LED (flash)
+    ledcSetup(ledChannel, ledFreq, ledRresolution);
+    ledcAttachPin(brightLED, ledChannel);
+    brightLed(0);    // change bright LED
 
   // startup complete
     if (serialDebug) Serial.println("\nSetup complete...");
-    illuminationBrightness(100);   // turn flash on
+    brightLed(64);    // change bright LED
     delay(200);
-    illuminationBrightness(0);     // turn flash off
+    brightLed(0);    // change bright LED
 
 }  // setup
+
+
+// change bright LED illumination level
+  void brightLed(byte ledBrightness){
+    brightLEDbrightness = ledBrightness;    // store setting
+    ledcWrite(ledChannel, ledBrightness);   // change LED brightness (0 - 255)
+  }
 
 
 // ******************************************************************************************************************
@@ -501,51 +522,8 @@ bool cameraImageSettings() {
 
 
 // ----------------------------------------------------------------
-//             Set up pwm for the illumination led
-// ----------------------------------------------------------------
-// configure PWM for brightness control of the illumination led
-// Note: Using this more long winded pwm setup as timer0 is already used by the camera (and channel 0)
-//       more info: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/ledc.html
-
-void illuminationSetup() {
-
-    // set up the timer
-      ledc_timer_config_t timer_conf;
-          timer_conf.duty_resolution = LEDC_TIMER_8_BIT;          // 8 bits gives a brightness range of 0 to 255
-          timer_conf.freq_hz = 1000;                              // frequency of the pwm 
-          timer_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
-          timer_conf.timer_num = LEDC_TIMER_3;                    // which timer to use (0 to 3)
-      ledc_timer_config(&timer_conf);
-
-    // set up the channel
-      ledc_channel_config_t ledc_conf;
-          ledc_conf.channel = LEDC_CHANNEL_5;                     // led channel to use (0 to 15)
-          // ledc_conf.duty = 0;                                     // 0=off, 255=fully on
-          ledc_conf.gpio_num = brightLED;                         // gpio pin
-          ledc_conf.intr_type = LEDC_INTR_DISABLE;
-          ledc_conf.speed_mode = LEDC_HIGH_SPEED_MODE;
-          ledc_conf.timer_sel = LEDC_TIMER_3;                     // timer to use (0 to 3)
-      ledc_channel_config(&ledc_conf);
-
-    illuminationBrightness(0);                                    // set brightness to off
-    
-} // illuminationSetup
-
-
-// ******************************************************************************************************************
-
-
-// ----------------------------------------------------------------
 //                        Misc small procedures
 // ----------------------------------------------------------------
-
-
-//  Set the illumination LED brightness (PWM)
-void illuminationBrightness(uint32_t duty) {
-        ledc_set_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_5, duty);
-        ledc_update_duty(LEDC_HIGH_SPEED_MODE, LEDC_CHANNEL_5);
-        illuminationLEDstatus = duty;     // store current brightness
-}
 
 
 // returns the current real time as a String
@@ -592,10 +570,10 @@ byte storeImage() {
   fs::FS &fs = SD_MMC;                              // sd card file system
 
   // capture the image from camera
-    int currentBrightness = illuminationLEDstatus;
-    if (flashRequired) illuminationBrightness(255);   // turn flash on
-    camera_fb_t *fb = esp_camera_fb_get();            // capture image frame from camera
-    if (flashRequired) illuminationBrightness(currentBrightness);     // return flash to previous state
+    int currentBrightness = brightLEDbrightness;
+    if (flashRequired) brightLed(255);   // change LED brightness (0 - 255)
+    camera_fb_t *fb = esp_camera_fb_get();           // capture image frame from camera
+    if (flashRequired) brightLed(currentBrightness);   // change LED brightness back to previous state
     if (!fb) {
       if (serialDebug) Serial.println("Error: Camera capture failed");
       flashLED(3);   // stop and display error code on LED
@@ -704,9 +682,10 @@ void handleRoot() {
   
     // if button3 was pressed (toggle flash LED)
       if (server.hasArg("button3")) {
-        if (illuminationLEDstatus == 0) illuminationBrightness(30);          // turn led on dim
-        else if (illuminationLEDstatus == 30) illuminationBrightness(255);   // turn led on full
-        else illuminationBrightness(0);                                      // turn led off
+        if (brightLEDbrightness == 0) brightLed(10);                // turn led on dim
+        else if (brightLEDbrightness == 10) brightLed(40);          // turn led on medium
+        else if (brightLEDbrightness == 40) brightLed(255);         // turn led on full
+        else brightLed(0);                                          // turn led off
         if (serialDebug) Serial.println("Button 3 pressed");
       }
 
@@ -1088,7 +1067,7 @@ bool getNTPtime(int sec) {
       time(&now);
       localtime_r(&now, &timeinfo);
       Serial.print(".");
-      delay(10);
+      delay(100);
     } while (((millis() - start) <= (1000 * sec)) && (timeinfo.tm_year < (2016 - 1900)));
     if (timeinfo.tm_year <= (2016 - 1900)) return false;  // the NTP call was not successful
     Serial.print("now ");  Serial.println(now);
