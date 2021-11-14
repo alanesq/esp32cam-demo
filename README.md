@@ -9,7 +9,7 @@ NOTE: reboots if no sd card present and the LED stays on full all the time with 
 This can be used as a starting point sketch for projects using the esp32cam development board, 
 it has the following features:
 <br>-Web server with live video streaming and control buttons
-<br>-SD card support (using 1-bit mode - gpio pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2)
+<br>-SD card support (using 1-bit mode - gpio pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2) - I have heard there may be problems reading the sd card, I have only used it to write files myself?
 <br>-Stores captured image on sd-card or in spiffs if no sd card is present
 <br>-IO pins available for general use are 12 and 13 (12 must not be pulled high at boot)
 <br>-Option to connect a MCP23017 chip to pins 12 and 13 to give you 16 gpio pins to use (this requires the Adafruit MCP23017 library)
