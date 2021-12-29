@@ -1229,30 +1229,38 @@ void handleTest() {
 
 
 
-
-
-       // < YOUR TEST CODE GOES HERE>
-
+                          // test code goes here
 
 
 
 
+/*
+ // demo of how to request a web page
+   String page = "http://urlhere.com";   // url to request
+   String response;                             // reply will be stored here
+   int httpCode = requestWebPage(&page, &response);
+   // show results
+     client.println("Web page requested: '" + page + "' - http code: " + String(httpCode));
+     client.print("<xmp>'");     // enables the html code to be displayed
+     client.print(response);
+     client.println("'</xmp><br>");
+*/
 
 
-
+/*
 //  // demo useage of the mcp23017 io chip
-//    #if useMCP23017 == 1
-//      while(1) {
-//          mcp.digitalWrite(0, HIGH);
-//          int q = mcp.digitalRead(8);
-//          client.print("<p>HIGH, input =" + String(q) + "</p>");
-//          delay(1000);
-//          mcp.digitalWrite(0, LOW);
-//          client.print("<p>LOW</p>");
-//          delay(1000);
-//      }
-//    #endif
-
+    #if useMCP23017 == 1
+      while(1) {
+          mcp.digitalWrite(0, HIGH);
+          int q = mcp.digitalRead(8);
+          client.print("<p>HIGH, input =" + String(q) + "</p>");
+          delay(1000);
+          mcp.digitalWrite(0, LOW);
+          client.print("<p>LOW</p>");
+          delay(1000);
+      }
+    #endif
+*/
 
 
  // -------------------------------------------------------------------
@@ -1268,4 +1276,3 @@ void handleTest() {
 
 // ******************************************************************************************************************
 // end
-**Ñ¥
