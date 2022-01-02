@@ -796,8 +796,9 @@ void handleRoot() {
      client.write("<a href='/rgb'>Capture Image as raw RGB data</a> - \n");
      client.write("<a href='/stream'>Live stream</a><br>\n");
 
-    // show live image
-      client.write("<br><img src='/jpg' /> <br>");
+    // capture and show a jpg image
+      client.write("<br><a href='/jpg'>");         // make it a link
+      client.write("<img src='/jpg' /> </a>");     // show image from http://x.x.x.x/jpg
 
 
  // --------------------------------------------------------------------
