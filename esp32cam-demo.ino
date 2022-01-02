@@ -46,13 +46,11 @@
 
 //   ---------------------------------------------------------------------------------------------------------
 
-//                                      Wifi Settings
 
-#include <wifiSettings.h>       // delete this line, un-comment the below two lines and enter your wifi details
+//         Wifi Settings - uncomment and set here if not stored in platformio.ini
 
-//const char *SSID = "your_wifi_ssid";
-
-//const char *PWD = "your_wifi_pwd";
+//  #define SSID_NAME "Wifi SSID"
+//  #define SSID_PASWORD "wifi password"
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -75,6 +73,7 @@
    void handleNotFound();
    void readRGBImage();
    bool getNTPtime(int sec);
+   void handleJPG();
    void handleStream();
    int requestWebPage(String*, String*, int);
    void handleTest();
@@ -102,7 +101,7 @@
 // ---------------------------------------------------------------
 
  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
- const char* sversion = "29Dec21";                      // Sketch version
+ const char* sversion = "02Jan22";                      // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will send the rgb data as a file rather than display some on a HTML page
 
@@ -231,10 +230,10 @@ void setup() {
    digitalWrite(indicatorLED,LOW);               // small indicator led on
    if (serialDebug) {
      Serial.print("\nConnecting to ");
-     Serial.print(SSID);
+     Serial.print(SSID_NAME);
      Serial.print("\n   ");
    }
-   WiFi.begin(SSID, PWD);
+   WiFi.begin(SSID_NAME, SSID_PASWORD);         // can be set in platformio.ini
    while (WiFi.status() != WL_CONNECTED) {
        delay(500);
        if (serialDebug) Serial.print(".");
@@ -249,6 +248,7 @@ void setup() {
 
  // define the web pages (i.e. call these procedures when url is requested)
    server.on("/", handleRoot);                   // root page
+   server.on("/jpg", handleJPG);                 // capture image and send as jpg
    server.on("/stream", handleStream);           // stream live video
    server.on("/photo", handlePhoto);             // save image to sd card
    server.on("/img", handleImg);                 // show image from sd card
@@ -796,6 +796,8 @@ void handleRoot() {
      client.write("<a href='/rgb'>Capture Image as raw RGB data</a> - \n");
      client.write("<a href='/stream'>Live stream</a><br>\n");
 
+    // show live image
+      client.write("<br><img src='/jpg' /> <br>");
 
 
  // --------------------------------------------------------------------
@@ -1101,7 +1103,54 @@ bool getNTPtime(int sec) {
 }
 
 
-// ******************************************************************************************************************
+// ----------------------------------------------------------------
+//   -capture image and send as jpg     i.e. http://x.x.x.x/jpg
+// ----------------------------------------------------------------
+// Capture image and send as a jpg
+
+void handleJPG(){
+
+ WiFiClient client = server.client();          // open link with client
+
+ // log page request including clients IP address
+   if (serialDebug) {
+     IPAddress cip = client.remoteIP();
+     Serial.printf("jpg requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+   }
+
+ // HTML used in the web page
+ const char HEADER[] = "HTTP/1.1 200 OK\r\n" \
+                       "Access-Control-Allow-Origin: *\r\n" \
+                       "Content-Type: multipart/x-mixed-replace; boundary=123456789000000000000987654321\r\n";
+ const char BOUNDARY[] = "\r\n--123456789000000000000987654321\r\n";           // marks end of each image frame
+ const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";       // marks start of image data
+ const int hdrLen = strlen(HEADER);         // length of the stored text, used when sending to web page
+ const int bdrLen = strlen(BOUNDARY);
+ const int cntLen = strlen(CTNTTYPE);
+
+ // temp stores
+   char buf[32];
+   int s;
+   camera_fb_t * fb = NULL;
+
+ // send html header
+   client.write(HEADER, hdrLen);
+   client.write(BOUNDARY, bdrLen);
+
+ // send live image
+     fb = esp_camera_fb_get();                   // capture live image
+     s = fb->len;                                // store size of image (i.e. buffer length)
+     client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
+     sprintf( buf, "%d\r\n\r\n", s );            // format the image's size as html and put in to 'buf'
+     client.write(buf, strlen(buf));             // send result (image size)
+     client.write((char *)fb->buf, s);           // send the image data
+     client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
+     esp_camera_fb_return(fb);                   // return image so memory can be released
+
+ delay(3);
+ client.stop();
+
+}  // handleJPG
 
 
 // ----------------------------------------------------------------
