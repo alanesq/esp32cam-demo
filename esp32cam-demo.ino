@@ -101,7 +101,7 @@
 // ---------------------------------------------------------------
 
  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
- const char* sversion = "02Jan22";                      // Sketch version
+ const char* sversion = "03Jan22";                      // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will send the rgb data as a file rather than display some on a HTML page
 
@@ -192,7 +192,6 @@ WebServer server(80);                       // serve web pages on port 80
 
 // Define some global variables:
  uint32_t lastStatus = millis();           // last time status light changed status (to flash all ok led)
- uint32_t lastCamera = millis();           // timer for periodic image capture
  bool sdcardPresent;                       // flag if an sd card is detected
  int imageCounter;                         // image file name on sd card counter
  uint32_t illuminationLEDstatus;           // current brightness setting of the illumination led
@@ -233,7 +232,7 @@ void setup() {
      Serial.print(SSID_NAME);
      Serial.print("\n   ");
    }
-   WiFi.begin(SSID_NAME, SSID_PASWORD);         // can be set in platformio.ini
+   WiFi.begin(SSID_NAME, SSID_PASWORD);
    while (WiFi.status() != WL_CONNECTED) {
        delay(500);
        if (serialDebug) Serial.print(".");
@@ -336,7 +335,7 @@ void setup() {
    digitalWrite(indicatorLED,HIGH);          // led off = High
    pinMode(iopinA, OUTPUT);                  // pin 13 - free io pin, can be used for input or output
    pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be used for input or output (must not be high at boot)
-   pinMode(iopinC, INPUT);                   // pin 16 - free input only pin
+   pinMode(iopinC, INPUT);                   // pin 16 - free input only pin (may cause issues?)
 
  // MCP23017 io expander (requires adafruit MCP23017 library)
  #if useMCP23017 == 1
@@ -349,13 +348,13 @@ void setup() {
    // read pin state with     mcp.digitalRead(8)
  #endif
 
- // set up bright LED (flash)
+ // set up illumination LED (flash)
    ledcSetup(ledChannel, ledFreq, ledRresolution);
    ledcAttachPin(brightLED, ledChannel);
    brightLed(0);    // change bright LED
 
  // startup complete
-   if (serialDebug) Serial.println("\nSetup complete...");
+   if (serialDebug) Serial.println("\nStarted...");
    brightLed(64);    // change bright LED
    delay(200);
    brightLed(0);    // change bright LED
@@ -363,10 +362,11 @@ void setup() {
 }  // setup
 
 
-// change bright LED illumination level
+// change illumination LED brightness
  void brightLed(byte ledBrightness){
    brightLEDbrightness = ledBrightness;    // store setting
    ledcWrite(ledChannel, ledBrightness);   // change LED brightness (0 - 255)
+   if (serialDebug) Serial.println("Brightness changed to " + String(ledBrightness) );
  }
 
 
@@ -394,10 +394,12 @@ void loop() {
 
 
 
-//  //  demo to Capture an image and save to sd card every 5 seconds (i.e. time lapse)
+//  //  Capture an image and save to sd card every 5 seconds (i.e. time lapse)
+//      static uint32_t lastCamera = millis();
 //      if ( ((unsigned long)(millis() - lastCamera) >= 5000) && sdcardPresent ) {
 //        lastCamera = millis();     // reset timer
 //        storeImage();              // save an image to sd card
+//        if (serialDebug) Serial.println("Time lapse image captured");
 //      }
 
  // flash status LED to show sketch is running ok
@@ -421,7 +423,6 @@ void loop() {
 bool initialiseCamera() {
 
    camera_config_t config;
-
    config.ledc_channel = LEDC_CHANNEL_0;
    config.ledc_timer = LEDC_TIMER_0;
    config.pin_d0 = Y2_GPIO_NUM;
@@ -483,6 +484,8 @@ bool initialiseCamera() {
 // BTW - some interesting info on exposure times here: https://github.com/raduprv/esp32-cam_ov2640-timelapse
 
 bool cameraImageSettings() {
+
+  if (serialDebug) Serial.println("Applying camera settings");
 
    sensor_t *s = esp_camera_sensor_get();
    // something to try?:     if (s->id.PID == OV3660_PID)
@@ -571,10 +574,11 @@ void flashLED(int reps) {
 
 // critical error - stop sketch and continually flash error code on indicator led
 void showError(int errorNo) {
- while(1) {
+  if (serialDebug) Serial.println("Critical Error: " + String(errorNo) );
+  while(1) {     // repeat forever
    flashLED(errorNo);
    delay(4000);
- }
+  }
 }
 
 
@@ -593,7 +597,7 @@ byte storeImage() {
  // capture the image from camera
    int currentBrightness = brightLEDbrightness;
    if (flashRequired) brightLed(255);   // change LED brightness (0 - 255)
-   camera_fb_t *fb = esp_camera_fb_get();           // capture image frame from camera
+   camera_fb_t *fb = esp_camera_fb_get();             // capture image frame from camera
    if (flashRequired) brightLed(currentBrightness);   // change LED brightness back to previous state
    if (!fb) {
      if (serialDebug) Serial.println("Error: Camera capture failed");
@@ -691,27 +695,38 @@ void handleRoot() {
    // if button1 was pressed (toggle io pin A)
    //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1");
      if (server.hasArg("button1")) {
-       digitalWrite(iopinA,!digitalRead(iopinA));             // toggle output pin on/off
        if (serialDebug) Serial.println("Button 1 pressed");
+       digitalWrite(iopinA,!digitalRead(iopinA));             // toggle output pin on/off
      }
 
    // if button2 was pressed (toggle io pin B)
      if (server.hasArg("button2")) {
-       digitalWrite(iopinB,!digitalRead(iopinB));             // toggle output pin on/off
        if (serialDebug) Serial.println("Button 2 pressed");
+       digitalWrite(iopinB,!digitalRead(iopinB));             // toggle output pin on/off
      }
 
    // if button3 was pressed (toggle flash LED)
      if (server.hasArg("button3")) {
+       if (serialDebug) Serial.println("Button 3 pressed");
        if (brightLEDbrightness == 0) brightLed(10);                // turn led on dim
        else if (brightLEDbrightness == 10) brightLed(40);          // turn led on medium
        else if (brightLEDbrightness == 40) brightLed(255);         // turn led on full
        else brightLed(0);                                          // turn led off
-       if (serialDebug) Serial.println("Button 3 pressed");
      }
+
+     // if button4 was pressed (format SPIFFS)
+       if (server.hasArg("button4")) {
+         if (serialDebug) Serial.println("Button 4 pressed");
+         if (!SPIFFS.format()) {
+           if (serialDebug) Serial.println("Error: Unable to format Spiffs");
+         } else {
+           if (serialDebug) Serial.println("Spiffs memory has been formatted");
+         }
+       }
 
    // if exposure was adjusted - cameraImageExposure
        if (server.hasArg("exp")) {
+         if (serialDebug) Serial.println("Exposure has been changed");
          String Tvalue = server.arg("exp");   // read value
          if (Tvalue != NULL) {
            int val = Tvalue.toInt();
@@ -725,6 +740,7 @@ void handleRoot() {
 
     // if image gain was adjusted - cameraImageGain
        if (server.hasArg("gain")) {
+         if (serialDebug) Serial.println("Gain has been changed");
          String Tvalue = server.arg("gain");   // read value
            if (Tvalue != NULL) {
              int val = Tvalue.toInt();
@@ -781,7 +797,8 @@ void handleRoot() {
    // Control bottons
      client.write("<input style='height: 35px;' name='button1' value='Toggle pin 13' type='submit'> \n");
      client.write("<input style='height: 35px;' name='button2' value='Toggle pin 12' type='submit'> \n");
-     client.write("<input style='height: 35px;' name='button3' value='Toggle Flash' type='submit'><br> \n");
+     client.write("<input style='height: 35px;' name='button3' value='Toggle Flash' type='submit'> \n");
+     client.write("<input style='height: 35px;' name='button4' value='Wipe SPIFFS memory' type='submit'><br> \n");
 
    // Image setting controls
      client.write("<br>CAMERA SETTINGS: \n");
@@ -792,7 +809,7 @@ void handleRoot() {
    // links to the other pages available
      client.write("<br>LINKS: \n");
      client.write("<a href='/photo'>Capture an image</a> - \n");
-     client.write("<a href='/img'>View stored images</a> - \n");
+     client.write("<a href='/img'>View stored image</a> - \n");
      client.write("<a href='/rgb'>Capture Image as raw RGB data</a> - \n");
      client.write("<a href='/stream'>Live stream</a><br>\n");
 
@@ -937,8 +954,7 @@ void handleNotFound() {
 
  String tReply;
 
- // log page request
-   if (serialDebug) Serial.print("Invalid page requested");
+ if (serialDebug) Serial.print("Invalid page requested");
 
  tReply = "File Not Found\n\n";
  tReply += "URI: ";
@@ -965,8 +981,9 @@ void handleNotFound() {
 // send line of text to both serial port and web page
 void MessageRGB(WiFiClient &client, String theText) {
      if (!sendRGBfile) client.print(theText + "<br>\n");
-     if (serialDebug || theText.indexOf("error") > 0) Serial.println(theText);
+     if (serialDebug || theText.indexOf("error") > 0) Serial.println(theText);   // if text contains "error"
 }
+
 
 // ----------------------------------------------------------------
 //      -access image data as RGB - i.e. http://x.x.x.x/rgb
@@ -1003,6 +1020,7 @@ void readRGBImage() {
      camera_fb_t * fb = NULL;
      tTimer = millis();                                                                                    // store time that image capture started
      fb = esp_camera_fb_get();
+     if (!fb) MessageRGB(client,"error: failed to capture image");
      MessageRGB(client, "-Image capture took " + String(millis() - tTimer) + " milliseconds");              // report time it took to capture an image
      if (!fb) MessageRGB(client," -error capturing image from camera- ");
      else {
@@ -1085,21 +1103,28 @@ void readRGBImage() {
 
 bool getNTPtime(int sec) {
 
- {
-   uint32_t start = millis();
+   uint32_t start = millis();      // timeout timer
+
    do {
      time(&now);
      localtime_r(&now, &timeinfo);
-     Serial.print(".");
+     if (serialDebug) Serial.print(".");
      delay(100);
    } while (((millis() - start) <= (1000 * sec)) && (timeinfo.tm_year < (2016 - 1900)));
+
    if (timeinfo.tm_year <= (2016 - 1900)) return false;  // the NTP call was not successful
-   Serial.print("now ");  Serial.println(now);
-   char time_output[30];
-   strftime(time_output, 30, "%a  %d-%m-%y %T", localtime(&now));
-   Serial.println(time_output);
-   Serial.println();
- }
+   if (serialDebug) {
+     Serial.print("now ");
+     Serial.println(now);
+   }
+
+   // Display time
+   if (serialDebug)  {
+     char time_output[30];
+     strftime(time_output, 30, "%a  %d-%m-%y %T", localtime(&now));
+     Serial.println(time_output);
+     Serial.println();
+   }
  return true;
 }
 
@@ -1109,47 +1134,51 @@ bool getNTPtime(int sec) {
 // ----------------------------------------------------------------
 // Capture image and send as a jpg
 
-void handleJPG(){
+void handleJPG() {
 
- WiFiClient client = server.client();          // open link with client
+   WiFiClient client = server.client();          // open link with client
 
- // log page request including clients IP address
-   if (serialDebug) {
-     IPAddress cip = client.remoteIP();
-     Serial.printf("jpg requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
-   }
+   // log page request including clients IP address
+     if (serialDebug) {
+       IPAddress cip = client.remoteIP();
+       Serial.printf("jpg requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+     }
 
- // HTML used in the web page
- const char HEADER[] = "HTTP/1.1 200 OK\r\n" \
-                       "Access-Control-Allow-Origin: *\r\n" \
-                       "Content-Type: multipart/x-mixed-replace; boundary=123456789000000000000987654321\r\n";
- const char BOUNDARY[] = "\r\n--123456789000000000000987654321\r\n";           // marks end of each image frame
- const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";       // marks start of image data
- const int hdrLen = strlen(HEADER);         // length of the stored text, used when sending to web page
- const int bdrLen = strlen(BOUNDARY);
- const int cntLen = strlen(CTNTTYPE);
+   // HTML used in the web page
+   const char HEADER[] = "HTTP/1.1 200 OK\r\n" \
+                         "Access-Control-Allow-Origin: *\r\n" \
+                         "Content-Type: multipart/x-mixed-replace; boundary=123456789000000000000987654321\r\n";
+   const char BOUNDARY[] = "\r\n--123456789000000000000987654321\r\n";           // marks end of each image frame
+   const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";       // marks start of image data
+   const int hdrLen = strlen(HEADER);         // length of the stored text, used when sending to web page
+   const int bdrLen = strlen(BOUNDARY);
+   const int cntLen = strlen(CTNTTYPE);
 
- // temp stores
-   char buf[32];
-   int s;
-   camera_fb_t * fb = NULL;
+   // temp stores
+     char buf[32];
+     int s;
+     camera_fb_t * fb = NULL;
 
- // send html header
-   client.write(HEADER, hdrLen);
-   client.write(BOUNDARY, bdrLen);
+   // send html header
+     client.write(HEADER, hdrLen);
+     client.write(BOUNDARY, bdrLen);
 
- // send live image
-     fb = esp_camera_fb_get();                   // capture live image
-     s = fb->len;                                // store size of image (i.e. buffer length)
-     client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
-     sprintf( buf, "%d\r\n\r\n", s );            // format the image's size as html and put in to 'buf'
-     client.write(buf, strlen(buf));             // send result (image size)
-     client.write((char *)fb->buf, s);           // send the image data
-     client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
-     esp_camera_fb_return(fb);                   // return image so memory can be released
+   // capture and send image
+       fb = esp_camera_fb_get();                   // capture live image
+       if (!fb) {
+         if (serialDebug) Serial.println("Error: failed to capture image");
+         return;                                   // capture failed
+       }
+       s = fb->len;                                // store size of image (i.e. buffer length)
+       client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
+       sprintf( buf, "%d\r\n\r\n", s );            // format the image's size as html and put in to 'buf'
+       client.write(buf, strlen(buf));             // send result (image size)
+       client.write((char *)fb->buf, s);           // send the image data
+       client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
+       esp_camera_fb_return(fb);                   // return image so memory can be released
 
- delay(3);
- client.stop();
+   delay(3);
+   client.stop();
 
 }  // handleJPG
 
@@ -1193,6 +1222,9 @@ void handleStream(){
  {
    if (!client.connected()) break;
      fb = esp_camera_fb_get();                   // capture live image
+     if (!fb) {
+       if (serialDebug) Serial.println("Error: failed to capture image");
+     }
      s = fb->len;                                // store size of image (i.e. buffer length)
      client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
      sprintf( buf, "%d\r\n\r\n", s );            // format the image's size as html and put in to 'buf'
