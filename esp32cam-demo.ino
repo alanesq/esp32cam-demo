@@ -101,7 +101,7 @@
 // ---------------------------------------------------------------
 
  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
- const char* sversion = "03Jan22";                      // Sketch version
+ const char* sversion = "04Jan22";                      // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will send the rgb data as a file rather than display some on a HTML page
 
@@ -1028,7 +1028,6 @@ void readRGBImage() {
        //MessageRGB(client,"-Image size=" + String(pic->len));
      }
 
-
    // allocate memory to store the rgb data (in psram, 3 bytes per pixel)
      if (!psramFound()) MessageRGB(client," -error no psram found- ");
      MessageRGB(client,"Free psram before rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
@@ -1038,7 +1037,6 @@ void readRGBImage() {
      ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);                                          // allocate memory space for the rgb data
      uint8_t *rgb = (uint8_t *)ptrVal;                                                                    // create the 'rgb' array pointer to the allocated memory space
      MessageRGB(client,"Free psram after rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
-
 
    // convert the captured jpg image (fb) to rgb data (store in 'rgb' array)
      tTimer = millis();                                                                                   // store time that image conversion process started
@@ -1132,11 +1130,12 @@ bool getNTPtime(int sec) {
 // ----------------------------------------------------------------
 //   -capture image and send as jpg     i.e. http://x.x.x.x/jpg
 // ----------------------------------------------------------------
-// Capture image and send as a jpg
 
 void handleJPG() {
 
    WiFiClient client = server.client();          // open link with client
+   char buf[32];
+   camera_fb_t * fb = NULL;
 
    // log page request including clients IP address
      if (serialDebug) {
@@ -1144,43 +1143,36 @@ void handleJPG() {
        Serial.printf("jpg requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
      }
 
-   // HTML used in the web page
-   const char HEADER[] = "HTTP/1.1 200 OK\r\n" \
-                         "Access-Control-Allow-Origin: *\r\n" \
-                         "Content-Type: multipart/x-mixed-replace; boundary=123456789000000000000987654321\r\n";
-   const char BOUNDARY[] = "\r\n--123456789000000000000987654321\r\n";           // marks end of each image frame
-   const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";       // marks start of image data
-   const int hdrLen = strlen(HEADER);         // length of the stored text, used when sending to web page
-   const int bdrLen = strlen(BOUNDARY);
-   const int cntLen = strlen(CTNTTYPE);
-
-   // temp stores
-     char buf[32];
-     int s;
-     camera_fb_t * fb = NULL;
-
-   // send html header
-     client.write(HEADER, hdrLen);
-     client.write(BOUNDARY, bdrLen);
+   // build and send html
+      const char HEADER[] = "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\n";
+      const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";
+      const int hdrLen = strlen(HEADER);         // length of the stored text, used when sending to web page
+      const int cntLen = strlen(CTNTTYPE);
+      client.write(HEADER, hdrLen);
+      client.write(CTNTTYPE, cntLen);
 
    // capture and send image
-       fb = esp_camera_fb_get();                   // capture live image
+       fb = esp_camera_fb_get();
        if (!fb) {
          if (serialDebug) Serial.println("Error: failed to capture image");
-         return;                                   // capture failed
+         return;
        }
-       s = fb->len;                                // store size of image (i.e. buffer length)
-       client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
-       sprintf( buf, "%d\r\n\r\n", s );            // format the image's size as html and put in to 'buf'
-       client.write(buf, strlen(buf));             // send result (image size)
-       client.write((char *)fb->buf, s);           // send the image data
-       client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
-       esp_camera_fb_return(fb);                   // return image so memory can be released
 
-   delay(3);
-   client.stop();
+       // put text in to 'buf' char array and send
+         sprintf( buf, "%d\r\n\r\n", fb->len);
+         client.write(buf, strlen(buf));
+
+       // send the jpg data
+         client.write((char *)fb->buf, fb->len);
+
+   // close client connection
+     delay(3);
+     client.stop();
+
+  esp_camera_fb_return(fb);                   // return image so memory can be released
 
 }  // handleJPG
+
 
 
 // ----------------------------------------------------------------
