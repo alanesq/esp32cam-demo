@@ -1,10 +1,16 @@
 
 
-NOTE: reboots if no sd card present and the LED stays on full all the time with latest esp32 board manager.  I am using version  1.0.6<br>
-      known bug: https://github.com/espressif/arduino-esp32/issues/5195<br><br>
+NOTE: When using Arduino IDE I find it reboots if no sd card present and the LED stays on full all the time with latest esp32 board manager.  I am using version  1.0.6<br>
+known bug: https://github.com/espressif/arduino-esp32/issues/5195<br><br>
       
 <h1>ESP32Cam-demo sketch for use with the Arduino IDE or PlatformIO</h1>
-<p align="center"><img src="/images/esp32cam.jpeg" width="80%"/></p>
+
+I try to show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it<br>
+
+<table><tr>
+  <td><img src="/Misc/root.png" /></td>
+  <td><img src="/Misc/rgb.png" /></td>
+</tr></table> 
 
 This can be used as a starting point sketch for projects using the esp32cam development board, 
 it has the following features:
