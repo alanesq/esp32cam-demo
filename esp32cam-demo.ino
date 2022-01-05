@@ -65,7 +65,6 @@
    bool cameraImageSettings();
    String localTime();
    void flashLED(int reps);
-   void showError(int errorNo);
    byte storeImage();
    void handleRoot();
    void handlePhoto();
@@ -73,12 +72,12 @@
    void handleNotFound();
    void readRGBImage();
    bool getNTPtime(int sec);
-   void handleJPG();
+   bool handleJPG();
    void handleStream();
    int requestWebPage(String*, String*, int);
    void handleTest();
    void brightLed(byte ledBrightness);
-   //void MessageRGB(WiFiClient &client, String theText);
+   //void sendText(WiFiClient &client, String theText);
 
 
 // ---------------------------------------------------------------
@@ -101,9 +100,9 @@
 // ---------------------------------------------------------------
 
  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
- const char* sversion = "04Jan22";                      // Sketch version
+ const char* sversion = "05Jan22";                      // Sketch version
 
- bool sendRGBfile = 0;                                  // if set '/rgb' will send the rgb data as a file rather than display some on a HTML page
+ bool sendRGBfile = 0;                                  // if set '/rgb' will send the rgb data as a file rather than display a HTML page
 
  const bool serialDebug = 1;                            // show debug info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
 
@@ -271,8 +270,7 @@ void setup() {
        if (serialDebug) Serial.println("OK");
      }
      else {
-       if (serialDebug) Serial.println("Error!");
-       showError(2);                              // critical error so stop and flash led
+       if (serialDebug) Serial.println("failed");
      }
 
  // Spiffs - for storing images without an sd card
@@ -355,6 +353,7 @@ void setup() {
 
  // startup complete
    if (serialDebug) Serial.println("\nStarted...");
+   flashLED(2);     // flash the onboard indicator led
    brightLed(64);    // change bright LED
    delay(200);
    brightLed(0);    // change bright LED
@@ -572,16 +571,6 @@ void flashLED(int reps) {
 }
 
 
-// critical error - stop sketch and continually flash error code on indicator led
-void showError(int errorNo) {
-  if (serialDebug) Serial.println("Critical Error: " + String(errorNo) );
-  while(1) {     // repeat forever
-   flashLED(errorNo);
-   delay(4000);
-  }
-}
-
-
 // ******************************************************************************************************************
 
 
@@ -601,8 +590,7 @@ byte storeImage() {
    if (flashRequired) brightLed(currentBrightness);   // change LED brightness back to previous state
    if (!fb) {
      if (serialDebug) Serial.println("Error: Camera capture failed");
-     flashLED(3);   // stop and display error code on LED
-     // return 0
+     return 0;
    }
 
  // save image to Spiffs
@@ -613,8 +601,7 @@ byte storeImage() {
      if (!file) {
        if (serialDebug) Serial.println("Failed to create file in Spiffs");
        return 0;
-     }
-     else {
+     } else {
        if (file.write(fb->buf, fb->len)) {
          if (serialDebug)  {
            Serial.print("The picture has been saved as " + spiffsFilename);
@@ -645,16 +632,14 @@ byte storeImage() {
      File file = fs.open(SDfilename, FILE_WRITE);                                  // create file on sd card
      if (!file) {
        if (serialDebug) Serial.println("Error: Failed to create file on sd-card: " + SDfilename);
-       flashLED(4);    // stop and display error code on LED
-       // return 0
+       return 0;
      } else {
        if (file.write(fb->buf, fb->len)) {                                         // File created ok so save image to it
          if (serialDebug) Serial.println("Image saved to sd card");
          imageCounter ++;                                                          // increment image counter
        } else {
          if (serialDebug) Serial.println("Error: failed to save image to sd card");
-         flashLED(4);   // stop and display error code on LED
-         // return 0;
+         return 0;
        }
        file.close();              // close image file on sd card
      }
@@ -915,7 +900,7 @@ bool handleImg() {
        if (serialDebug) Serial.println("Error: image file not found");
        WiFiClient client = server.client();                       // open link with client
        client.write("<!DOCTYPE html> <html> <body>\n");
-       client.write("<p>Error: Image not found</p?\n");
+       client.write("<p>Error: Image not found</p></html>\n");
        delay(3);
        client.stop();
      }
@@ -979,7 +964,7 @@ void handleNotFound() {
 
 
 // send line of text to both serial port and web page
-void MessageRGB(WiFiClient &client, String theText) {
+void sendText(WiFiClient &client, String theText) {
      if (!sendRGBfile) client.print(theText + "<br>\n");
      if (serialDebug || theText.indexOf("error") > 0) Serial.println(theText);   // if text contains "error"
 }
@@ -999,9 +984,9 @@ void MessageRGB(WiFiClient &client, String theText) {
 //     I learned how to read the RGB data from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
 
 void readRGBImage() {
-
- uint32_t tTimer;                                                                                           // used for timing operations
- WiFiClient client = server.client();                                                                       // open link with client
+                                                                                            // used for timing operations
+ WiFiClient client = server.client();
+ uint32_t tTimer;     // used to time tasks                                                                    // open link with client
 
  // log page request including clients IP address
    if (serialDebug) {
@@ -1009,10 +994,10 @@ void readRGBImage() {
      Serial.printf("RGB requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
    }
 
- // html header
-   if (!sendRGBfile) client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");          // basic html header
+ // basic html header
+   if (!sendRGBfile) client.write("<!DOCTYPE html> <html lang='en'> <head> <title>Show RGB data</title> </head> <body>\n");          // basic html header
 
- MessageRGB(client,"LIVE IMAGE AS RGB DATA");                                                              // 'MessageRGB' sends the String to both serial port and web page
+ sendText(client,"LIVE IMAGE AS RGB DATA");                                                              // 'sendText' sends the String to both serial port and web page
 
  //   ****** the main code for converting an image to RGB data *****
 
@@ -1020,41 +1005,41 @@ void readRGBImage() {
      camera_fb_t * fb = NULL;
      tTimer = millis();                                                                                    // store time that image capture started
      fb = esp_camera_fb_get();
-     if (!fb) MessageRGB(client,"error: failed to capture image");
-     MessageRGB(client, "-Image capture took " + String(millis() - tTimer) + " milliseconds");              // report time it took to capture an image
-     if (!fb) MessageRGB(client," -error capturing image from camera- ");
-     else {
-       MessageRGB(client,"-Image resolution=" + String(fb->width) + "x" + String(fb->height));
-       //MessageRGB(client,"-Image size=" + String(pic->len));
+     if (!fb) {
+       sendText(client,"error: failed to capture image");
+     } else {
+       sendText(client, "-JPG image capture took " + String(millis() - tTimer) + " milliseconds");              // report time it took to capture an image
+       sendText(client,"-Image resolution=" + String(fb->width) + "x" + String(fb->height));
+       sendText(client,"-Image size=" + String(fb->len) + " bytes");
      }
 
    // allocate memory to store the rgb data (in psram, 3 bytes per pixel)
-     if (!psramFound()) MessageRGB(client," -error no psram found- ");
-     MessageRGB(client,"Free psram before rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
+     if (!psramFound()) sendText(client," -error no psram found- ");
+     sendText(client,"Free psram before rgb data allocated = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024) + "K");
      void *ptrVal = NULL;                                                                                 // create a pointer for memory location to store the data
      uint32_t ARRAY_LENGTH = fb->width * fb->height * 3;                                                  // calculate memory required to store the RGB data (i.e. number of pixels in the jpg image x 3)
-     if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM) <  ARRAY_LENGTH) MessageRGB(client," -error: not enough free psram to store the rgb data- ");
+     if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM) <  ARRAY_LENGTH) sendText(client," -error: not enough free psram to store the rgb data- ");
      ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);                                          // allocate memory space for the rgb data
      uint8_t *rgb = (uint8_t *)ptrVal;                                                                    // create the 'rgb' array pointer to the allocated memory space
-     MessageRGB(client,"Free psram after rgb data stored = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)));
+     sendText(client,"Free psram after rgb data allocated = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024) + "K");
 
    // convert the captured jpg image (fb) to rgb data (store in 'rgb' array)
      tTimer = millis();                                                                                   // store time that image conversion process started
      bool jpeg_converted = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);
-     if (!jpeg_converted) MessageRGB(client," -error converting image to RGB- ");
-     MessageRGB(client, "Conversion from jpg to RGB took " + String(millis() - tTimer) + " milliseconds");// report how long the conversion took
+     if (!jpeg_converted) sendText(client," -error: failed to convert image to RGB- ");
+     sendText(client, "Conversion from jpg to RGB took " + String(millis() - tTimer) + " milliseconds");// report how long the conversion took
 
 
-   if (sendRGBfile) client.write(rgb, ARRAY_LENGTH);          // send the rgb data as a file
+   if (sendRGBfile) client.write(rgb, ARRAY_LENGTH);          // send the raw rgb data
 
 
- //   ****** examples of reading the resulting RGB data *****
+ //   ****** examples of using the resulting RGB data *****
 
    // display some of the resulting data
        uint32_t resultsToShow = 60;                                                                       // how much data to display
-       MessageRGB(client,"R , G , B");
+       sendText(client,"<br>R , G , B");
        for (uint32_t i = 0; i < resultsToShow-2; i+=3) {
-         MessageRGB(client,String(rgb[i+2]) + "," + String(rgb[i+1]) + "," + String(rgb[i+0]));           // Red , Green , Blue
+         sendText(client,String(rgb[i+2]) + "," + String(rgb[i+1]) + "," + String(rgb[i+0]));           // Red , Green , Blue
          // // calculate the x and y coordinate of the current pixel
          //   uint16_t x = (i / 3) % fb->width;
          //   uint16_t y = floor( (i / 3) / fb->width);
@@ -1072,9 +1057,9 @@ void readRGBImage() {
        aRed = aRed / (fb->width * fb->height);                                                            // divide total by number of pixels to give the average value
        aGreen = aGreen / (fb->width * fb->height);
        aBlue = aBlue / (fb->width * fb->height);
-       MessageRGB(client,"Average Blue = " + String(aBlue));
-       MessageRGB(client,"Average Green = " + String(aGreen));
-       MessageRGB(client,"Average Red = " + String(aRed));
+       sendText(client,"Average Blue = " + String(aBlue));
+       sendText(client,"Average Green = " + String(aGreen));
+       sendText(client,"Average Red = " + String(aRed));
 
 
  //   *******************************************************
@@ -1128,48 +1113,49 @@ bool getNTPtime(int sec) {
 
 
 // ----------------------------------------------------------------
-//   -capture image and send as jpg     i.e. http://x.x.x.x/jpg
+//     -capture jpg image and send    i.e. http://x.x.x.x/jpg
 // ----------------------------------------------------------------
 
-void handleJPG() {
+bool handleJPG() {
 
-   WiFiClient client = server.client();          // open link with client
-   char buf[32];
-   camera_fb_t * fb = NULL;
+    WiFiClient client = server.client();          // open link with client
+    char buf[32];
+    camera_fb_t * fb = NULL;                      // pointer for image frame buffer
 
-   // log page request including clients IP address
-     if (serialDebug) {
-       IPAddress cip = client.remoteIP();
-       Serial.printf("jpg requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
-     }
+    // log page request including clients IP address
+      if (serialDebug) {
+        IPAddress cip = client.remoteIP();
+        Serial.printf("jpg requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
+      }
 
-   // build and send html
+    // capture the jpg image from camera
+        fb = esp_camera_fb_get();
+        if (!fb) {
+          if (serialDebug) Serial.println("Error: failed to capture image");
+          return 0;
+        }
+
+    // html to send a jpg
       const char HEADER[] = "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\n";
       const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";
-      const int hdrLen = strlen(HEADER);         // length of the stored text, used when sending to web page
+      const int hdrLen = strlen(HEADER);
       const int cntLen = strlen(CTNTTYPE);
       client.write(HEADER, hdrLen);
       client.write(CTNTTYPE, cntLen);
+      sprintf( buf, "%d\r\n\r\n", fb->len);      // put text size in to 'buf' char array and send
+      client.write(buf, strlen(buf));
 
-   // capture and send image
-       fb = esp_camera_fb_get();
-       if (!fb) {
-         if (serialDebug) Serial.println("Error: failed to capture image");
-         return;
-       }
+    // send the captured jpg data
+      client.write((char *)fb->buf, fb->len);
 
-       // put text in to 'buf' char array and send
-         sprintf( buf, "%d\r\n\r\n", fb->len);
-         client.write(buf, strlen(buf));
+    // close client connection
+      delay(3);
+      client.stop();
 
-       // send the jpg data
-         client.write((char *)fb->buf, fb->len);
+    // return image frame so memory can be released
+      esp_camera_fb_return(fb);
 
-   // close client connection
-     delay(3);
-     client.stop();
-
-  esp_camera_fb_return(fb);                   // return image so memory can be released
+    return 1;
 
 }  // handleJPG
 
@@ -1182,7 +1168,9 @@ void handleJPG() {
 
 void handleStream(){
 
- WiFiClient client = server.client();          // open link with client
+  WiFiClient client = server.client();          // open link with client
+  char buf[32];
+  camera_fb_t * fb = NULL;
 
  // log page request including clients IP address
    if (serialDebug) {
@@ -1190,7 +1178,7 @@ void handleStream(){
      Serial.printf("Video stream requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
    }
 
- // HTML used in the web page
+ // html
  const char HEADER[] = "HTTP/1.1 200 OK\r\n" \
                        "Access-Control-Allow-Origin: *\r\n" \
                        "Content-Type: multipart/x-mixed-replace; boundary=123456789000000000000987654321\r\n";
@@ -1199,29 +1187,21 @@ void handleStream(){
  const int hdrLen = strlen(HEADER);         // length of the stored text, used when sending to web page
  const int bdrLen = strlen(BOUNDARY);
  const int cntLen = strlen(CTNTTYPE);
+ client.write(HEADER, hdrLen);
+ client.write(BOUNDARY, bdrLen);
 
- // temp stores
-   char buf[32];
-   int s;
-   camera_fb_t * fb = NULL;
-
- // send html header
-   client.write(HEADER, hdrLen);
-   client.write(BOUNDARY, bdrLen);
-
- // send live images until client disconnects
+ // send live jpg images until client disconnects
  while (true)
  {
    if (!client.connected()) break;
-     fb = esp_camera_fb_get();                   // capture live image
+     fb = esp_camera_fb_get();                   // capture live image as jpg
      if (!fb) {
-       if (serialDebug) Serial.println("Error: failed to capture image");
+       if (serialDebug) Serial.println("Error: failed to capture jpg image");
      }
-     s = fb->len;                                // store size of image (i.e. buffer length)
      client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
-     sprintf( buf, "%d\r\n\r\n", s );            // format the image's size as html and put in to 'buf'
+     sprintf( buf, "%d\r\n\r\n", fb->len);            // format the image's size as html and put in to 'buf'
      client.write(buf, strlen(buf));             // send result (image size)
-     client.write((char *)fb->buf, s);           // send the image data
+     client.write((char *)fb->buf, fb->len);           // send the image data
      client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
      esp_camera_fb_return(fb);                   // return image so memory can be released
  }
