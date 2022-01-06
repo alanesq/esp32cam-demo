@@ -100,7 +100,7 @@
 // ---------------------------------------------------------------
 
  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
- const char* sversion = "05Jan22";                      // Sketch version
+ const char* sversion = "06Jan22";                      // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will send the rgb data as a file rather than display a HTML page
 
@@ -571,6 +571,20 @@ void flashLED(int reps) {
 }
 
 
+// send a standard html header
+void sendHeader(WiFiClient &client) {
+  // html header
+    client.write("HTTP/1.1 200 OK\r\n");
+    client.write("Content-Type: text/html\r\n");
+    client.write("Connection: close\r\n");
+    client.write("\r\n");
+    client.write("<!DOCTYPE HTML>\n");
+    client.write("<html lang='en'>\n");
+    client.write("<head>\n");
+    client.write("<meta name='viewport' content='width=device-width, initial-scale=1.0'>\n");
+}
+
+
 // ******************************************************************************************************************
 
 
@@ -668,12 +682,6 @@ void handleRoot() {
 
  WiFiClient client = server.client();                       // open link with client
 
- // log the page request including clients IP address
-   if (serialDebug) {
-     IPAddress cip = client.remoteIP();
-     Serial.printf("Root page requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
-   }
-
 
  // Action any button presses or settings entered on web page
 
@@ -739,7 +747,8 @@ void handleRoot() {
 
 
   // html header
-   client.write("<!DOCTYPE html> <html lang='en'> <head> <title>root</title> </head> <body>\n");         // basic html header
+   sendHeader(client);
+   client.write("<title>root</title> </head> <body>\n");         // basic html header
    client.write("<FORM action='/' method='post'>\n");       // used by the buttons in the html (action = the web page to send it to
 
 
@@ -826,17 +835,17 @@ void handlePhoto() {
 
  WiFiClient client = server.client();                                                        // open link with client
 
- // log page request including clients IP address
-   if (serialDebug) {
-     IPAddress cip = client.remoteIP();
-     Serial.printf("Photo requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
-   }
+ // log page request including clients IP
+   IPAddress cIP = client.remoteIP();
+   if (serialDebug) Serial.println("Save photo requested by " + cIP.toString());
+
 
  // save an image to sd card or spiffs
    byte sRes = storeImage();              // save an image to sd card or spiffs (store sucess or failed flag - 0=fail, 1=spiffs only, 2=spiffs and sd card)
 
  // html header
-   client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");         // basic html header
+   sendHeader(client);
+   client.write("<title>photo</title> </head> <body>\n");         // basic html header
 
  // html body
    if (sRes == 2) {
@@ -869,12 +878,10 @@ bool handleImg() {
    WiFiClient client = server.client();                 // open link with client
    bool pRes = 0;
 
- // log page request including clients IP address
-   if (serialDebug) {
-     IPAddress cip = client.remoteIP();
-     Serial.printf("Image display requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
-     if (imageCounter == 0) Serial.println("Error: no images to display");
-   }
+   // log page request including clients IP
+     IPAddress cIP = client.remoteIP();
+     if (serialDebug) Serial.println("Display stored image requested by " + cIP.toString());
+
 
    int imgToShow = imageCounter;                        // default to showing most recent file
 
@@ -988,16 +995,21 @@ void readRGBImage() {
  WiFiClient client = server.client();
  uint32_t tTimer;     // used to time tasks                                                                    // open link with client
 
- // log page request including clients IP address
-   if (serialDebug) {
-     IPAddress cip = client.remoteIP();
-     Serial.printf("RGB requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
-   }
-
  // basic html header
    if (!sendRGBfile) client.write("<!DOCTYPE html> <html lang='en'> <head> <title>Show RGB data</title> </head> <body>\n");          // basic html header
 
- sendText(client,"LIVE IMAGE AS RGB DATA");                                                              // 'sendText' sends the String to both serial port and web page
+ // display page title including clients IP
+   IPAddress cIP = client.remoteIP();
+   sendText(client, "Live image as rgb data, requested by " + cIP.toString());                                                            // 'sendText' sends the String to both serial port and web page
+
+ // make sure psram is available
+ if (!psramFound()) {
+   sendText(client,"error: Unable to get RGB data as no psram available to store it in");
+   delay(3);
+   client.stop();
+   return;
+ }
+
 
  //   ****** the main code for converting an image to RGB data *****
 
@@ -1014,7 +1026,6 @@ void readRGBImage() {
      }
 
    // allocate memory to store the rgb data (in psram, 3 bytes per pixel)
-     if (!psramFound()) sendText(client," -error no psram found- ");
      sendText(client,"Free psram before rgb data allocated = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024) + "K");
      void *ptrVal = NULL;                                                                                 // create a pointer for memory location to store the data
      uint32_t ARRAY_LENGTH = fb->width * fb->height * 3;                                                  // calculate memory required to store the RGB data (i.e. number of pixels in the jpg image x 3)
@@ -1122,12 +1133,6 @@ bool handleJPG() {
     char buf[32];
     camera_fb_t * fb = NULL;                      // pointer for image frame buffer
 
-    // log page request including clients IP address
-      if (serialDebug) {
-        IPAddress cip = client.remoteIP();
-        Serial.printf("jpg requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
-      }
-
     // capture the jpg image from camera
         fb = esp_camera_fb_get();
         if (!fb) {
@@ -1172,11 +1177,9 @@ void handleStream(){
   char buf[32];
   camera_fb_t * fb = NULL;
 
- // log page request including clients IP address
-   if (serialDebug) {
-     IPAddress cip = client.remoteIP();
-     Serial.printf("Video stream requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
-   }
+  // log page request including clients IP
+    IPAddress cIP = client.remoteIP();
+    if (serialDebug) Serial.println("Live stream requested by " + cIP.toString());
 
  // html
  const char HEADER[] = "HTTP/1.1 200 OK\r\n" \
@@ -1264,14 +1267,13 @@ void handleTest() {
 
  WiFiClient client = server.client();                                                        // open link with client
 
- // log page request including clients IP address
-   if (serialDebug) {
-     IPAddress cip = client.remoteIP();
-     Serial.printf("Test requested from: %d.%d.%d.%d \n", cip[0], cip[1], cip[2], cip[3]);
-   }
+ // log page request including clients IP
+   IPAddress cIP = client.remoteIP();
+   if (serialDebug) Serial.println("Test page requested by " + cIP.toString());
 
  // html header
-   client.write("<!DOCTYPE html> <html lang='en'> <head> <title>photo</title> </head> <body>\n");         // basic html header
+   sendHeader(client);
+   client.write("<title>photo</title> </head> <body>\n");         // basic html header
 
 
  // html body
