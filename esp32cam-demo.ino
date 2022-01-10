@@ -14,7 +14,7 @@
 *
 *     GPIO:
 *        You can use io pins 13 and 12 for input or output (but 12 must not be high at boot)
-*        pin 16 is used for psram but you may get away with using it as input for a button etc.
+*        pin 16 is used for psram but you may get away with using it as input for a button but not recommended
 *        You could also use pins 1 & 3 if you do not use Serial (disable serialDebug in the settings below)
 *        Pins 14, 2 & 15 should be ok to use if you are not using an SD Card
 *        More info:   https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
