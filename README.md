@@ -86,13 +86,13 @@ as data (http://x.x.x.x/rgb).
                              resolution images as there is not enough memory)
                                            
 GPIO PINS:
-<br>The main io pins available for general use are 13 and 12 (12 must not be high at boot),
+<br>The main io pins available for general use are 13 and 12 (12 must not be high at boot and sd-card needs to be in 1-bit mode),
 <br>14, 2 & 15 should also be available if you are not using the SD Card. 
 <br>You can also use pins 1 and 3 if you do not use Serial. 
 <br>More info: https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
 <br>BTW-You can use an MCP23017 io expander chip on pins 12 and 13 to give you 16 general purpose gpio pins, this requires the adafruit MCP23017 library to be installed.
 <br>Pin 16 is used for psram but you may get away with using it as input for a button etc.?
-
+<br>Note: I have been told there may be issues reading files when sd-card is in 1-bit mode, I have only used it for writing them myself.
 
 ----------------
 
