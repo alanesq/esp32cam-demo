@@ -32,6 +32,7 @@ It looks like the esp32cam suplied with them are not standard and have one of th
 So on esp32cam modules without this feature you have to plug the USB in whilst holding the program button to upload a sketch 
 I find I have to use the lowest serial upload speed or it fails (Select 'ESP32 dev module' in the Arduino IDE to have the option and 
 make sure PSRam is enabled). <br>
+There is also now a esp32cam with built in USB available called the "ESP32-CAM-CH340".<br>
 The wifi is very poor whilst in the motherboard (I find this happens if you have something near the antenna on the esp32cam modules) <br>
 but if I rest my thumb above the antenna I find the signal works ok). <br> 
 Many of the ebay listing include an external antenna and I would suggest this would b a good option if ordering one.  <br>
