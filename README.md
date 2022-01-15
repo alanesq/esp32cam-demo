@@ -124,6 +124,7 @@ I suspect it may be when streaming video for long periods?  May be worth bearing
 You can see a demo of accessing greyscale image data here:
     https://github.com/alanesq/esp32cam-demo/blob/master/Misc/esp32camdemo-greyscale.ino
     
-A esp32cam wrapper that looks very interesting:  https://github.com/yoursunny/esp32cam    
+A very impressive sketch here which can record AVI video to sd card - https://github.com/mtnbkr88/ESP32CAMVideoRecorder
+
 
                                                       https://github.com/alanesq/esp32cam-demo
