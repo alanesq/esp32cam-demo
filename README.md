@@ -128,6 +128,8 @@ A very impressive sketch here which can record AVI video to sd card - https://gi
 
 A handy way to upload images to a computer/web server via php which is very reliable and easy to use: https://RandomNerdTutorials.com/esp32-cam-post-image-photo-server/
 
+How to crop images on the esp32cam: https://makexyz.fun/esp32-cam-cropping-images-on-device/
+
 If you have any handy info, tips, or improvements to my code etc. please feel let me know at: alanesq@disroot.org
 
 
