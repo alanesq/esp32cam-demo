@@ -84,6 +84,7 @@
 
 #include "esp_camera.h"         // https://github.com/espressif/esp32-camera
 // #include "camera_pins.h"
+#include <base64.h>             // for encoding buffer to display image on page
 #include <WiFi.h>
 #include <WebServer.h>
 #include <HTTPClient.h>
@@ -192,7 +193,6 @@ WebServer server(80);                       // serve web pages on port 80
  uint32_t lastStatus = millis();           // last time status light changed status (to flash all ok led)
  bool sdcardPresent;                       // flag if an sd card is detected
  int imageCounter;                         // image file name on sd card counter
- uint32_t illuminationLEDstatus;           // current brightness setting of the illumination led
  String spiffsFilename = "/image.jpg";     // image name to use when storing in spiffs
 
 
@@ -591,7 +591,7 @@ void sendFooter(WiFiClient &client) {
 }
 
 
-// send line of text to both serial port and web page
+// send line of text to both serial port and web page - used by readRGBImage
 void sendText(WiFiClient &client, String theText) {
      if (!sendRGBfile) client.print(theText + "<br>\n");
      if (serialDebug || theText.indexOf("error") > 0) Serial.println(theText);   // if text contains "error"
@@ -608,7 +608,8 @@ void sendText(WiFiClient &client, String theText) {
 
 byte storeImage() {
 
- fs::FS &fs = SD_MMC;                              // sd card file system
+ byte sRes = 0;                // result flag
+ fs::FS &fs = SD_MMC;          // sd card file system
 
  // capture the image from camera
    int currentBrightness = brightLEDbrightness;
@@ -626,31 +627,32 @@ byte storeImage() {
      SPIFFS.remove(spiffsFilename);                       // delete old image file if it exists
      File file = SPIFFS.open(spiffsFilename, FILE_WRITE);
      if (!file) {
-       if (serialDebug) Serial.println("Failed to create file in Spiffs");
-       return 0;
-     } else {
-       if (file.write(fb->buf, fb->len)) {
-         if (serialDebug)  {
-           Serial.print("The picture has been saved as " + spiffsFilename);
-           Serial.print(" - Size: ");
-           Serial.print(file.size());
-           Serial.println(" bytes");
-         }
+       if (serialDebug) Serial.println("Failed to create file in Spiffs - will format and try again");
+       if (!SPIFFS.format()) {
+         if (serialDebug) Serial.println("Spiffs format failed");
        } else {
-         if (serialDebug) Serial.println("Error: writing image to spiffs...will format and try again");
-         if (!SPIFFS.format()) {
-           if (serialDebug) Serial.println("Error: Unable to format Spiffs");
-           return 0;
-         }
          file = SPIFFS.open(spiffsFilename, FILE_WRITE);
-         if (!file.write(fb->buf, fb->len)) {
-           if (serialDebug) Serial.println("Error: Still unable to write image to Spiffs");
-           return 0;
+         if (!file) {
+           if (serialDebug) Serial.println("Still unable to create file in spiffs");
          }
        }
-     file.close();
      }
+     if (file) {       // if file has been created ok write data to it
+       if (file.write(fb->buf, fb->len)) {
+         sRes = 1;    // flag as saved ok
+       } else {
+         if (serialDebug) Serial.println("Error: writing image to spiffs file");
+       }
+     }
+     if (sRes == 1 && serialDebug)  {
+       Serial.print("The picture has been saved as " + spiffsFilename);
+       Serial.print(" - Size: ");
+       Serial.print(file.size());
+       Serial.println(" bytes");
+     }
+     file.close();
    }
+
 
  // save the image to sd card
    if (sdcardPresent) {
@@ -659,14 +661,13 @@ byte storeImage() {
      File file = fs.open(SDfilename, FILE_WRITE);                                  // create file on sd card
      if (!file) {
        if (serialDebug) Serial.println("Error: Failed to create file on sd-card: " + SDfilename);
-       return 0;
      } else {
        if (file.write(fb->buf, fb->len)) {                                         // File created ok so save image to it
          if (serialDebug) Serial.println("Image saved to sd card");
          imageCounter ++;                                                          // increment image counter
+         sRes = 2;    // flag as saved ok
        } else {
          if (serialDebug) Serial.println("Error: failed to save image to sd card");
-         return 0;
        }
        file.close();              // close image file on sd card
      }
@@ -674,8 +675,7 @@ byte storeImage() {
 
  esp_camera_fb_return(fb);        // return frame so memory can be released
 
- if (sdcardPresent) return 2;     // saved to sd card
- else return 1;                   // saved in spiffs
+ return sRes;
 
 } // storeImage
 
@@ -792,7 +792,7 @@ void handleRoot() {
      else client.write("<p>Input Pin 16 is High</p>\n");
 
    // illumination led brightness
-     client.printf("<p>Illumination led set to %d</p>\n", illuminationLEDstatus);
+     client.printf("<p>Illumination led set to %d</p>\n", brightLEDbrightness);
 
    // Current real time
      client.print("<p>Current time: " + localTime() + "</p>\n");
@@ -860,14 +860,12 @@ void handlePhoto() {
  // html body
    if (sRes == 2) {
        client.printf("<p>Image saved to sd card as image number %d </p>\n", imageCounter);
-       client.write("<a href='/img'>View Image</a>\n");                // link to the image
    } else if (sRes == 1) {
        client.write("<p>Image saved in Spiffs</p>\n");
-       client.write("<a href='/img'>View Image</a>\n");                // link to the image
    } else {
        client.write("<p>Error: Failed to save image to sd card</p>\n");
    }
-
+   client.write("<a href='/'>Return</a>\n");                // link back
    sendFooter(client);     // close web page
 
 }  // handlePhoto
@@ -1029,8 +1027,13 @@ void readRGBImage() {
        sendText(client,"-Image size=" + String(fb->len) + " bytes");
      }
 
+     // display captured image using base64
+      if (!sendRGBfile) {
+        client.println("<br><img src='data:image/png;base64," + base64::encode(fb->buf, fb->len) + "'><br>");
+      }
+
    // allocate memory to store the rgb data (in psram, 3 bytes per pixel)
-     sendText(client,"Free psram before rgb data allocated = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024) + "K");
+     sendText(client,"<br>Free psram before rgb data allocated = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024) + "K");
      void *ptrVal = NULL;                                                                                 // create a pointer for memory location to store the data
      uint32_t ARRAY_LENGTH = fb->width * fb->height * 3;                                                  // calculate memory required to store the RGB data (i.e. number of pixels in the jpg image x 3)
      if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM) <  ARRAY_LENGTH) {
@@ -1053,14 +1056,21 @@ void readRGBImage() {
      sendText(client, "Conversion from jpg to RGB took " + String(millis() - tTimer) + " milliseconds");// report how long the conversion took
 
 
-   if (sendRGBfile) client.write(rgb, ARRAY_LENGTH);          // send the raw rgb data
+   // if sendRGBfile is set then just send raw RGB data and close
+   if (sendRGBfile) {
+     client.write(rgb, ARRAY_LENGTH);          // send the raw rgb data
+     esp_camera_fb_return(fb);                 // camera frame buffer
+     delay(3);
+     client.stop();
+     return;
+   }
 
 
  //   ****** examples of using the resulting RGB data *****
 
    // display some of the resulting data
        uint32_t resultsToShow = 50;                                                                       // how much data to display
-       sendText(client,"<br>R , G , B - for first " + String(resultsToShow) + "pixels of image");
+       sendText(client,"<br>R , G , B - for first " + String(resultsToShow) + " pixels of image");
        for (uint32_t i = 0; i < resultsToShow-2; i+=3) {
          sendText(client,String(rgb[i+2]) + "," + String(rgb[i+1]) + "," + String(rgb[i+0]));           // Red , Green , Blue
          // // calculate the x and y coordinate of the current pixel
@@ -1087,8 +1097,8 @@ void readRGBImage() {
 
  //   *******************************************************
 
-
- if (!sendRGBfile) sendFooter(client);     // close web page
+ client.write("<br><a href='/'>Return</a>\n");       // link back
+ sendFooter(client);     // close web page
 
  // finished with the data so free up the memory space used in psram
    esp_camera_fb_return(fb);   // camera frame buffer
