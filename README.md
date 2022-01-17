@@ -126,5 +126,11 @@ You can see a demo of accessing greyscale image data here:
     
 A very impressive sketch here which can record AVI video to sd card - https://github.com/mtnbkr88/ESP32CAMVideoRecorder
 
+A handy way to upload images to a computer/web server via php which is very reliable and easy to use: https://RandomNerdTutorials.com/esp32-cam-post-image-photo-server/
+
+If you have any handy info, tips, or improvements to my code etc. please feel let me know at: alanesq@disroot.org
+
+
+
 
                                                       https://github.com/alanesq/esp32cam-demo
