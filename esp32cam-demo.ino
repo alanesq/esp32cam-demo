@@ -788,8 +788,8 @@ void handleRoot() {
      else client.write("<p>No SD Card detected</p>\n");
 
    // io pin details
-     if (digitalRead(iopinA) == LOW) client.write("<p>Output Pin 13 is Low</p>\n");
-     else client.write("<p>Output Pin 13 is High</p>\n");
+     if (digitalRead(iopinA) == LOW) client.write("<p>Input Pin 13 is Low</p>\n");
+     else client.write("<p>Input Pin 13 is High</p>\n");
 
      if (digitalRead(iopinB) == LOW) client.write("<p>Output Pin 12 is Low</p>\n");
      else client.write("<p>Output Pin 12 is High</p>\n");
