@@ -94,7 +94,6 @@ GPIO PINS:
 <br>BTW-You can use an MCP23017 io expander chip on pins 12 and 13 to give you 16 general purpose gpio pins, this requires the adafruit MCP23017 library to be installed.
 <br>Pin 16 is used for psram but you may get away with using it as input for a button etc.?
 <br>Note: I have been told there may be issues reading files when sd-card is in 1-bit mode, I have only used it for writing them myself.
-<br>Some good info here:   https://github.com/raphaelbs/esp32-cam-ai-thinker/blob/master/docs/esp32cam-pin-notes.md
 
 ----------------
 
@@ -130,6 +129,8 @@ A very impressive sketch here which can record AVI video to sd card - https://gi
 A handy way to upload images to a computer/web server via php which is very reliable and easy to use: https://RandomNerdTutorials.com/esp32-cam-post-image-photo-server/
 
 How to crop images on the esp32cam: https://makexyz.fun/esp32-cam-cropping-images-on-device/
+
+Some good info here: https://github.com/raphaelbs/esp32-cam-ai-thinker
 
 If you have any handy info, tips, or improvements to my code etc. please feel let me know at: alanesq@disroot.org
 
