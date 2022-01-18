@@ -893,7 +893,7 @@ bool handleImg() {
    int imgToShow = imageCounter;                        // default to showing most recent file
 
    // get image number from url parameter
-     if (server.hasArg("img")) {
+     if (server.hasArg("img") && sdcardPresent) {
        String Tvalue = server.arg("img");               // read value
        imgToShow = Tvalue.toInt();                      // convert string to int
        if (imgToShow < 1 || imgToShow > imageCounter) imgToShow = imageCounter;    // validate image number
@@ -912,20 +912,33 @@ bool handleImg() {
          pRes = 1;                                                // flag sucess
      } else {
        if (serialDebug) Serial.println("Error: image file not found");
-       WiFiClient client = server.client();                       // open link with client
-       client.write("<!DOCTYPE html> <html> <body>\n");
+       sendHeader(client, "Display stored image");
        client.write("<p>Error: Image not found</p></html>\n");
-       delay(3);
-       client.stop();
+       client.write("<br><a href='/'>Return</a>\n");       // link back
+       sendFooter(client);     // close web page
      }
    }
 
    // if stored in SPIFFS
    if (!sdcardPresent) {
      if (serialDebug) Serial.println("Displaying image from spiffs");
+
+     // check file exists
+     if (!SPIFFS.exists(spiffsFilename)) {
+       sendHeader(client, "Display stored image");
+       client.write("Error: No image found to display\n");
+       client.write("<br><a href='/'>Return</a>\n");       // link back
+       sendFooter(client);     // close web page
+       return 0;
+     }
+
      File f = SPIFFS.open(spiffsFilename, "r");                         // read file from spiffs
          if (!f) {
            if (serialDebug) Serial.println("Error reading " + spiffsFilename);
+           sendHeader(client, "Display stored image");
+           client.write("Error reading file from Spiffs\n");
+           client.write("<br><a href='/'>Return</a>\n");       // link back
+           sendFooter(client);     // close web page
          }
          else {
              size_t sent = server.streamFile(f, "image/jpeg");     // send file to web page
