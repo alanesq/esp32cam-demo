@@ -323,7 +323,7 @@ void setup() {
  // define i/o pins
    pinMode(indicatorLED, OUTPUT);            // defined again as sd card config can reset it
    digitalWrite(indicatorLED,HIGH);          // led off = High
-   pinMode(iopinA, OUTPUT);                  // pin 13 - free io pin, can be used for input or output
+   pinMode(iopinA, INPUT);                   // pin 13 - free io pin, can be used for input or output
    pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be used for input or output (must not be high at boot)
 
  // MCP23017 io expander (requires adafruit MCP23017 library)
@@ -710,20 +710,16 @@ void handleRoot() {
 
    // if button1 was pressed (toggle io pin A)
    //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1");
+
+   // if button1 was pressed (toggle io pin B)
      if (server.hasArg("button1")) {
        if (serialDebug) Serial.println("Button 1 pressed");
-       digitalWrite(iopinA,!digitalRead(iopinA));             // toggle output pin on/off
-     }
-
-   // if button2 was pressed (toggle io pin B)
-     if (server.hasArg("button2")) {
-       if (serialDebug) Serial.println("Button 2 pressed");
        digitalWrite(iopinB,!digitalRead(iopinB));             // toggle output pin on/off
      }
 
    // if button3 was pressed (toggle flash LED)
-     if (server.hasArg("button3")) {
-       if (serialDebug) Serial.println("Button 3 pressed");
+     if (server.hasArg("button2")) {
+       if (serialDebug) Serial.println("Button 2 pressed");
        if (brightLEDbrightness == 0) brightLed(10);                // turn led on dim
        else if (brightLEDbrightness == 10) brightLed(40);          // turn led on medium
        else if (brightLEDbrightness == 40) brightLed(255);         // turn led on full
@@ -731,8 +727,8 @@ void handleRoot() {
      }
 
      // if button4 was pressed (format SPIFFS)
-       if (server.hasArg("button4")) {
-         if (serialDebug) Serial.println("Button 4 pressed");
+       if (server.hasArg("button3")) {
+         if (serialDebug) Serial.println("Button 3 pressed");
          if (!SPIFFS.format()) {
            if (serialDebug) Serial.println("Error: Unable to format Spiffs");
          } else {
@@ -809,10 +805,9 @@ void handleRoot() {
 //      client.printf("<p>Touch on pin 13: %d </p>\n", touchRead(T4) );
 
    // Control bottons
-     client.write("<input style='height: 35px;' name='button1' value='Toggle pin 13' type='submit'> \n");
-     client.write("<input style='height: 35px;' name='button2' value='Toggle pin 12' type='submit'> \n");
-     client.write("<input style='height: 35px;' name='button3' value='Toggle Flash' type='submit'> \n");
-     client.write("<input style='height: 35px;' name='button4' value='Wipe SPIFFS memory' type='submit'><br> \n");
+     client.write("<input style='height: 35px;' name='button1' value='Toggle pin 12' type='submit'> \n");
+     client.write("<input style='height: 35px;' name='button2' value='Toggle Flash' type='submit'> \n");
+     client.write("<input style='height: 35px;' name='button3' value='Wipe SPIFFS memory' type='submit'><br> \n");
 
    // Image setting controls
      client.write("<br>CAMERA SETTINGS: \n");
@@ -825,7 +820,8 @@ void handleRoot() {
      client.write("<a href='/photo'>Capture an image</a> - \n");
      client.write("<a href='/img'>View stored image</a> - \n");
      client.write("<a href='/rgb'>Capture Image as raw RGB data</a> - \n");
-     client.write("<a href='/stream'>Live stream</a><br>\n");
+     client.write("<a href='/stream'>Live stream</a> - \n");
+     client.write("<a href='/test'>Test procedure</a><br>\n");
 
     // capture and show a jpg image
       client.write("<br><a href='/jpg'>");         // make it a link
