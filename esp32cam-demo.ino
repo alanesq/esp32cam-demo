@@ -14,7 +14,6 @@
 *
 *     GPIO:
 *        You can use io pins 13 and 12 for input or output (but 12 must not be high at boot)
-*        pin 16 is used for psram but you may get away with using it as input for a button but not recommended
 *        You could also use pins 1 & 3 if you do not use Serial (disable serialDebug in the settings below)
 *        Pins 14, 2 & 15 should be ok to use if you are not using an SD Card
 *        More info:   https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
@@ -31,8 +30,6 @@
 *     To see a more advanced sketch along the same format as this one have a look at https://github.com/alanesq/CameraWifiMotion
 *        which includes email support, FTP, OTA updates and motion detection
 *
-*     Sending image to TFT display see:   https://www.survivingwithandroid.com/esp32-cam-tft-display-picture-st7735/
-*
 *     esp32cam-demo is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
 *        implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 *
@@ -43,6 +40,7 @@
  #error This sketch is only for an ESP32Cam module
 #endif
 
+#include "esp_camera.h"         // https://github.com/espressif/esp32-camera
 
 //   ---------------------------------------------------------------------------------------------------------
 
@@ -80,29 +78,13 @@
 
 
 // ---------------------------------------------------------------
-
-
-#include "esp_camera.h"         // https://github.com/espressif/esp32-camera
-// #include "camera_pins.h"
-#include <base64.h>             // for encoding buffer to display image on page
-#include <WiFi.h>
-#include <WebServer.h>
-#include <HTTPClient.h>
-#include "driver/ledc.h"      // used to configure pwm on illumination led
-
-// spiffs used to store images if no sd card present
- #include <SPIFFS.h>
- #include <FS.h>             // gives file access on spiffs
-
-
-// ---------------------------------------------------------------
 //                           -SETTINGS
 // ---------------------------------------------------------------
 
  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
- const char* sversion = "17Jan22";                      // Sketch version
+ const char* sversion = "18Jan22";                      // Sketch version
 
- bool sendRGBfile = 0;                                  // if set '/rgb' will send the rgb data as a file rather than display a HTML page
+ bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
  const bool serialDebug = 1;                            // show debug info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
 
@@ -123,7 +105,7 @@
 
  const int indicatorLED = 33;                           // onboard small LED pin (33)
 
- // Bright LED
+ // Bright LED (Flash)
    const int brightLED = 4;                             // onboard Illumination/flash LED pin (4)
    int brightLEDbrightness = 0;                         // initial brightness (0 - 255)
    const int ledFreq = 5000;                            // PWM settings
@@ -132,7 +114,6 @@
 
  const int iopinA = 13;                                 // general io pin 13
  const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
- const int iopinC = 16;                                 // input only pin 16 (used by PSRam but you may get away with using it for a button)
 
  const int serialSpeed = 115200;                        // Serial data speed to use
 
@@ -168,8 +149,19 @@
 
 // ******************************************************************************************************************
 
+//#include "esp_camera.h"         // https://github.com/espressif/esp32-camera
+// #include "camera_pins.h"
+#include <base64.h>             // for encoding buffer to display image on page
+#include <WiFi.h>
+#include <WebServer.h>
+#include <HTTPClient.h>
+#include "driver/ledc.h"        // used to configure pwm on illumination led
 
-WebServer server(80);                       // serve web pages on port 80
+// spiffs used to store images if no sd card present
+ #include <SPIFFS.h>
+ #include <FS.h>                // gives file access on spiffs
+
+WebServer server(80);           // serve web pages on port 80
 
 // Used to disable brownout detection
  #include "soc/soc.h"
@@ -332,7 +324,6 @@ void setup() {
    digitalWrite(indicatorLED,HIGH);          // led off = High
    pinMode(iopinA, OUTPUT);                  // pin 13 - free io pin, can be used for input or output
    pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be used for input or output (must not be high at boot)
-   pinMode(iopinC, INPUT);                   // pin 16 - free input only pin (may cause issues?)
 
  // MCP23017 io expander (requires adafruit MCP23017 library)
  #if useMCP23017 == 1
@@ -571,7 +562,7 @@ void flashLED(int reps) {
 
 
 // send a standard html header (i.e. start of web page)
-void sendHeader(WiFiClient &client) {
+void sendHeader(WiFiClient &client, String wTitle) {
     client.write("HTTP/1.1 200 OK\r\n");
     client.write("Content-Type: text/html\r\n");
     client.write("Connection: close\r\n");
@@ -580,6 +571,7 @@ void sendHeader(WiFiClient &client) {
     client.write("<html lang='en'>\n");
     client.write("<head>\n");
     client.write("<meta name='viewport' content='width=device-width, initial-scale=1.0'>\n");
+    client.print("<title>" + wTitle + "</title> </head> <body>\n");
 }
 
 
@@ -624,28 +616,28 @@ byte storeImage() {
  // save image to Spiffs
    if (!sdcardPresent) {
      if (serialDebug) Serial.println("Storing image to spiffs only");
-     SPIFFS.remove(spiffsFilename);                       // delete old image file if it exists
-     File file = SPIFFS.open(spiffsFilename, FILE_WRITE);
+     SPIFFS.remove(spiffsFilename);                         // if file name already exists delete it
+     File file = SPIFFS.open(spiffsFilename, FILE_WRITE);   // create new file
      if (!file) {
        if (serialDebug) Serial.println("Failed to create file in Spiffs - will format and try again");
-       if (!SPIFFS.format()) {
+       if (!SPIFFS.format()) {                              // format spiffs
          if (serialDebug) Serial.println("Spiffs format failed");
        } else {
-         file = SPIFFS.open(spiffsFilename, FILE_WRITE);
+         file = SPIFFS.open(spiffsFilename, FILE_WRITE);    // try again to create new file
          if (!file) {
            if (serialDebug) Serial.println("Still unable to create file in spiffs");
          }
        }
      }
-     if (file) {       // if file has been created ok write data to it
+     if (file) {       // if file has been created ok write image data to it
        if (file.write(fb->buf, fb->len)) {
          sRes = 1;    // flag as saved ok
        } else {
-         if (serialDebug) Serial.println("Error: writing image to spiffs file");
+         if (serialDebug) Serial.println("Error: failed to write image data to spiffs file");
        }
      }
-     if (sRes == 1 && serialDebug)  {
-       Serial.print("The picture has been saved as " + spiffsFilename);
+     if (sRes == 1 && serialDebug) {
+       Serial.print("The picture has been saved to Spiffs as " + spiffsFilename);
        Serial.print(" - Size: ");
        Serial.print(file.size());
        Serial.println(" bytes");
@@ -667,7 +659,7 @@ byte storeImage() {
          imageCounter ++;                                                          // increment image counter
          sRes = 2;    // flag as saved ok
        } else {
-         if (serialDebug) Serial.println("Error: failed to save image to sd card");
+         if (serialDebug) Serial.println("Error: failed to save image data file on sd card");
        }
        file.close();              // close image file on sd card
      }
@@ -678,7 +670,6 @@ byte storeImage() {
  return sRes;
 
 } // storeImage
-
 
 
 // ******************************************************************************************************************
@@ -692,11 +683,10 @@ byte storeImage() {
 void handleRoot() {
 
  getNTPtime(2);                                             // refresh current time from NTP server
-
  WiFiClient client = server.client();                       // open link with client
 
 
- // Action any button presses or settings entered on web page
+ // Action any user input on web page
 
    // if button1 was pressed (toggle io pin A)
    //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1");
@@ -760,9 +750,8 @@ void handleRoot() {
 
 
   // html header
-   sendHeader(client);
-   client.write("<title>root</title> </head> <body>\n");         // basic html header
-   client.write("<FORM action='/' method='post'>\n");       // used by the buttons in the html (action = the web page to send it to
+   sendHeader(client, "ESP32Cam demo sketch");
+   client.write("<FORM action='/' method='post'>\n");            // used by the buttons in the html (action = the web page to send it to
 
 
  // --------------------------------------------------------------------
@@ -776,6 +765,7 @@ void handleRoot() {
 
 
    client.write("<h1>Hello from ESP32Cam</h1>\n");
+   client.write("Sketch from: github.com/alanesq/esp32cam-demo<br>");
 
    // sd card details
      if (sdcardPresent) client.printf("<p>SD Card detected - %d images stored</p>\n", imageCounter);
@@ -787,9 +777,6 @@ void handleRoot() {
 
      if (digitalRead(iopinB) == LOW) client.write("<p>Output Pin 12 is Low</p>\n");
      else client.write("<p>Output Pin 12 is High</p>\n");
-
-     if (digitalRead(iopinC) == LOW) client.write("<p>Input Pin 16 is Low</p>\n");
-     else client.write("<p>Input Pin 16 is High</p>\n");
 
    // illumination led brightness
      client.printf("<p>Illumination led set to %d</p>\n", brightLEDbrightness);
@@ -849,13 +836,10 @@ void handlePhoto() {
    IPAddress cIP = client.remoteIP();
    if (serialDebug) Serial.println("Save photo requested by " + cIP.toString());
 
-
- // save an image to sd card or spiffs
-   byte sRes = storeImage();              // save an image to sd card or spiffs (store sucess or failed flag - 0=fail, 1=spiffs only, 2=spiffs and sd card)
+ byte sRes = storeImage();   // capture and save an image to sd card or spiffs (store sucess or failed flag - 0=fail, 1=spiffs only, 2=spiffs and sd card)
 
  // html header
-   sendHeader(client);
-   client.write("<title>photo</title> </head> <body>\n");         // basic html header
+   sendHeader(client, "Capture and save image");
 
  // html body
    if (sRes == 2) {
@@ -863,10 +847,13 @@ void handlePhoto() {
    } else if (sRes == 1) {
        client.write("<p>Image saved in Spiffs</p>\n");
    } else {
-       client.write("<p>Error: Failed to save image to sd card</p>\n");
+       client.write("<p>Error: Failed to save image</p>\n");
    }
-   client.write("<a href='/'>Return</a>\n");                // link back
-   sendFooter(client);     // close web page
+
+   client.write("<a href='/'>Return</a>\n");       // link back
+
+ // close web page
+   sendFooter(client);
 
 }  // handlePhoto
 
@@ -995,8 +982,7 @@ void readRGBImage() {
 
  if (!sendRGBfile) {
    // html header
-    sendHeader(client);
-    client.write("<title>Show RGB data</title> </head> <body>\n");         // basic html header
+    sendHeader(client, "Show RGB data");
 
    // page title including clients IP
      IPAddress cIP = client.remoteIP();
@@ -1027,10 +1013,11 @@ void readRGBImage() {
        sendText(client,"-Image size=" + String(fb->len) + " bytes");
      }
 
-     // display captured image using base64
-      if (!sendRGBfile) {
-        client.println("<br><img src='data:image/png;base64," + base64::encode(fb->buf, fb->len) + "'><br>");
-      }
+   // display captured image using base64 - probably not a good idea with large images?
+    if (!sendRGBfile) {
+      client.print("<br>Displaying image direct from frame buffer:");
+      client.println("<br><img src='data:image/png;base64," + base64::encode(fb->buf, fb->len) + "'><br>");
+    }
 
    // allocate memory to store the rgb data (in psram, 3 bytes per pixel)
      sendText(client,"<br>Free psram before rgb data allocated = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024) + "K");
@@ -1070,7 +1057,7 @@ void readRGBImage() {
 
    // display some of the resulting data
        uint32_t resultsToShow = 50;                                                                       // how much data to display
-       sendText(client,"<br>R , G , B - for first " + String(resultsToShow) + " pixels of image");
+       sendText(client,"<br>R,G,B data for first " + String(resultsToShow / 3) + " pixels of image");
        for (uint32_t i = 0; i < resultsToShow-2; i+=3) {
          sendText(client,String(rgb[i+2]) + "," + String(rgb[i+1]) + "," + String(rgb[i+0]));           // Red , Green , Blue
          // // calculate the x and y coordinate of the current pixel
@@ -1294,8 +1281,7 @@ void handleTest() {
    if (serialDebug) Serial.println("Test page requested by " + cIP.toString());
 
  // html header
-   sendHeader(client);
-   client.write("<title>photo</title> </head> <body>\n");         // basic html header
+   sendHeader(client, "Testing");
 
 
  // html body
