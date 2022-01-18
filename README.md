@@ -100,6 +100,8 @@ GPIO PINS:
 Notes
 -----
 
+See the test procedure at the end of the sketch for several demos of what you can do
+
 You can see an example Processing sketch for displaying the raw rgb data from this sketch<br>
 here: https://github.com/alanesq/esp32cam-demo/blob/master/Misc/displayRGB.pde
 This would read in a file created from the Arduino command:   client.write(rgb, ARRAY_LENGTH);
