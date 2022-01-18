@@ -8,8 +8,8 @@ known bug: https://github.com/espressif/arduino-esp32/issues/5195<br><br>
 I try to show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it<br>
 
 <table><tr>
-  <td><img src="/Misc/root.png" /></td>
-  <td><img src="/Misc/rgb.png" /></td>
+  <td><img src="/images/root.png" /></td>
+  <td><img src="/images/rgb.png" /></td>
 </tr></table> 
 
 This can be used as a starting point sketch for projects using the esp32cam development board, 
