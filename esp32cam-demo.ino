@@ -596,7 +596,7 @@ void sendText(WiFiClient &client, String theText) {
 }
 
 
-// reset the camera example
+// reset the camera example - see handleTest() for example
 void resetCamera() {
   // power cycle the camera module (handy if camera stops responding)
     digitalWrite(PWDN_GPIO_NUM, HIGH);    // turn power off to camera module
@@ -1021,7 +1021,8 @@ void readRGBImage() {
  // make sure psram is available
  if (!psramFound()) {
    sendText(client,"error: no psram available to store the RGB data");
-   if (!sendRGBfile) sendFooter(client);     // close web page
+   client.write("<br><a href='/'>Return</a>\n");       // link back
+   if (!sendRGBfile) sendFooter(client);               // close web page
    return;
  }
 
@@ -1034,21 +1035,26 @@ void readRGBImage() {
      fb = esp_camera_fb_get();
      if (!fb) {
        sendText(client,"error: failed to capture image from camera");
-       if (!sendRGBfile) sendFooter(client);     // close web page
+       client.write("<br><a href='/'>Return</a>\n");       // link back
+       if (!sendRGBfile) sendFooter(client);               // close web page
        return;
      } else {
        sendText(client, "-JPG image capture took " + String(millis() - tTimer) + " milliseconds");              // report time it took to capture an image
-       sendText(client,"-Image resolution=" + String(fb->width) + "x" + String(fb->height));
-       sendText(client,"-Image size=" + String(fb->len) + " bytes");
+       sendText(client, "-Image resolution=" + String(fb->width) + "x" + String(fb->height));
+       sendText(client, "-Image size=" + String(fb->len) + " bytes");
+       sendText(client, "-Image format=" + String(fb->format));
+       sendText(client, "-Free memory=" + String(ESP.getFreeHeap()) + " bytes");
      }
 
-   // display captured image using base64 - probably not a good idea with large images?
+/*
+   // display captured image using base64 - seems a bit unreliable especially with larger images?
     if (!sendRGBfile) {
       client.print("<br>Displaying image direct from frame buffer");
-      client.print("<br><img src='data:image/png;base64,");
-      client.print(base64::encode(fb->buf, fb->len));
-      client.println("'><br>");
+      String base64data = base64::encode(fb->buf, fb->len);      // convert buffer to base64
+      client.print(" - Base64 data length = " + String(base64data.length()) + " bytes\n" );
+      client.print("<br><img src='data:image/jpg;base64," + base64data + "'></img><br>\n");
     }
+*/
 
    // allocate memory to store the rgb data (in psram, 3 bytes per pixel)
      sendText(client,"<br>Free psram before rgb data allocated = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024) + "K");
@@ -1327,6 +1333,33 @@ void handleTest() {
                           // test code goes here
 
 
+
+
+
+// draw on camera image using javascript / html canvas
+  // load live camera image without displaying it
+    client.print("<img id='myImage' width='0' height='0' src='/jpg'>\n");
+  // create a html canvas
+    client.print("<canvas id='myCanvas' width='640' height='480' style='border:1px solid #d3d3d3;'>");
+    client.print("Your browser does not support the HTML5 canvas tag. </canvas>\n");
+  // javascript
+    client.print (R"=====(<script>
+      // copy camera image in to canvas
+        window.onload = function() {
+        var c = document.getElementById("myCanvas");
+        var ctx = c.getContext("2d");
+        var img = document.getElementById("myImage");
+        ctx.drawImage(img, 0, 0);
+
+      // draw red box on top of the image
+        ctx.strokeStyle = "red";
+        ctx.rect(20, 20, 150, 100);
+        ctx.stroke();
+    }
+     </script>)=====");
+
+
+/*
 // demo of how to change image resolution - note: this stops PWM on the flash working for some reason
   esp_camera_deinit();                 // disable camera
   delay(50);
@@ -1337,6 +1370,7 @@ void handleTest() {
     else FRAME_SIZE_IMAGE = FRAMESIZE_QVGA;
   initialiseCamera();                  // restart camera
   client.println("Camera resolution changed to " + String(FRAME_SIZE_IMAGE));
+*/
 
 
 /*
