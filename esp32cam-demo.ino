@@ -75,6 +75,7 @@
    int requestWebPage(String*, String*, int);
    void handleTest();
    void brightLed(byte ledBrightness);
+   void setupFlashPWM();
 
 
 // ---------------------------------------------------------------
@@ -91,8 +92,8 @@
  #define useMCP23017 0                                  // if MCP23017 IO expander chip is being used (on pins 12 and 13)
 
  // Camera related
-   const bool flashRequired = 1;                        // If flash to be used when capturing image (1 = yes)
-   const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA;  // Image resolution:
+   bool flashRequired = 1;                              // If flash to be used when capturing image (1 = yes)
+   framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA;        // Image resolution:
                                                         //               default = "const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA"
                                                         //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA),
                                                         //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA),
@@ -109,7 +110,7 @@
    const int brightLED = 4;                             // onboard Illumination/flash LED pin (4)
    int brightLEDbrightness = 0;                         // initial brightness (0 - 255)
    const int ledFreq = 5000;                            // PWM settings
-   const int ledChannel = 15;                           // needs to be 14 or 15 with esp32cam (timer3?)
+   const int ledChannel = 15;                           // camera uses timer1
    const int ledRresolution = 8;
 
  const int iopinA = 13;                                 // general io pin 13
@@ -336,10 +337,7 @@ void setup() {
    // read pin state with     mcp.digitalRead(8)
  #endif
 
- // set up illumination LED (flash)
-   ledcSetup(ledChannel, ledFreq, ledRresolution);
-   ledcAttachPin(brightLED, ledChannel);
-   brightLed(0);    // change bright LED
+setupFlashPWM();    // configure PWM for the illumination LED
 
  // startup complete
    if (serialDebug) Serial.println("\nStarted...");
@@ -349,14 +347,6 @@ void setup() {
    brightLed(0);    // change bright LED
 
 }  // setup
-
-
-// change illumination LED brightness
- void brightLed(byte ledBrightness){
-   brightLEDbrightness = ledBrightness;    // store setting
-   ledcWrite(ledChannel, ledBrightness);   // change LED brightness (0 - 255)
-   if (serialDebug) Serial.println("Brightness changed to " + String(ledBrightness) );
- }
 
 
 // ******************************************************************************************************************
@@ -539,6 +529,22 @@ bool cameraImageSettings() {
 // ----------------------------------------------------------------
 
 
+// set up PWM for the illumination LED (flash)
+// note: I am not sure PWM is very reliable on the esp32cam - requires more testing
+void setupFlashPWM() {
+    ledcSetup(ledChannel, ledFreq, ledRresolution);
+    ledcAttachPin(brightLED, ledChannel);
+    brightLed(brightLEDbrightness);    // change bright LED
+}
+
+// change illumination LED brightness
+ void brightLed(byte ledBrightness){
+   brightLEDbrightness = ledBrightness;    // store setting
+   ledcWrite(ledChannel, ledBrightness);   // change LED brightness (0 - 255)
+   if (serialDebug) Serial.println("Brightness changed to " + String(ledBrightness) );
+ }
+
+
 // returns the current real time as a String
 //   see: https://randomnerdtutorials.com/esp32-date-time-ntp-client-server-arduino/
 String localTime() {
@@ -587,6 +593,20 @@ void sendFooter(WiFiClient &client) {
 void sendText(WiFiClient &client, String theText) {
      if (!sendRGBfile) client.print(theText + "<br>\n");
      if (serialDebug || theText.indexOf("error") > 0) Serial.println(theText);   // if text contains "error"
+}
+
+
+// reset the camera example
+void resetCamera() {
+  // power cycle the camera module (handy if camera stops responding)
+    digitalWrite(PWDN_GPIO_NUM, HIGH);    // turn power off to camera module
+    delay(300);
+    digitalWrite(PWDN_GPIO_NUM, LOW);
+    delay(300);
+  // reset via software (handy if you wish to change resolution or image type etc. - see test procedure)
+    esp_camera_deinit();                 // disable camera
+    delay(50);
+    initialiseCamera();
 }
 
 
@@ -1015,8 +1035,10 @@ void readRGBImage() {
 
    // display captured image using base64 - probably not a good idea with large images?
     if (!sendRGBfile) {
-      client.print("<br>Displaying image direct from frame buffer:");
-      client.println("<br><img src='data:image/png;base64," + base64::encode(fb->buf, fb->len) + "'><br>");
+      client.print("<br>Displaying image direct from frame buffer");
+      client.print("<br><img src='data:image/png;base64,");
+      client.print(base64::encode(fb->buf, fb->len));
+      client.println("'><br>");
     }
 
    // allocate memory to store the rgb data (in psram, 3 bytes per pixel)
@@ -1296,6 +1318,16 @@ void handleTest() {
                           // test code goes here
 
 
+// demo of how to change image resolution - note: this stops PWM on the flash working for some reason
+  esp_camera_deinit();                 // disable camera
+  delay(50);
+  // cycle through a selection of resolutions
+    if (FRAME_SIZE_IMAGE == FRAMESIZE_QVGA) FRAME_SIZE_IMAGE = FRAMESIZE_VGA;
+    else if (FRAME_SIZE_IMAGE == FRAMESIZE_VGA) FRAME_SIZE_IMAGE = FRAMESIZE_XGA;
+    else if (FRAME_SIZE_IMAGE == FRAMESIZE_XGA) FRAME_SIZE_IMAGE = FRAMESIZE_SXGA;
+    else FRAME_SIZE_IMAGE = FRAMESIZE_QVGA;
+  initialiseCamera();                  // restart camera
+  client.println("Camera resolution changed to " + String(FRAME_SIZE_IMAGE));
 
 
 /*
@@ -1312,7 +1344,7 @@ void handleTest() {
 
 
 /*
-//  // demo useage of the mcp23017 io chip
+//  // demo useage of the mcp23017 io chipnote: this stops PWM on the flash working for some reason
     #if useMCP23017 == 1
       while(1) {
           mcp.digitalWrite(0, HIGH);
@@ -1329,7 +1361,7 @@ void handleTest() {
 
  // -------------------------------------------------------------------
 
-
+ client.write("<br><br><a href='/'>Return</a>\n");       // link back
  sendFooter(client);     // close web page
 
 }  // handleTest
