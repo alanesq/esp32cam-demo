@@ -83,7 +83,7 @@
 // ---------------------------------------------------------------
 
  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
- const char* sversion = "18Jan22";                      // Sketch version
+ const char* sversion = "19Jan22";                      // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
@@ -111,7 +111,7 @@
    int brightLEDbrightness = 0;                         // initial brightness (0 - 255)
    const int ledFreq = 5000;                            // PWM settings
    const int ledChannel = 15;                           // camera uses timer1
-   const int ledRresolution = 8;
+   const int ledRresolution = 8;                        // resolution (8 = from 0 to 255)
 
  const int iopinA = 13;                                 // general io pin 13
  const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
@@ -534,7 +534,7 @@ bool cameraImageSettings() {
 void setupFlashPWM() {
     ledcSetup(ledChannel, ledFreq, ledRresolution);
     ledcAttachPin(brightLED, ledChannel);
-    brightLed(brightLEDbrightness);    // change bright LED
+    brightLed(brightLEDbrightness);
 }
 
 // change illumination LED brightness
@@ -1335,28 +1335,25 @@ void handleTest() {
 
 
 
-
-// draw on camera image using javascript / html canvas
-  // load live camera image without displaying it
-    client.print("<img id='myImage' width='0' height='0' src='/jpg'>\n");
-  // create a html canvas
-    client.print("<canvas id='myCanvas' width='640' height='480' style='border:1px solid #d3d3d3;'>");
-    client.print("Your browser does not support the HTML5 canvas tag. </canvas>\n");
-  // javascript
-    client.print (R"=====(<script>
-      // copy camera image in to canvas
-        window.onload = function() {
-        var c = document.getElementById("myCanvas");
-        var ctx = c.getContext("2d");
-        var img = document.getElementById("myImage");
-        ctx.drawImage(img, 0, 0);
-
-      // draw red box on top of the image
-        ctx.strokeStyle = "red";
-        ctx.rect(20, 20, 150, 100);
-        ctx.stroke();
-    }
-     </script>)=====");
+// demo of drawing on the camera image using javascript / html canvas
+//   could be of use to show area of interest on the image etc.
+// creat a DIV and put image in it with a html canvas on top of it
+  int tWidth = 640;   // image dimensions on web page
+  int tHeight = 480;
+  client.println("<div style='display:inline-block;position:relative;'>");
+  client.println("<img style='position:absolute;z-index:10;' src='/jpg' width='" + String(tWidth) + "' height='" + String(tHeight) + "' />");
+  client.println("<canvas style='position:relative;z-index:20;' id='myCanvas' width='" + String(tWidth) + "' height='" + String(tHeight) + "'></canvas>");
+  client.println("</div>");
+// javascript to draw on the canvas
+  client.print (R"=====(<script>
+    // connect to the canvas
+      var c = document.getElementById("myCanvas");
+      var ctx = c.getContext("2d");
+    // draw red box
+      ctx.strokeStyle = "red";
+      ctx.rect(c.width / 2, 60, c.height / 2, 40);
+      ctx.stroke();
+   </script>\n)=====");
 
 
 /*
@@ -1368,7 +1365,7 @@ void handleTest() {
     else if (FRAME_SIZE_IMAGE == FRAMESIZE_VGA) FRAME_SIZE_IMAGE = FRAMESIZE_XGA;
     else if (FRAME_SIZE_IMAGE == FRAMESIZE_XGA) FRAME_SIZE_IMAGE = FRAMESIZE_SXGA;
     else FRAME_SIZE_IMAGE = FRAMESIZE_QVGA;
-  initialiseCamera();                  // restart camera
+  initialiseCamera();
   client.println("Camera resolution changed to " + String(FRAME_SIZE_IMAGE));
 */
 
@@ -1404,7 +1401,7 @@ void handleTest() {
 
  // -------------------------------------------------------------------
 
- client.write("<br><br><a href='/'>Return</a>\n");       // link back
+ client.println("<br><br><a href='/'>Return</a>");       // link back
  sendFooter(client);     // close web page
 
 }  // handleTest
