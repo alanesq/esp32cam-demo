@@ -76,6 +76,7 @@
    void handleTest();
    void brightLed(byte ledBrightness);
    void setupFlashPWM();
+   void changeResolution(framesize_t);
 
 
 // ---------------------------------------------------------------
@@ -83,7 +84,7 @@
 // ---------------------------------------------------------------
 
  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
- const char* sversion = "19Jan22";                      // Sketch version
+ const char* sversion = "20Jan22";                      // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
@@ -524,18 +525,19 @@ bool cameraImageSettings() {
 // ******************************************************************************************************************
 
 
-// ----------------------------------------------------------------
-//                        Misc small procedures
-// ----------------------------------------------------------------
+//                          Misc small procedures
 
 
-// set up PWM for the illumination LED (flash)
+// ----------------------------------------------------------------
+//       set up PWM for the illumination LED (flash)
+// ----------------------------------------------------------------
 // note: I am not sure PWM is very reliable on the esp32cam - requires more testing
 void setupFlashPWM() {
     ledcSetup(ledChannel, ledFreq, ledRresolution);
     ledcAttachPin(brightLED, ledChannel);
     brightLed(brightLEDbrightness);
 }
+
 
 // change illumination LED brightness
  void brightLed(byte ledBrightness){
@@ -545,7 +547,9 @@ void setupFlashPWM() {
  }
 
 
-// returns the current real time as a String
+// ----------------------------------------------------------------
+//          returns the current real time as a String
+// ----------------------------------------------------------------
 //   see: https://randomnerdtutorials.com/esp32-date-time-ntp-client-server-arduino/
 String localTime() {
  struct tm timeinfo;
@@ -556,7 +560,9 @@ String localTime() {
 }
 
 
-// flash the indicator led 'reps' number of times
+// ----------------------------------------------------------------
+//        flash the indicator led 'reps' number of times
+// ----------------------------------------------------------------
 void flashLED(int reps) {
  for(int x=0; x < reps; x++) {
    digitalWrite(indicatorLED,LOW);
@@ -567,7 +573,9 @@ void flashLED(int reps) {
 }
 
 
-// send a standard html header (i.e. start of web page)
+// ----------------------------------------------------------------
+//     send a standard html header (i.e. start of web page)
+// ----------------------------------------------------------------
 void sendHeader(WiFiClient &client, String wTitle) {
     client.write("HTTP/1.1 200 OK\r\n");
     client.write("Content-Type: text/html\r\n");
@@ -581,7 +589,9 @@ void sendHeader(WiFiClient &client, String wTitle) {
 }
 
 
-// send a standard html footer (i.e. end of web page)
+// ----------------------------------------------------------------
+//      send a standard html footer (i.e. end of web page)
+// ----------------------------------------------------------------
 void sendFooter(WiFiClient &client) {
   client.write("</body></html>\n");
   delay(3);
@@ -589,14 +599,18 @@ void sendFooter(WiFiClient &client) {
 }
 
 
-// send line of text to both serial port and web page - used by readRGBImage
+// ----------------------------------------------------------------
+//  send line of text to both serial port and web page - used by readRGBImage
+// ----------------------------------------------------------------
 void sendText(WiFiClient &client, String theText) {
      if (!sendRGBfile) client.print(theText + "<br>\n");
      if (serialDebug || theText.indexOf("error") > 0) Serial.println(theText);   // if text contains "error"
 }
 
 
-// reset the camera example - see handleTest() for example
+// ----------------------------------------------------------------
+//    reset the camera example - see handleTest() for example
+// ----------------------------------------------------------------
 void resetCamera() {
   // power cycle the camera module (handy if camera stops responding)
     digitalWrite(PWDN_GPIO_NUM, HIGH);    // turn power off to camera module
@@ -607,6 +621,26 @@ void resetCamera() {
     esp_camera_deinit();                 // disable camera
     delay(50);
     initialiseCamera();
+}
+
+
+// ----------------------------------------------------------------
+//                    -change image resolution
+// ----------------------------------------------------------------
+// if required resolution not supplied it cycles through several
+// note: this stops PWM on the flash working for some reason
+void changeResolution(framesize_t tRes = FRAMESIZE_96X96) {
+  esp_camera_deinit();     // disable camera
+  delay(50);
+  if (tRes == FRAMESIZE_96X96) {      // taken as none supplied so cycle through several
+    if (FRAME_SIZE_IMAGE == FRAMESIZE_QVGA) tRes = FRAMESIZE_VGA;
+    else if (FRAME_SIZE_IMAGE == FRAMESIZE_VGA) tRes = FRAMESIZE_XGA;
+    else if (FRAME_SIZE_IMAGE == FRAMESIZE_XGA) tRes = FRAMESIZE_UXGA;
+    else tRes = FRAMESIZE_QVGA;
+  }
+  FRAME_SIZE_IMAGE = tRes;
+  initialiseCamera();
+  if (serialDebug) Serial.println("Camera resolution changed to " + String(tRes));
 }
 
 
@@ -717,7 +751,7 @@ void handleRoot() {
        digitalWrite(iopinB,!digitalRead(iopinB));             // toggle output pin on/off
      }
 
-   // if button3 was pressed (toggle flash LED)
+   // if button2 was pressed (toggle flash LED)
      if (server.hasArg("button2")) {
        if (serialDebug) Serial.println("Button 2 pressed");
        if (brightLEDbrightness == 0) brightLed(10);                // turn led on dim
@@ -726,7 +760,7 @@ void handleRoot() {
        else brightLed(0);                                          // turn led off
      }
 
-     // if button4 was pressed (format SPIFFS)
+     // if button3 was pressed (format SPIFFS)
        if (server.hasArg("button3")) {
          if (serialDebug) Serial.println("Button 3 pressed");
          if (!SPIFFS.format()) {
@@ -735,6 +769,12 @@ void handleRoot() {
            if (serialDebug) Serial.println("Spiffs memory has been formatted");
          }
        }
+
+       // if button4 was pressed (change resolution)
+         if (server.hasArg("button4")) {
+           if (serialDebug) Serial.println("Button 4 pressed");
+           changeResolution();   // cycle through some options
+         }
 
    // if exposure was adjusted - cameraImageExposure
        if (server.hasArg("exp")) {
@@ -807,7 +847,8 @@ void handleRoot() {
    // Control bottons
      client.write("<input style='height: 35px;' name='button1' value='Toggle pin 12' type='submit'> \n");
      client.write("<input style='height: 35px;' name='button2' value='Toggle Flash' type='submit'> \n");
-     client.write("<input style='height: 35px;' name='button3' value='Wipe SPIFFS memory' type='submit'><br> \n");
+     client.write("<input style='height: 35px;' name='button3' value='Wipe SPIFFS memory' type='submit'> \n");
+     client.write("<input style='height: 35px;' name='button4' value='Change Resolution' type='submit'><br> \n");
 
    // Image setting controls
      client.write("<br>CAMERA SETTINGS: \n");
@@ -1062,7 +1103,10 @@ void readRGBImage() {
      uint32_t ARRAY_LENGTH = fb->width * fb->height * 3;                                                  // calculate memory required to store the RGB data (i.e. number of pixels in the jpg image x 3)
      if (heap_caps_get_free_size( MALLOC_CAP_SPIRAM) <  ARRAY_LENGTH) {
        sendText(client,"error: not enough free psram to store the rgb data");
-       if (!sendRGBfile) sendFooter(client);     // close web page
+       if (!sendRGBfile) {
+         client.write("<br><a href='/'>Return</a>\n");    // link back
+         sendFooter(client);                              // close web page
+       }
        return;
      }
      ptrVal = heap_caps_malloc(ARRAY_LENGTH, MALLOC_CAP_SPIRAM);                                          // allocate memory space for the rgb data
@@ -1074,7 +1118,10 @@ void readRGBImage() {
      bool jpeg_converted = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);
      if (!jpeg_converted) {
        sendText(client,"error: failed to convert image to RGB data");
-       if (!sendRGBfile) sendFooter(client);     // close web page
+       if (!sendRGBfile) {
+         client.write("<br><a href='/'>Return</a>\n");    // link back
+         sendFooter(client);                              // close web page
+       }
        return;
      }
      sendText(client, "Conversion from jpg to RGB took " + String(millis() - tTimer) + " milliseconds");// report how long the conversion took
@@ -1336,38 +1383,29 @@ void handleTest() {
 
 
 // demo of drawing on the camera image using javascript / html canvas
-//   could be of use to show area of interest on the image etc.
+//   could be of use to show area of interest on the image etc. - see https://www.w3schools.com/html/html5_canvas.asp
 // creat a DIV and put image in it with a html canvas on top of it
-  int tWidth = 640;   // image dimensions on web page
-  int tHeight = 480;
+  int imageWidth = 640;   // image dimensions on web page
+  int imageHeight = 480;
   client.println("<div style='display:inline-block;position:relative;'>");
-  client.println("<img style='position:absolute;z-index:10;' src='/jpg' width='" + String(tWidth) + "' height='" + String(tHeight) + "' />");
-  client.println("<canvas style='position:relative;z-index:20;' id='myCanvas' width='" + String(tWidth) + "' height='" + String(tHeight) + "'></canvas>");
+  client.println("<img style='position:absolute;z-index:10;' src='/jpg' width='" + String(imageWidth) + "' height='" + String(imageHeight) + "' />");
+  client.println("<canvas style='position:relative;z-index:20;' id='myCanvas' width='" + String(imageWidth) + "' height='" + String(imageHeight) + "'></canvas>");
   client.println("</div>");
 // javascript to draw on the canvas
-  client.print (R"=====(<script>
+  client.println("<script>");
+  client.println("var imageWidth = " + String(imageWidth) + ";");
+  client.println("var imageHeight = " + String(imageHeight) + ";");
+  client.print (R"=====(
     // connect to the canvas
       var c = document.getElementById("myCanvas");
       var ctx = c.getContext("2d");
-    // draw red box
       ctx.strokeStyle = "red";
-      ctx.rect(c.width / 2, 60, c.height / 2, 40);
+    // draw on image
+      ctx.rect(imageWidth / 2, imageHeight / 2, 60, 40);                              // box
+      ctx.moveTo(20, 20); ctx.lineTo(200, 100);                                       // line
+      ctx.font = "30px Arial";  ctx.fillText("Hello World", 50, imageHeight - 50);    // text
       ctx.stroke();
    </script>\n)=====");
-
-
-/*
-// demo of how to change image resolution - note: this stops PWM on the flash working for some reason
-  esp_camera_deinit();                 // disable camera
-  delay(50);
-  // cycle through a selection of resolutions
-    if (FRAME_SIZE_IMAGE == FRAMESIZE_QVGA) FRAME_SIZE_IMAGE = FRAMESIZE_VGA;
-    else if (FRAME_SIZE_IMAGE == FRAMESIZE_VGA) FRAME_SIZE_IMAGE = FRAMESIZE_XGA;
-    else if (FRAME_SIZE_IMAGE == FRAMESIZE_XGA) FRAME_SIZE_IMAGE = FRAMESIZE_SXGA;
-    else FRAME_SIZE_IMAGE = FRAMESIZE_QVGA;
-  initialiseCamera();
-  client.println("Camera resolution changed to " + String(FRAME_SIZE_IMAGE));
-*/
 
 
 /*
