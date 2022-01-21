@@ -134,6 +134,8 @@ How to crop images on the esp32cam: https://makexyz.fun/esp32-cam-cropping-image
 
 Some good info here: https://github.com/raphaelbs/esp32-cam-ai-thinker
 
+I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/misc/blob/main/esp32cam-timelapse.cpp
+
 If you have any handy info, tips, or improvements to my code etc. please feel let me know at: alanesq@disroot.org
 
 
