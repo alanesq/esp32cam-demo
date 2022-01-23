@@ -24,6 +24,8 @@ it has the following features:
 <br>-Can read the image as RGB data  (i.e. 3 bytes per pixel for red, green and blue value)
 <br>-Act as web client (reading the web page in to a string) - see requestWebPage()
 
+BTW - I have created a timelapse sketch based on this one which may be of interest as it uses AJAX to update the info on the root web page: https://github.com/alanesq/misc/blob/main/esp32cam-timelapse.cpp
+
 <br><br>
 LATEST NEWS!!!
 <br>There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
@@ -133,8 +135,6 @@ A handy way to upload images to a computer/web server via php which is very reli
 How to crop images on the esp32cam: https://makexyz.fun/esp32-cam-cropping-images-on-device/
 
 Some good info here: https://github.com/raphaelbs/esp32-cam-ai-thinker
-
-I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/misc/blob/main/esp32cam-timelapse.cpp
 
 If you have any handy info, tips, or improvements to my code etc. please feel let me know at: alanesq@disroot.org
 
