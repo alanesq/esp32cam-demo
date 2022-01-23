@@ -77,6 +77,7 @@
    void brightLed(byte ledBrightness);
    void setupFlashPWM();
    void changeResolution(framesize_t);
+   void handleData();
 
 
 // ---------------------------------------------------------------
@@ -84,9 +85,11 @@
 // ---------------------------------------------------------------
 
  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
- const char* sversion = "20Jan22";                      // Sketch version
+ const char* sversion = "23Jan22";                      // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
+
+ uint16_t datarefresh = 2200;                           // how often to refresh data on root web page (ms)
 
  const bool serialDebug = 1;                            // show debug info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
 
@@ -102,6 +105,7 @@
    #define PIXFORMAT PIXFORMAT_JPEG;                    // image format, Options =  YUV422, GRAYSCALE, RGB565, JPEG, RGB888
    int cameraImageExposure = 0;                         // Camera exposure (0 - 1200)   If gain and exposure both set to zero then auto adjust is enabled
    int cameraImageGain = 0;                             // Image gain (0 - 30)
+   int cameraImageBrightness = 0;                       // Image brightness (-2 to +2)
 
  const int TimeBetweenStatus = 600;                     // speed of flashing system running ok status light (milliseconds)
 
@@ -188,7 +192,7 @@ WebServer server(80);           // serve web pages on port 80
  bool sdcardPresent;                       // flag if an sd card is detected
  int imageCounter;                         // image file name on sd card counter
  String spiffsFilename = "/image.jpg";     // image name to use when storing in spiffs
-
+ String ImageResDetails = "Unknown";       // image resolution info
 
 
 // ******************************************************************************************************************
@@ -239,6 +243,7 @@ void setup() {
 
  // define the web pages (i.e. call these procedures when url is requested)
    server.on("/", handleRoot);                   // root page
+   server.on("/data", handleData);               // suplies data to periodically update root (AJAX)
    server.on("/jpg", handleJPG);                 // capture image and send as jpg
    server.on("/stream", handleStream);           // stream live video
    server.on("/photo", handlePhoto);             // save image to sd card
@@ -480,11 +485,13 @@ bool cameraImageSettings() {
        s->set_gain_ctrl(s, 1);                       // auto gain on
        s->set_exposure_ctrl(s, 1);                   // auto exposure on
        s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1)
+       s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
    } else {
      // Apply manual settings
        s->set_gain_ctrl(s, 0);                       // auto gain off
        s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1)
        s->set_exposure_ctrl(s, 0);                   // auto exposure off
+       s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
        s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
        s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
    }
@@ -555,7 +562,7 @@ String localTime() {
  struct tm timeinfo;
  char ttime[40];
  if(!getLocalTime(&timeinfo)) return"Failed to obtain time";
- strftime(ttime,40,  "%A, %B %d %Y %H:%M:%S", &timeinfo);
+ strftime(ttime,40,  "%A %B %d %Y %H:%M:%S", &timeinfo);
  return ttime;
 }
 
@@ -641,6 +648,7 @@ void changeResolution(framesize_t tRes = FRAMESIZE_96X96) {
   FRAME_SIZE_IMAGE = tRes;
   initialiseCamera();
   if (serialDebug) Serial.println("Camera resolution changed to " + String(tRes));
+  ImageResDetails = "Unknown";   // set next time image captured
 }
 
 
@@ -730,6 +738,95 @@ byte storeImage() {
 
 
 // ----------------------------------------------------------------
+//            -Action any user input on root web page
+// ----------------------------------------------------------------
+
+void rootUserInput(WiFiClient &client) {
+
+    // if button1 was pressed (toggle io pin A)
+    //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1");
+
+    // if button1 was pressed (toggle io pin B)
+      if (server.hasArg("button1")) {
+        if (serialDebug) Serial.println("Button 1 pressed");
+        digitalWrite(iopinB,!digitalRead(iopinB));             // toggle output pin on/off
+      }
+
+    // if button2 was pressed (Cycle illumination LED)
+      if (server.hasArg("button2")) {
+        if (serialDebug) Serial.println("Button 2 pressed");
+        if (brightLEDbrightness == 0) brightLed(10);                // turn led on dim
+        else if (brightLEDbrightness == 10) brightLed(40);          // turn led on medium
+        else if (brightLEDbrightness == 40) brightLed(255);         // turn led on full
+        else brightLed(0);                                          // turn led off
+      }
+
+    // if button3 was pressed (toggle flash)
+      if (server.hasArg("button3")) {
+        if (serialDebug) Serial.println("Button 3 pressed");
+        flashRequired = !flashRequired;
+      }
+
+    // if button3 was pressed (format SPIFFS)
+      if (server.hasArg("button4")) {
+        if (serialDebug) Serial.println("Button 4 pressed");
+        if (!SPIFFS.format()) {
+          if (serialDebug) Serial.println("Error: Unable to format Spiffs");
+        } else {
+          if (serialDebug) Serial.println("Spiffs memory has been formatted");
+        }
+      }
+
+    // if button4 was pressed (change resolution)
+      if (server.hasArg("button5")) {
+        if (serialDebug) Serial.println("Button 5 pressed");
+        changeResolution();   // cycle through some options
+      }
+
+    // if brightness was adjusted - cameraImageBrightness
+        if (server.hasArg("bright")) {
+          String Tvalue = server.arg("bright");   // read value
+          if (Tvalue != NULL) {
+            int val = Tvalue.toInt();
+            if (val >= -2 && val <= 2 && val != cameraImageBrightness) {
+              if (serialDebug) Serial.printf("Brightness changed to %d\n", val);
+              cameraImageBrightness = val;
+              cameraImageSettings();           // Apply camera image settings
+            }
+          }
+        }
+
+    // if exposure was adjusted - cameraImageExposure
+        if (server.hasArg("exp")) {
+          if (serialDebug) Serial.println("Exposure has been changed");
+          String Tvalue = server.arg("exp");   // read value
+          if (Tvalue != NULL) {
+            int val = Tvalue.toInt();
+            if (val >= 0 && val <= 1200 && val != cameraImageExposure) {
+              if (serialDebug) Serial.printf("Exposure changed to %d\n", val);
+              cameraImageExposure = val;
+              cameraImageSettings();           // Apply camera image settings
+            }
+          }
+        }
+
+     // if image gain was adjusted - cameraImageGain
+        if (server.hasArg("gain")) {
+          if (serialDebug) Serial.println("Gain has been changed");
+          String Tvalue = server.arg("gain");   // read value
+            if (Tvalue != NULL) {
+              int val = Tvalue.toInt();
+              if (val >= 0 && val <= 31 && val != cameraImageGain) {
+                if (serialDebug) Serial.printf("Gain changed to %d\n", val);
+                cameraImageGain = val;
+                cameraImageSettings();          // Apply camera image settings
+              }
+            }
+         }
+  }
+
+
+// ----------------------------------------------------------------
 //       -root web page requested    i.e. http://x.x.x.x/
 // ----------------------------------------------------------------
 // web page with control buttons, links etc.
@@ -739,79 +836,14 @@ void handleRoot() {
  getNTPtime(2);                                             // refresh current time from NTP server
  WiFiClient client = server.client();                       // open link with client
 
+ rootUserInput(client);                                     // Action any user input from this web page
 
- // Action any user input on web page
-
-   // if button1 was pressed (toggle io pin A)
-   //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1");
-
-   // if button1 was pressed (toggle io pin B)
-     if (server.hasArg("button1")) {
-       if (serialDebug) Serial.println("Button 1 pressed");
-       digitalWrite(iopinB,!digitalRead(iopinB));             // toggle output pin on/off
-     }
-
-   // if button2 was pressed (toggle flash LED)
-     if (server.hasArg("button2")) {
-       if (serialDebug) Serial.println("Button 2 pressed");
-       if (brightLEDbrightness == 0) brightLed(10);                // turn led on dim
-       else if (brightLEDbrightness == 10) brightLed(40);          // turn led on medium
-       else if (brightLEDbrightness == 40) brightLed(255);         // turn led on full
-       else brightLed(0);                                          // turn led off
-     }
-
-     // if button3 was pressed (format SPIFFS)
-       if (server.hasArg("button3")) {
-         if (serialDebug) Serial.println("Button 3 pressed");
-         if (!SPIFFS.format()) {
-           if (serialDebug) Serial.println("Error: Unable to format Spiffs");
-         } else {
-           if (serialDebug) Serial.println("Spiffs memory has been formatted");
-         }
-       }
-
-       // if button4 was pressed (change resolution)
-         if (server.hasArg("button4")) {
-           if (serialDebug) Serial.println("Button 4 pressed");
-           changeResolution();   // cycle through some options
-         }
-
-   // if exposure was adjusted - cameraImageExposure
-       if (server.hasArg("exp")) {
-         if (serialDebug) Serial.println("Exposure has been changed");
-         String Tvalue = server.arg("exp");   // read value
-         if (Tvalue != NULL) {
-           int val = Tvalue.toInt();
-           if (val >= 0 && val <= 1200 && val != cameraImageExposure) {
-             if (serialDebug) Serial.printf("Exposure changed to %d\n", val);
-             cameraImageExposure = val;
-             cameraImageSettings();           // Apply camera image settings
-           }
-         }
-       }
-
-    // if image gain was adjusted - cameraImageGain
-       if (server.hasArg("gain")) {
-         if (serialDebug) Serial.println("Gain has been changed");
-         String Tvalue = server.arg("gain");   // read value
-           if (Tvalue != NULL) {
-             int val = Tvalue.toInt();
-             if (val >= 0 && val <= 31 && val != cameraImageGain) {
-               if (serialDebug) Serial.printf("Gain changed to %d\n", val);
-               cameraImageGain = val;
-               cameraImageSettings();          // Apply camera image settings
-             }
-           }
-        }
-
-
-  // html header
+ // html header
    sendHeader(client, "ESP32Cam demo sketch");
    client.write("<FORM action='/' method='post'>\n");            // used by the buttons in the html (action = the web page to send it to
 
 
  // --------------------------------------------------------------------
-
 
  // html main body
  //                    Info on the arduino ethernet library:  https://www.arduino.cc/en/Reference/Ethernet
@@ -820,44 +852,83 @@ void handleRoot() {
  //                               Verify your HTML is valid:  https://validator.w3.org/
 
 
-   client.write("<h1>Hello from ESP32Cam</h1>\n");
-   client.write("Sketch from: github.com/alanesq/esp32cam-demo<br>");
+ // Page title
+  client.printf("<h1 style='color:red;'>%s</H1>\n", stitle);
+  client.write("Sketch from: github.com/alanesq/esp32cam-demo<br>");
 
-   // sd card details
-     if (sdcardPresent) client.printf("<p>SD Card detected - %d images stored</p>\n", imageCounter);
-     else client.write("<p>No SD Card detected</p>\n");
+  // ---------------------------------------------------------------------------------------------
+  //  info which is periodically updated usin AJAX - https://www.w3schools.com/xml/ajax_intro.asp
 
-   // io pin details
-     if (digitalRead(iopinA) == LOW) client.write("<p>Input Pin 13 is Low</p>\n");
-     else client.write("<p>Input Pin 13 is High</p>\n");
+    // sd card
+      if (!sdcardPresent) {
+        client.println("<p style='color:blue;'>NO SD CARD DETECTED<span id=uImages></span><span id=uUsed></span><span id=uRemain></span></p>");    // spans will be left empty
+      } else {
+        client.println("<p>SD Card: <span id=uImages> - </span> images stored, <span id=uUsed> - </span>MB used , <span id=uRemain> - </span>MB remaining</p>\n");
+      }
 
-     if (digitalRead(iopinB) == LOW) client.write("<p>Output Pin 12 is Low</p>\n");
-     else client.write("<p>Output Pin 12 is High</p>\n");
+    // illumination/flash led
+      client.println("Illumination led brightness=<span id=uBrightness> - </span>, Flash is <span id=uFlash> - </span>");
 
-   // illumination led brightness
-     client.printf("<p>Illumination led set to %d</p>\n", brightLEDbrightness);
+    // Current real time
+      client.println("<br>Current time: <span id=uTime> - </span>");
 
-   // Current real time
-     client.print("<p>Current time: " + localTime() + "</p>\n");
+    // gpio pin status
+      client.print("<br>GPIO output pin 12 is: <span id=uGPIO12> - </span>, GPIO input pin 13 is: <span id=uGPIO13> - </span>");
+
+    // image resolution
+      client.println("<br>Image size: <span id=uRes> - </span>");
+
+    // Javascript - to periodically update above getting info from http://x.x.x.x/data
+      client.printf(R"=====(
+         <script>
+            function getData() {
+              var xhttp = new XMLHttpRequest();
+              xhttp.onreadystatechange = function() {
+              if (this.readyState == 4 && this.status == 200) {
+                var receivedArr = this.responseText.split(',');
+                document.getElementById('uImages').innerHTML = receivedArr[0];
+                document.getElementById('uUsed').innerHTML = receivedArr[1];
+                document.getElementById('uRemain').innerHTML = receivedArr[2];
+                document.getElementById('uBrightness').innerHTML = receivedArr[3];
+                document.getElementById('uTime').innerHTML = receivedArr[4];
+                document.getElementById('uGPIO12').innerHTML = receivedArr[5];
+                document.getElementById('uGPIO13').innerHTML = receivedArr[6];
+                document.getElementById('uFlash').innerHTML = receivedArr[7];
+                document.getElementById('uRes').innerHTML = receivedArr[8];
+              }
+            };
+            xhttp.open('GET', 'data', true);
+            xhttp.send();}
+            getData();
+            setInterval(function() { getData(); }, %d);
+         </script>
+      )=====", datarefresh);
+
+  // ---------------------------------------------------------------------------------------------
+
 
 //    // touch input on the two gpio pins
 //      client.printf("<p>Touch on pin 12: %d </p>\n", touchRead(T5) );
 //      client.printf("<p>Touch on pin 13: %d </p>\n", touchRead(T4) );
 
-   // Control bottons
+   // Control buttons
+     client.write("<br><br>");
      client.write("<input style='height: 35px;' name='button1' value='Toggle pin 12' type='submit'> \n");
-     client.write("<input style='height: 35px;' name='button2' value='Toggle Flash' type='submit'> \n");
-     client.write("<input style='height: 35px;' name='button3' value='Wipe SPIFFS memory' type='submit'> \n");
-     client.write("<input style='height: 35px;' name='button4' value='Change Resolution' type='submit'><br> \n");
+     client.write("<input style='height: 35px;' name='button2' value='Cycle illumination LED' type='submit'> \n");
+     client.write("<input style='height: 35px;' name='button3' value='Toggle Flash' type='submit'> \n");
+     client.write("<input style='height: 35px;' name='button4' value='Wipe SPIFFS memory' type='submit'> \n");
+     client.write("<input style='height: 35px;' name='button5' value='Change Resolution' type='submit'><br> \n");
 
    // Image setting controls
-     client.write("<br>CAMERA SETTINGS: \n");
-     client.printf("Exposure: <input type='number' style='width: 50px' name='exp' min='0' max='1200' value='%d'>  \n", cameraImageExposure);
-     client.printf("Gain: <input type='number' style='width: 50px' name='gain' min='0' max='30' value='%d'>\n", cameraImageGain);
-     client.write(" - Set both to zero for auto adjust<br>\n");
+     client.println("<br>CAMERA SETTINGS: ");
+     client.printf("Brightness: <input type='number' style='width: 50px' name='bright' title='from -2 to +2' min='-2' max='2' value='%d'>  \n", cameraImageBrightness);
+     client.printf("Exposure: <input type='number' style='width: 50px' name='exp' title='from 0 to 1200' min='0' max='1200' value='%d'>  \n", cameraImageExposure);
+     client.printf("Gain: <input type='number' style='width: 50px' name='gain' title='from 0 to 30' min='0' max='30' value='%d'>\n", cameraImageGain);
+     client.println(" <input type='submit' name='submit' value='Submit change / Refresh Image'>");
+     client.println("<br>Set exposure and gain to zero for auto adjust");
 
    // links to the other pages available
-     client.write("<br>LINKS: \n");
+     client.write("<br><br>LINKS: \n");
      client.write("<a href='/photo'>Capture an image</a> - \n");
      client.write("<a href='/img'>View stored image</a> - \n");
      client.write("<a href='/rgb'>Capture Image as raw RGB data</a> - \n");
@@ -875,6 +946,47 @@ void handleRoot() {
  sendFooter(client);     // close web page
 
 }  // handleRoot
+
+
+// ----------------------------------------------------------------
+//     -data web page requested     i.e. http://x.x.x.x/data
+// ----------------------------------------------------------------
+// suplies changing info to update root web page as comma seperated String
+
+void handleData(){
+
+  // sd sdcard
+    uint32_t SDusedSpace = 0;
+    uint32_t SDtotalSpace = 0;
+    uint32_t SDfreeSpace = 0;
+    if (sdcardPresent) {
+      SDusedSpace = SD_MMC.usedBytes() / (1024 * 1024);
+      SDtotalSpace = SD_MMC.totalBytes() / (1024 * 1024);
+      SDfreeSpace = SDtotalSpace - SDusedSpace;
+    }
+
+   String reply = "";
+    if (sdcardPresent) reply += String(imageCounter);      // images stored
+    reply += ",";
+    if (sdcardPresent) reply += String(SDusedSpace);       // space used on sd card
+    reply += ",";
+    if (sdcardPresent) reply += String(SDfreeSpace);       // space remaining on sd card
+    reply += ",";
+    reply += String(brightLEDbrightness);   // illumination led brightness
+    reply += ",";
+    reply += localTime();               // current date/time
+    reply += ",";
+    reply += (digitalRead(iopinB)==1) ? "ON" : "OFF";       // output gpio pin status
+    reply += ",";
+    reply += (digitalRead(iopinA)==1) ? "ON" : "OFF";       // output gpio pin status
+    reply += ",";
+    reply += (flashRequired==1) ? "ON" : "OFF";       // if flash is enabled
+    reply += ",";
+    reply += ImageResDetails;          // if flash is enabled
+    //reply += ",";
+
+   server.send(200, "text/plane", reply); //Send millis value only to client ajax request
+}
 
 
 // ******************************************************************************************************************
@@ -1222,14 +1334,16 @@ bool handleJPG() {
 
     WiFiClient client = server.client();          // open link with client
     char buf[32];
-    camera_fb_t * fb = NULL;                      // pointer for image frame buffer
 
     // capture the jpg image from camera
-        fb = esp_camera_fb_get();
+        camera_fb_t * fb = esp_camera_fb_get();
         if (!fb) {
           if (serialDebug) Serial.println("Error: failed to capture image");
           return 0;
         }
+
+    // store image resolution info.
+      ImageResDetails = String(fb->width) + "x" + String(fb->height);
 
     // html to send a jpg
       const char HEADER[] = "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\n";
