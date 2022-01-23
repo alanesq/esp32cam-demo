@@ -24,7 +24,7 @@ it has the following features:
 <br>-Can read the image as RGB data  (i.e. 3 bytes per pixel for red, green and blue value)
 <br>-Act as web client (reading the web page in to a string) - see requestWebPage()
 
-BTW - I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/misc/blob/main/esp32cam-timelapse.cpp
+BTW - I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/esp32cam-Timelapse
 
 <br><br>
 LATEST NEWS!!!
