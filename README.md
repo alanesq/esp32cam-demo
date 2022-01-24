@@ -61,9 +61,15 @@ created using the Arduino IDE with ESP32 module installed
 No additional libraries required
 
 
-BTW - If you has an ideas/info./suggestions to improve this sketch etc. please let me know.
+BTW - If you has an ideas/info./suggestions to improve this sketch etc. please let me know - alanesq@disroot.org
 
 There is a very good Youtube video on using the ESP32Cam board here: https://www.youtube.com/watch?v=FmlxC0goKew&t=610s
+
+Schematic: https://github.com/SeeedDocument/forum_doc/blob/master/reg/ESP32_CAM_V1.6.pdf 
+https://github.com/raphaelbs/esp32-cam-ai-thinker/blob/master/docs/about-esp32-cam.md
+
+
+
 
 ----------------
 
