@@ -66,9 +66,6 @@ BTW - If you has an ideas/info./suggestions to improve this sketch etc. please l
 There is a very good Youtube video on using the ESP32Cam board here: https://www.youtube.com/watch?v=FmlxC0goKew&t=610s
 
 Schematic: https://github.com/SeeedDocument/forum_doc/blob/master/reg/ESP32_CAM_V1.6.pdf 
-https://github.com/raphaelbs/esp32-cam-ai-thinker/blob/master/docs/about-esp32-cam.md
-
-
 
 
 ----------------
@@ -109,6 +106,8 @@ GPIO PINS:
 <br>BTW-You can use an MCP23017 io expander chip on pins 12 and 13 to give you 16 general purpose gpio pins, this requires the adafruit MCP23017 library to be installed.
 <br>Pin 16 is used for psram but you may get away with using it as input for a button etc.?
 <br>Note: I have been told there may be issues reading files when sd-card is in 1-bit mode, I have only used it for writing them myself.
+
+Some great info here:   https://github.com/raphaelbs/esp32-cam-ai-thinker/blob/master/docs/esp32cam-pin-notes.md
 
 ----------------
 
