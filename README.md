@@ -90,10 +90,12 @@ as data (http://x.x.x.x/rgb).
                                            
 GPIO PINS:
 <br>The available pins are very limited on the esp32cam, my best understanding is:
-<br>If using the sd card (must be in 1-bit mode) the main io pins available for general use are 13 and 12 (12 must not be high at boot),
-14, 2 & 15 should also be available if you are not using the SD Card.
-<br>You can also use pins 1 and 3 if you do not use Serial.  Pin 4 is the onboard flash LED which you could remove and use this pin for i/o 
-(but again sd card must be in 1-bit mode if using the sd card)?
+<br>If using the sd card (must be in 1-bit mode) the main io pins available for general use are 13 and 12 
+<br>(12 must not be high at boot), 14, 2 & 15 should also be available if you are not using the SD Card.
+<br>You can also use pins 1 and 3 if you do not use Serial.
+<br>Pin 4 is the onboard flash LED which you could possibly remove and use this pin for i/o but again sd card 
+<br>needs to be in 1-bit mode if you are using it otherwise the sd-card uses pin 4. pin 33 is another onboard 
+<br>led which could possibly be used?
 <br>More info: https://randomnerdtutorials.com/esp32-cam-ai-thinker-pinout/
 <br>BTW-You can use an MCP23017 io expander chip on pins 12 and 13 to give you 16 general purpose gpio pins, this requires the adafruit MCP23017 library to be installed.
 <br>Pin 16 is used for psram but you may get away with using it as input for a button etc.?
