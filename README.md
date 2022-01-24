@@ -24,11 +24,11 @@ it has the following features:
 <br>-Can read the image as RGB data  (i.e. 3 bytes per pixel for red, green and blue value)
 <br>-Act as web client (reading the web page in to a string) - see requestWebPage()
 
-<br><br>The root web page uses AJAX to update info. on the page.  This is done in the easiest to understand/follow way I can, it seems a bit complicated 
+<br>The root web page uses AJAX to update info. on the page.  This is done in the easiest to understand/follow way I can, it seems a bit complicated 
 <br>at first but basically you just create html with a named <span> where you want the info to go, the javascript then periodically sends a request to <br>http://x.x.x.x/data which returns the information seperated by commas which the JavaScript splits in to an array and then sends to the relevant 
 <br><span> on the web page.
 
-<br><br>BTW - I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/esp32cam-Timelapse
+<br>BTW - I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/esp32cam-Timelapse
 
 <br><br>LATEST NEWS!!!
 <br>There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
