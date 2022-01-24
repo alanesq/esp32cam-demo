@@ -95,7 +95,6 @@ as data (http://x.x.x.x/rgb).
                              resolution images as there is not enough memory)
                                            
 GPIO PINS:
-
 <br>    13      free (used by sd card but free if using 1 bit mode)
 <br>    12      free (must be low at boot, used by sd card but free if using 1 bit mode)
 <br>    14      used by sd card (useable is SPI clock?)
@@ -105,7 +104,7 @@ GPIO PINS:
 <br>    3       serial - input only?
 <br>    4       has the illumination/flash led on it - led could be removed and use as output?
 <br>    33      onboard led - possibly remove led and use as gpio?
-<br>Some great info here:   https://github.com/raphaelbs/esp32-cam-ai-thinker/blob/master/docs/esp32cam-pin-notes.md
+<br><br>Some great info here:   https://github.com/raphaelbs/esp32-cam-ai-thinker/blob/master/docs/esp32cam-pin-notes.md
 <br>BTW-You can use an MCP23017 io expander chip on pins 12 and 13 to give you 16 general purpose gpio pins, this requires the adafruit MCP23017 library to be installed.
 <br>Note: I have been told there may be issues reading files when sd-card is in 1-bit mode, I have only used it for writing them myself.
 
