@@ -85,11 +85,12 @@
 // ---------------------------------------------------------------
 
  const char* stitle = "ESP32Cam-demo";                  // title of this sketch
- const char* sversion = "23Jan22";                      // Sketch version
+ const char* sversion = "25Jan22";                      // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
  uint16_t datarefresh = 2200;                           // how often to refresh data on root web page (ms)
+ uint16_t imagerefresh = 5000;                          // how often to refresh the image on root web page (ms)
 
  const bool serialDebug = 1;                            // show debug info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
 
@@ -581,18 +582,46 @@ void flashLED(int reps) {
 
 
 // ----------------------------------------------------------------
-//     send a standard html header (i.e. start of web page)
+//      send standard html header (i.e. start of web page)
 // ----------------------------------------------------------------
-void sendHeader(WiFiClient &client, String wTitle) {
-    client.write("HTTP/1.1 200 OK\r\n");
-    client.write("Content-Type: text/html\r\n");
-    client.write("Connection: close\r\n");
-    client.write("\r\n");
-    client.write("<!DOCTYPE HTML>\n");
-    client.write("<html lang='en'>\n");
-    client.write("<head>\n");
-    client.write("<meta name='viewport' content='width=device-width, initial-scale=1.0'>\n");
-    client.print("<title>" + wTitle + "</title> </head> <body>\n");
+void sendHeader(WiFiClient &client, char* hTitle) {
+    // Start page
+      client.write("HTTP/1.1 200 OK\r\n");
+      client.write("Content-Type: text/html\r\n");
+      client.write("Connection: close\r\n");
+      client.write("\r\n");
+      client.write("<!DOCTYPE HTML><html lang='en'>\n");
+    // HTML / CSS
+      client.printf(R"=====(
+        <head>
+          <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+          <title>%s</title>
+          <style>
+            body {
+              color: black;
+              background-color: #FFFF00;
+              text-align: center;
+            }
+            input {
+              background-color: #FF9900;
+              border: 2px #FF9900;
+              color: blue;
+              padding: 3px 6px;
+              text-align: center;
+              text-decoration: none;
+              display: inline-block;
+              font-size: 16px;
+              cursor: pointer;
+              border-radius: 7px;
+            }
+            input:hover {
+              background-color: #FF4400;
+            }
+          </style>
+        </head>
+        <body>
+        <h1 style='color:red;'>%s</H1>
+      )=====", hTitle, hTitle);
 }
 
 
@@ -616,18 +645,23 @@ void sendText(WiFiClient &client, String theText) {
 
 
 // ----------------------------------------------------------------
-//    reset the camera example - see handleTest() for example
+//                        reset the camera
 // ----------------------------------------------------------------
-void resetCamera() {
-  // power cycle the camera module (handy if camera stops responding)
-    digitalWrite(PWDN_GPIO_NUM, HIGH);    // turn power off to camera module
-    delay(300);
-    digitalWrite(PWDN_GPIO_NUM, LOW);
-    delay(300);
-  // reset via software (handy if you wish to change resolution or image type etc. - see test procedure)
-    esp_camera_deinit();                 // disable camera
-    delay(50);
-    initialiseCamera();
+// either hardware(1) or software(0)
+void resetCamera(bool type = 0) {
+  if (type == 1) {
+    // power cycle the camera module (handy if camera stops responding)
+      digitalWrite(PWDN_GPIO_NUM, HIGH);    // turn power off to camera module
+      delay(300);
+      digitalWrite(PWDN_GPIO_NUM, LOW);
+      delay(300);
+      initialiseCamera();
+    } else {
+    // reset via software (handy if you wish to change resolution or image type etc. - see test procedure)
+      esp_camera_deinit();
+      delay(50);
+      initialiseCamera();
+    }
 }
 
 
@@ -852,8 +886,6 @@ void handleRoot() {
  //                               Verify your HTML is valid:  https://validator.w3.org/
 
 
- // Page title
-  client.printf("<h1 style='color:red;'>%s</H1>\n", stitle);
   client.write("Sketch from: github.com/alanesq/esp32cam-demo<br>");
 
   // ---------------------------------------------------------------------------------------------
@@ -938,6 +970,19 @@ void handleRoot() {
     // capture and show a jpg image
       client.write("<br><a href='/jpg'>");         // make it a link
       client.write("<img src='/jpg' /> </a>");     // show image from http://x.x.x.x/jpg
+
+    // javascript to refresh the image periodically
+      client.printf(R"=====(
+         <script>
+           function refreshImage(){
+               var timestamp = new Date().getTime();
+               var el = document.getElementById('image1');
+               var queryString = '?t=' + timestamp;
+               el.src = '/jpg' + queryString;
+           }
+           setInterval(function() { refreshImage(); }, %d);
+         </script>
+      )=====", imagerefresh);
 
 
  // --------------------------------------------------------------------
@@ -1483,7 +1528,6 @@ void handleTest() {
 
 
  // html body
-   client.print("<h1>Test Page</h1>\n");
 
 
  // -------------------------------------------------------------------
