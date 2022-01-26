@@ -148,6 +148,10 @@ How to crop images on the esp32cam: https://makexyz.fun/esp32-cam-cropping-image
 
 Some good info here: https://github.com/raphaelbs/esp32-cam-ai-thinker
 
+Very handy for testingout bits of ESP32 code:  https://wokwi.com/
+
+Some sites I find handy when creating HTML:  https://htmlg.com/html-editor/  http://www.freeformatter.com/html-formatter.html#ad-output  https://www.w3schools.com/
+
 If you have any handy info, tips, or improvements to my code etc. please feel let me know at: alanesq@disroot.org
 
 
