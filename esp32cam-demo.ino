@@ -432,7 +432,7 @@ bool initialiseCamera() {
    config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA),
                                                  //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA),
                                                  //              1600x1200 (UXGA)
-   config.jpeg_quality = 10;                     // 0-63 lower number means higher quality
+   config.jpeg_quality = 15;                     // 0-63 lower number means higher quality
    config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
 
    // check the esp32cam board has a psram chip installed (extra memory used for storing captured images)
