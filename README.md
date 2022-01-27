@@ -67,6 +67,8 @@ There is a very good Youtube video on using the ESP32Cam board here: https://www
 
 Schematic: https://github.com/SeeedDocument/forum_doc/blob/master/reg/ESP32_CAM_V1.6.pdf 
 
+Info on camera settings:  https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
+
 
 ----------------
 
