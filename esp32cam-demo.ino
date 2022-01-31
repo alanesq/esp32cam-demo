@@ -90,7 +90,7 @@
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
  uint16_t dataRefresh = 2;                              // how often to refresh data on root web page (seconds)
- uint16_t imagerefresh = 5;                             // how often to refresh the image on root web page (seconds)
+ uint16_t imagerefresh = 2;                             // how often to refresh the image on root web page (seconds)
 
  const bool serialDebug = 1;                            // show debug info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
 
@@ -300,7 +300,7 @@ void setup() {
        } else {
          // valid sd card detected
          uint16_t SDfreeSpace = (uint64_t)(SD_MMC.totalBytes() - SD_MMC.usedBytes()) / (1024 * 1024);
-         if (serialDebug) Serial.printf("SD Card found, free space = %dMB \n", SDfreeSpace);
+         if (serialDebug) Serial.printf("SD Card found, free space = %dmB \n", SDfreeSpace);
          sdcardPresent = 1;                      // flag sd card available
        }
      }
@@ -890,19 +890,16 @@ void handleRoot() {
   // ---------------------------------------------------------------------------------------------
     //  info which is periodically updated usin AJAX - https://www.w3schools.com/xml/ajax_intro.asp
 
-    // empty lines which are populated via vbscript with live data from http://x.x.x.x/data in the form of comma seperated text
-    //   you can add more or remove unwanted ones as required without modifying the javascript
-      client.println("<span id='uline0'></span>");
-      client.println("<br><span id='uline1'></span>");
-      client.println("<br><span id='uline2'></span>");
-      client.println("<br><span id='uline3'></span>");
-      client.println("<br><span id='uline4'></span>");
-      client.println("<br><span id='uline5'></span>");
+    // empty lines which are populated via vbscript with live data from http://x.x.x.x/data in the form of comma separated text
+      int noLines = 5;      // number of text lines to be populated by javascript
+      for (int i = 0; i < noLines; i++) {
+        client.println("<span id='uline" + String(i) + "'></span><br>");
+      }
 
     // Javascript - to periodically update the above info lines from http://x.x.x.x/data
-    // This is the below javascript code compacted to save flash memory via https://www.textfixer.com/html/compress-html-compression.php
-       client.printf(R"=====(  <script> function getData() { var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange = function() { if (this.readyState == 4 && this.status == 200) { var receivedArr = this.responseText.split(','); for (let i = 0; i < receivedArr.length; i++) { document.getElementById('uline' + i).innerHTML = receivedArr[i]; } } }; xhttp.open('GET', 'data', true); xhttp.send();} getData(); setInterval(function() { getData(); }, %d); </script> )=====", dataRefresh * 1000);
-    /*
+    // Note: You can compact the javascript to save flash memory via https://www.textfixer.com/html/compress-html-compression.php
+    //       The below = client.printf(R"=====(  <script> function getData() { var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange = function() { if (this.readyState == 4 && this.status == 200) { var receivedArr = this.responseText.split(','); for (let i = 0; i < receivedArr.length; i++) { document.getElementById('uline' + i).innerHTML = receivedArr[i]; } } }; xhttp.open('GET', 'data', true); xhttp.send();} getData(); setInterval(function() { getData(); }, %d); </script> )=====", dataRefresh * 1000);
+
       // get a comma seperated list from http://x.x.x.x/data and populate the blank lines in html above
       client.printf(R"=====(
          <script>
@@ -922,7 +919,7 @@ void handleRoot() {
             setInterval(function() { getData(); }, %d);
          </script>
       )=====", dataRefresh * 1000);
-    */
+
 
   // ---------------------------------------------------------------------------------------------
 
@@ -953,7 +950,12 @@ void handleRoot() {
      client.write("<a href='/img'>View stored image</a> - \n");
      client.write("<a href='/rgb'>Capture Image as raw RGB data</a> - \n");
      client.write("<a href='/stream'>Live stream</a> - \n");
-     client.write("<a href='/test'>Test procedure</a><br>\n");
+     client.write("<a href='/test'>Test procedure</a>\n");
+
+    // addnl info if sd card present
+     if (sdcardPresent) {
+       client.write("<br>Note: You can view the individual stored images on sd card with:   http://x.x.x.x/img?img=1");
+     }
 
     // capture and show a jpg image
       client.write("<br><a href='/jpg'>");         // make it a link
@@ -970,7 +972,7 @@ void handleRoot() {
            }
            setInterval(function() { refreshImage(); }, %d);
          </script>
-      )=====", imagerefresh * 1000);
+      )=====", imagerefresh * 1013);        // 1013 is just to stop it refreshing at the same time as /data
 
     client.println("<br><br><a href='https://github.com/alanesq/esp32cam-demo'>Sketch Info</a>");
 
@@ -989,6 +991,7 @@ void handleRoot() {
 // the root web page requests this periodically via Javascript in order to display updating information.
 // information in the form of comma seperated text is supplied which are then inserted in to blank lines on the web page
 // This makes it very easy to modify the data shown without having to change the javascript or root page html
+// Note: to change the number of lines displayed update variable 'noLines' in handleroot()
 
 void handleData(){
 
@@ -1003,32 +1006,32 @@ void handleData(){
     }
    String reply = "";
 
-  // sd card
+  // line1 - sd card
     if (!sdcardPresent) {
       reply += "<span style='color:blue;'>NO SD CARD DETECTED</span>";
     } else {
-      reply += "SD Card: " + String(SDusedSpace) + "Mb used - " + String(SDfreeSpace) + "Mb free";
+      reply += "SD Card: " + String(SDusedSpace) + "MB used - " + String(SDfreeSpace) + "MB free";
     }
     reply += ",";
 
-  // illumination/flash led
+  // line2 - illumination/flash led
     reply += "Illumination led brightness=" + String(brightLEDbrightness);
     reply += " &ensp; Flash is ";     // Note: '&ensp;' leaves a gap
     reply += (flashRequired) ? "Enabled" : "Off";
     reply += ",";
 
-  // Current real time
+  // line3 - Current real time
     reply += "Current time: " + localTime();
     reply += ",";
 
-  // gpio pin status
+  // line4 - gpio pin status
     reply += "GPIO output pin 12 is: ";
     reply += (digitalRead(iopinB)==1) ? "ON" : "OFF";
     reply += " &ensp; GPIO input pin 13 is: ";
     reply += (digitalRead(iopinA)==1) ? "ON" : "OFF";
     reply += ",";
 
-  // image resolution
+  // line5 - image resolution
     reply += "Image size: " + ImageResDetails;
 
 
@@ -1239,11 +1242,11 @@ void readRGBImage() {
        if (!sendRGBfile) sendFooter(client);               // close web page
        return;
      } else {
-       sendText(client, "-JPG image capture took " + String(millis() - tTimer) + " milliseconds");              // report time it took to capture an image
-       sendText(client, "-Image resolution=" + String(fb->width) + "x" + String(fb->height));
-       sendText(client, "-Image size=" + String(fb->len) + " bytes");
-       sendText(client, "-Image format=" + String(fb->format));
-       sendText(client, "-Free memory=" + String(ESP.getFreeHeap()) + " bytes");
+       sendText(client, "JPG image capture took " + String(millis() - tTimer) + " milliseconds");              // report time it took to capture an image
+       sendText(client, "Image resolution=" + String(fb->width) + "x" + String(fb->height));
+       sendText(client, "Image size=" + String(fb->len) + " bytes");
+       sendText(client, "Image format=" + String(fb->format));
+       sendText(client, "Free memory=" + String(ESP.getFreeHeap()) + " bytes");
      }
 
 /*
