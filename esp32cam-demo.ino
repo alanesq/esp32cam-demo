@@ -89,8 +89,8 @@
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
- uint16_t datarefresh = 2200;                           // how often to refresh data on root web page (ms)
- uint16_t imagerefresh = 5000;                          // how often to refresh the image on root web page (ms)
+ uint16_t dataRefresh = 2;                              // how often to refresh data on root web page (seconds)
+ uint16_t imagerefresh = 5;                             // how often to refresh the image on root web page (seconds)
 
  const bool serialDebug = 1;                            // show debug info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
 
@@ -432,7 +432,7 @@ bool initialiseCamera() {
    config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA),
                                                  //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA),
                                                  //              1600x1200 (UXGA)
-   config.jpeg_quality = 15;                     // 0-63 lower number means higher quality
+   config.jpeg_quality = 12;                     // 0-63 lower number means higher quality (can cause failed image capture if set too low at higher resolutions)
    config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
 
    // check the esp32cam board has a psram chip installed (extra memory used for storing captured images)
@@ -467,7 +467,8 @@ bool initialiseCamera() {
 // Adjust image properties (brightness etc.)
 // Defaults to auto adjustments if exposure and gain are both set to zero
 // - Returns TRUE if successful
-// BTW - some interesting info on exposure times here: https://github.com/raduprv/esp32-cam_ov2640-timelapse
+// More info: https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
+//            interesting info on exposure times here: https://github.com/raduprv/esp32-cam_ov2640-timelapse
 
 bool cameraImageSettings() {
 
@@ -886,31 +887,23 @@ void handleRoot() {
  //                               Verify your HTML is valid:  https://validator.w3.org/
 
 
-  client.write("Sketch from: github.com/alanesq/esp32cam-demo<br>");
-
   // ---------------------------------------------------------------------------------------------
-  //  info which is periodically updated usin AJAX - https://www.w3schools.com/xml/ajax_intro.asp
+    //  info which is periodically updated usin AJAX - https://www.w3schools.com/xml/ajax_intro.asp
 
-    // sd card
-      if (!sdcardPresent) {
-        client.println("<p style='color:blue;'>NO SD CARD DETECTED<span id=uImages></span><span id=uUsed></span><span id=uRemain></span></p>");    // spans will be left empty
-      } else {
-        client.println("<p>SD Card: <span id=uImages> - </span> images stored, <span id=uUsed> - </span>MB used , <span id=uRemain> - </span>MB remaining</p>\n");
-      }
+    // empty lines which are populated via vbscript with live data from http://x.x.x.x/data in the form of comma seperated text
+    //   you can add more or remove unwanted ones as required without modifying the javascript
+      client.println("<span id='uline0'></span>");
+      client.println("<br><span id='uline1'></span>");
+      client.println("<br><span id='uline2'></span>");
+      client.println("<br><span id='uline3'></span>");
+      client.println("<br><span id='uline4'></span>");
+      client.println("<br><span id='uline5'></span>");
 
-    // illumination/flash led
-      client.println("Illumination led brightness=<span id=uBrightness> - </span>, Flash is <span id=uFlash> - </span>");
-
-    // Current real time
-      client.println("<br>Current time: <span id=uTime> - </span>");
-
-    // gpio pin status
-      client.print("<br>GPIO output pin 12 is: <span id=uGPIO12> - </span>, GPIO input pin 13 is: <span id=uGPIO13> - </span>");
-
-    // image resolution
-      client.println("<br>Image size: <span id=uRes> - </span>");
-
-    // Javascript - to periodically update above getting info from http://x.x.x.x/data
+    // Javascript - to periodically update the above info lines from http://x.x.x.x/data
+    // This is the below javascript code compacted to save flash memory via https://www.textfixer.com/html/compress-html-compression.php
+       client.printf(R"=====(  <script> function getData() { var xhttp = new XMLHttpRequest(); xhttp.onreadystatechange = function() { if (this.readyState == 4 && this.status == 200) { var receivedArr = this.responseText.split(','); for (let i = 0; i < receivedArr.length; i++) { document.getElementById('uline' + i).innerHTML = receivedArr[i]; } } }; xhttp.open('GET', 'data', true); xhttp.send();} getData(); setInterval(function() { getData(); }, %d); </script> )=====", dataRefresh * 1000);
+    /*
+      // get a comma seperated list from http://x.x.x.x/data and populate the blank lines in html above
       client.printf(R"=====(
          <script>
             function getData() {
@@ -918,15 +911,9 @@ void handleRoot() {
               xhttp.onreadystatechange = function() {
               if (this.readyState == 4 && this.status == 200) {
                 var receivedArr = this.responseText.split(',');
-                document.getElementById('uImages').innerHTML = receivedArr[0];
-                document.getElementById('uUsed').innerHTML = receivedArr[1];
-                document.getElementById('uRemain').innerHTML = receivedArr[2];
-                document.getElementById('uBrightness').innerHTML = receivedArr[3];
-                document.getElementById('uTime').innerHTML = receivedArr[4];
-                document.getElementById('uGPIO12').innerHTML = receivedArr[5];
-                document.getElementById('uGPIO13').innerHTML = receivedArr[6];
-                document.getElementById('uFlash').innerHTML = receivedArr[7];
-                document.getElementById('uRes').innerHTML = receivedArr[8];
+                for (let i = 0; i < receivedArr.length; i++) {
+                  document.getElementById('uline' + i).innerHTML = receivedArr[i];
+                }
               }
             };
             xhttp.open('GET', 'data', true);
@@ -934,7 +921,8 @@ void handleRoot() {
             getData();
             setInterval(function() { getData(); }, %d);
          </script>
-      )=====", datarefresh);
+      )=====", dataRefresh * 1000);
+    */
 
   // ---------------------------------------------------------------------------------------------
 
@@ -969,7 +957,7 @@ void handleRoot() {
 
     // capture and show a jpg image
       client.write("<br><a href='/jpg'>");         // make it a link
-      client.write("<img src='/jpg' /> </a>");     // show image from http://x.x.x.x/jpg
+      client.write("<img id='image1' src='/jpg' width='320' height='240' /> </a>");     // show image from http://x.x.x.x/jpg
 
     // javascript to refresh the image periodically
       client.printf(R"=====(
@@ -982,7 +970,9 @@ void handleRoot() {
            }
            setInterval(function() { refreshImage(); }, %d);
          </script>
-      )=====", imagerefresh);
+      )=====", imagerefresh * 1000);
+
+    client.println("<br><br><a href='https://github.com/alanesq/esp32cam-demo'>Sketch Info</a>");
 
 
  // --------------------------------------------------------------------
@@ -996,11 +986,13 @@ void handleRoot() {
 // ----------------------------------------------------------------
 //     -data web page requested     i.e. http://x.x.x.x/data
 // ----------------------------------------------------------------
-// suplies changing info to update root web page as comma seperated String
+// the root web page requests this periodically via Javascript in order to display updating information.
+// information in the form of comma seperated text is supplied which are then inserted in to blank lines on the web page
+// This makes it very easy to modify the data shown without having to change the javascript or root page html
 
 void handleData(){
 
-  // sd sdcard
+  // sd sdcard info
     uint32_t SDusedSpace = 0;
     uint32_t SDtotalSpace = 0;
     uint32_t SDfreeSpace = 0;
@@ -1009,26 +1001,36 @@ void handleData(){
       SDtotalSpace = SD_MMC.totalBytes() / (1024 * 1024);
       SDfreeSpace = SDtotalSpace - SDusedSpace;
     }
-
    String reply = "";
-    if (sdcardPresent) reply += String(imageCounter);      // images stored
+
+  // sd card
+    if (!sdcardPresent) {
+      reply += "<span style='color:blue;'>NO SD CARD DETECTED</span>";
+    } else {
+      reply += "SD Card: " + String(SDusedSpace) + "Mb used - " + String(SDfreeSpace) + "Mb free";
+    }
     reply += ",";
-    if (sdcardPresent) reply += String(SDusedSpace);       // space used on sd card
+
+  // illumination/flash led
+    reply += "Illumination led brightness=" + String(brightLEDbrightness);
+    reply += " &ensp; Flash is ";     // Note: '&ensp;' leaves a gap
+    reply += (flashRequired) ? "Enabled" : "Off";
     reply += ",";
-    if (sdcardPresent) reply += String(SDfreeSpace);       // space remaining on sd card
+
+  // Current real time
+    reply += "Current time: " + localTime();
     reply += ",";
-    reply += String(brightLEDbrightness);   // illumination led brightness
+
+  // gpio pin status
+    reply += "GPIO output pin 12 is: ";
+    reply += (digitalRead(iopinB)==1) ? "ON" : "OFF";
+    reply += " &ensp; GPIO input pin 13 is: ";
+    reply += (digitalRead(iopinA)==1) ? "ON" : "OFF";
     reply += ",";
-    reply += localTime();               // current date/time
-    reply += ",";
-    reply += (digitalRead(iopinB)==1) ? "ON" : "OFF";       // output gpio pin status
-    reply += ",";
-    reply += (digitalRead(iopinA)==1) ? "ON" : "OFF";       // output gpio pin status
-    reply += ",";
-    reply += (flashRequired==1) ? "ON" : "OFF";       // if flash is enabled
-    reply += ",";
-    reply += ImageResDetails;          // if flash is enabled
-    //reply += ",";
+
+  // image resolution
+    reply += "Image size: " + ImageResDetails;
+
 
    server.send(200, "text/plane", reply); //Send millis value only to client ajax request
 }
