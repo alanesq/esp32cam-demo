@@ -24,9 +24,9 @@ it has the following features:
 <br>-Can read the image as RGB data  (i.e. 3 bytes per pixel for red, green and blue value)
 <br>-Act as web client (reading the web page in to a string) - see requestWebPage()
 
-<br>The root web page uses AJAX to update info. on the page.  This is done in the easiest to understand/follow way I can, it seems a bit complicated 
- at first but basically you just create html with a named SPAN where you want the info to go, the javascript then periodically sends a request to  http://x.x.x.x/data which returns the information seperated by commas which the JavaScript splits in to an array and then sends to the relevant 
-SPAN on the web page.
+<br>The root web page uses AJAX to update info. on the page.  This is not done in the conventional way where variable data is passed but 
+instead passes complete lines of text, it may not be elegant but it makes changing what information is displayed much easier as all you 
+have to do is modify what info handleData() sends.
 
 <br>BTW - I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/esp32cam-Timelapse
 
