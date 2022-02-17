@@ -136,8 +136,7 @@ BTW - You may like to have a look at the security camera sketch I have created a
 including FTP, email, OTA updates
 https://github.com/alanesq/CameraWifiMotion
 
-I have heard reports of these modules getting very warm when in use although I have not experienced this myself, 
-I suspect it may be when streaming video for long periods?  May be worth bearing in mind.
+When streaming video these units can get very hot so if you plan to do a lot of streaming this is worth checking to make sure it is not going to over heat.
 
 You can see a demo of accessing greyscale image data here:
     https://github.com/alanesq/esp32cam-demo/blob/master/Misc/esp32camdemo-greyscale.ino
@@ -149,8 +148,9 @@ A handy way to upload images to a computer/web server via php which is very reli
 How to crop images on the esp32cam: https://makexyz.fun/esp32-cam-cropping-images-on-device/
 
 Some good info here: https://github.com/raphaelbs/esp32-cam-ai-thinker
+and here: https://randomnerdtutorials.com/projects-esp32-cam/
 
-Very handy for testingout bits of ESP32 code:  https://wokwi.com/
+Very handy for testing out bits of ESP32 code:  https://wokwi.com/
 
 Some sites I find handy when creating HTML:
       test html: https://www.w3schools.com/tryit/tryit.asp?filename=tryhtml_hello 
