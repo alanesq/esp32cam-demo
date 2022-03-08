@@ -1,11 +1,11 @@
 
 
-NOTE: When using Arduino IDE I find it reboots if no sd card present and the LED stays on full all the time with latest esp32 board manager.  I am using version  1.0.6<br>
-known bug: https://github.com/espressif/arduino-esp32/issues/5195<br><br>
+NOTE: When using Arduino IDE I find it reboots if no sd card present and the LED stays on full all the time with latest esp32 board manager.  I am using version  1.0.6
+known bug: https://github.com/espressif/arduino-esp32/issues/5195
       
-<h1>ESP32Cam-demo sketch for use with the Arduino IDE or PlatformIO</h1>
+## ESP32Cam-demo sketch for use with the Arduino IDE or PlatformIO
 
-I try to show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it<br>
+I try to show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it
 
 <table><tr>
   <td><img src="/images/root.png" /></td>
@@ -13,7 +13,7 @@ I try to show in this sketch how to use the esp32cam as easily as possible.  Eve
 </tr></table> 
 
 This can be used as a starting point sketch for projects using the esp32cam development board, 
-it has the following features:
+it has the following features.
 <br>-Web server with live video streaming and control buttons
 <br>-SD card support (using 1-bit mode - gpio pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2) - I have heard there may be problems reading the sd card, I have only used it to write files myself?
 <br>-Stores captured image on sd-card or in spiffs if no sd card is present
@@ -24,25 +24,25 @@ it has the following features:
 <br>-Can read the image as RGB data  (i.e. 3 bytes per pixel for red, green and blue value)
 <br>-Act as web client (reading the web page in to a string) - see requestWebPage()
 
-<br>The root web page uses AJAX to update info. on the page.  This is not done in the conventional way where variable data is passed but 
+The root web page uses AJAX to update info. on the page.  This is not done in the conventional way where variable data is passed but 
 instead passes complete lines of text, it may not be elegant but it makes changing what information is displayed much easier as all you 
 have to do is modify what info handleData() sends.
 
-<br>BTW - I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/esp32cam-Timelapse
+BTW - I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/esp32cam-Timelapse
 
-<br><br>LATEST NEWS!!!
-<br>There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
-<br>Search eBay for "esp32cam mb" - see http://www.hpcba.com/en/latest/source/DevelopmentBoard/HK-ESP32-CAM-MB.html 
-It looks like the esp32cam suplied with them are not standard and have one of the GND pins modified to act as a reset pin?<br>
+LATEST NEWS!!!
+There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
+Search eBay for "esp32cam mb" - see http://www.hpcba.com/en/latest/source/DevelopmentBoard/HK-ESP32-CAM-MB.html 
+It looks like the esp32cam suplied with them are not standard and have one of the GND pins modified to act as a reset pin?
 So on esp32cam modules without this feature you have to plug the USB in whilst holding the program button to upload a sketch 
 I find I have to use the lowest serial upload speed or it fails (Select 'ESP32 dev module' in the Arduino IDE to have the option and 
-make sure PSRam is enabled). <br>
-There is also now a esp32cam with built in USB available called the "ESP32-CAM-CH340".<br>
-The wifi is very poor whilst in the motherboard (I find this happens if you have something near the antenna on the esp32cam modules) <br>
-but if I rest my thumb above the antenna I find the signal works ok). <br> 
-Many of the ebay listing include an external antenna and I would suggest this would b a good option if ordering one.  <br>
+make sure PSRam is enabled). 
+There is also now a esp32cam with built in USB available called the "ESP32-CAM-CH340".
+The wifi is very poor whilst in the motherboard (I find this happens if you have something near the antenna on the esp32cam modules) 
+but if I rest my thumb above the antenna I find the signal works ok).  
+Many of the ebay listing include an external antenna and I would suggest this would b a good option if ordering one.  
 So they are far from perfect but still for the price I think well worth having.
-<br><br><br>
+
 
 I have tried to make the sketch as easy to follow/modify as possible with lots of comments etc. and no additional libraries used, 
 as I found it quiet confusing as an ameteur trying to do much with this module and difficult to find easy to understand 
@@ -87,7 +87,7 @@ Will capture an image and save it to the sd card
 There is a procedure which demonstarates how to get RGB data from an image which will allow for processing the images 
 as data (http://x.x.x.x/rgb).
 
-<br>URLs:
+URLs:
 <br>http://x.x.x.x/              Hello message
 <br>http://x.x.x.x/photo         Capture an image and save to sd card
 <br>http://x.x.x.x/stream        Show live streaming video
@@ -106,9 +106,10 @@ GPIO PINS:
 <br>    3       serial - input only?
 <br>    4       has the illumination/flash led on it - led could be removed and use as output?
 <br>    33      onboard led - possibly remove led and use as gpio?
-<br><br>Some great info here:   https://github.com/raphaelbs/esp32-cam-ai-thinker/blob/master/docs/esp32cam-pin-notes.md
-<br>BTW-You can use an MCP23017 io expander chip on pins 12 and 13 to give you 16 general purpose gpio pins, this requires the adafruit MCP23017 library to be installed.
-<br>Note: I have been told there may be issues reading files when sd-card is in 1-bit mode, I have only used it for writing them myself.
+
+Some great info here:   https://github.com/raphaelbs/esp32-cam-ai-thinker/blob/master/docs/esp32cam-pin-notes.md
+BTW-You can use an MCP23017 io expander chip on pins 12 and 13 to give you 16 general purpose gpio pins, this requires the adafruit MCP23017 library to be installed.
+Note: I have been told there may be issues reading files when sd-card is in 1-bit mode, I have only used it for writing them myself.
 
 
 ----------------
@@ -118,7 +119,7 @@ Notes
 
 See the test procedure at the end of the sketch for several demos of what you can do
 
-You can see an example Processing sketch for displaying the raw rgb data from this sketch<br>
+You can see an example Processing sketch for displaying the raw rgb data from this sketch
 here: https://github.com/alanesq/esp32cam-demo/blob/master/Misc/displayRGB.pde
 This would read in a file created from the Arduino command:   client.write(rgb, ARRAY_LENGTH);
 You can create such a file by setting the 'sendRGBfile' flag in settings and then accessing the /rgb page
