@@ -99,13 +99,13 @@ URLs:
 GPIO PINS:
 <br>    13      free (used by sd card but free if using 1 bit mode)
 <br>    12      free (must be low at boot, used by sd card but free if using 1 bit mode)
-<br>    14      used by sd card (useable is SPI clock?)
-<br>    2       used by sd card (useabke as SPI MISO?)
-<br>    15      used by sd card (might be usable as SPI CS??)
+<br>    14      used by sd card (usable is SPI clock?)
+<br>    2       used by sd card (usable as SPI MISO?)
+<br>    15      used by sd card as CS
 <br>    1       serial - output only?
 <br>    3       serial - input only?
 <br>    4       has the illumination/flash led on it - led could be removed and use as output?
-<br>    33      onboard led - possibly remove led and use as gpio?
+<br>    33      onboard led - use as output?
 
 Some great info here:   https://github.com/raphaelbs/esp32-cam-ai-thinker/blob/master/docs/esp32cam-pin-notes.md
 BTW-You can use an MCP23017 io expander chip on pins 12 and 13 to give you 16 general purpose gpio pins, this requires the adafruit MCP23017 library to be installed.
