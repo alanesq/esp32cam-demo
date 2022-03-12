@@ -101,7 +101,7 @@ GPIO PINS:
 <br>    12      free (must be low at boot, used by sd card but free if using 1 bit mode)
 <br>    14      used by sd card (usable is SPI clock?)
 <br>    2       used by sd card (usable as SPI MISO?)
-<br>    15      used by sd card as CS
+<br>    15      used by sd card (usable as SPI CS?)
 <br>    1       serial - output only?
 <br>    3       serial - input only?
 <br>    4       has the illumination/flash led on it - led could be removed and use as output?
