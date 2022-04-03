@@ -98,7 +98,7 @@
 
  // Camera related
    bool flashRequired = 1;                              // If flash to be used when capturing image (1 = yes)
-   framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA;        // Image resolution:
+   framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_XGA;        // Image resolution:
                                                         //               default = "const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA"
                                                         //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA),
                                                         //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA),
