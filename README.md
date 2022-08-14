@@ -157,6 +157,9 @@ Some sites I find handy when creating HTML:
       test html: https://www.w3schools.com/tryit/tryit.asp?filename=tryhtml_hello 
       check html for erros:   http://www.freeformatter.com/html-formatter.html#ad-output 
       learn HTML:   https://www.w3schools.com/
+      
+You may like to have a play with a Processing sketch I created which could be used to grab JPG images from this camera and motion detect
+https://github.com/alanesq/misc/blob/main/cctv-camera-motion-detector-processing-sketch.pde      
 
 If you have any handy info, tips, or improvements to my code etc. please feel let me know at: alanesq@disroot.org
 
