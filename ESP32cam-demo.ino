@@ -47,8 +47,8 @@
 
 //         Enter your Wifi Settings here
 
-  #define SSID_NAME "<ssid>"
-  #define SSID_PASWORD "<password>"
+  #define SSID_NAME "your wifi here"
+  #define SSID_PASWORD "your wifi password here"
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -84,9 +84,8 @@
 //                           -SETTINGS
 // ---------------------------------------------------------------
 
- //const char* stitle = "ESP32Cam-demo";                  // title of this sketch
- const char* stitle = "ESP32-DomeCam1";                  // title of this sketch
- const char* sversion = "07Jan23";                      // Sketch version
+ const char* stitle = "ESP32Cam-demo";                  // title of this sketch
+ const char* sversion = "14Jul23";                      // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
@@ -99,7 +98,7 @@
 
  // Camera related
    bool flashRequired = 1;                              // If flash to be used when capturing image (1 = yes)
-   framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_XGA;        // Image resolution:
+   framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_SVGA;       // Image resolution:
                                                         //               default = "const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA"
                                                         //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA),
                                                         //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA),
@@ -681,7 +680,7 @@ void changeResolution(framesize_t tRes = FRAMESIZE_96X96) {
   if (tRes == FRAMESIZE_96X96) {      // taken as none supplied so cycle through several
     if (FRAME_SIZE_IMAGE == FRAMESIZE_QVGA) tRes = FRAMESIZE_VGA;
     else if (FRAME_SIZE_IMAGE == FRAMESIZE_VGA) tRes = FRAMESIZE_XGA;
-    else if (FRAME_SIZE_IMAGE == FRAMESIZE_XGA) tRes = FRAMESIZE_UXGA;
+    //else if (FRAME_SIZE_IMAGE == FRAMESIZE_XGA) tRes = FRAMESIZE_UXGA;
     else tRes = FRAMESIZE_QVGA;
   }
   FRAME_SIZE_IMAGE = tRes;
