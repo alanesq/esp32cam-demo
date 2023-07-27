@@ -47,8 +47,8 @@
 
 //         Enter your Wifi Settings here
 
-  #define SSID_NAME "your wifi here"
-  #define SSID_PASWORD "your wifi password here"
+  #define SSID_NAME "<your wifi ssid here>"
+  #define SSID_PASWORD "<your wifi password here>"
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -70,7 +70,8 @@
       void handleNotFound();
       void readRGBImage();
       bool getNTPtime(int sec);
-      bool handleJPG();
+      bool handleJPG(); 
+      bool handleJpeg();
       void handleStream();
       int requestWebPage(String*, String*, int);
       void handleTest();
@@ -84,8 +85,8 @@
 //                           -SETTINGS
 // ---------------------------------------------------------------
 
- const char* stitle = "ESP32Cam-demo";                  // title of this sketch
- const char* sversion = "14Jul23";                      // Sketch version
+ char* stitle = "ESP32Cam-demo";                        // title of this sketch
+ char* sversion = "27Jul23";                            // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
@@ -248,6 +249,7 @@ void setup() {
    server.on("/", handleRoot);                   // root page
    server.on("/data", handleData);               // suplies data to periodically update root (AJAX)
    server.on("/jpg", handleJPG);                 // capture image and send as jpg
+   server.on("/jpeg", handleJpeg);                // show updating image
    server.on("/stream", handleStream);           // stream live video
    server.on("/photo", handlePhoto);             // save image to sd card
    server.on("/img", handleImg);                 // show image from sd card
@@ -877,7 +879,7 @@ void handleRoot() {
  rootUserInput(client);                                     // Action any user input from this web page
 
  // html header
-   sendHeader(client, "ESP32Cam demo sketch");
+   sendHeader(client, stitle);
    client.write("<FORM action='/' method='post'>\n");            // used by the buttons in the html (action = the web page to send it to
 
 
@@ -1515,6 +1517,51 @@ int requestWebPage(String* page, String* received, int maxWaitTime=5000){
   return httpCode;
 
 }  // requestWebPage
+
+
+// ******************************************************************************************************************
+
+
+// ----------------------------------------------------------------
+//       -show updating image    i.e. http://x.x.x.x/jpeg
+// ----------------------------------------------------------------
+
+void handleJpeg() {
+
+  int refreshRate = 2000;     // image refresh rate (ms)
+
+  WiFiClient client = server.client();                                                        // open link with client
+
+    // Start page
+      client.write("HTTP/1.1 200 OK\r\n");
+      client.write("Content-Type: text/html\r\n");
+      client.write("Connection: close\r\n");
+      client.write("\r\n");
+      client.write("<!DOCTYPE HTML><html lang='en'>\n");
+      client.write("<head></head><body>");
+
+    client.write("<FORM action='/' method='post'>\n");            // used by the buttons in the html (action = the web page to send it to
+
+    // capture and show a jpg image
+      client.write("<img id='image1' src='/jpg'/>");     // show image from http://x.x.x.x/jpg
+
+    // javascript to refresh the image periodically
+      client.printf(R"=====(
+         <script>
+           function refreshImage(){
+               var timestamp = new Date().getTime();
+               var el = document.getElementById('image1');
+               var queryString = '?t=' + timestamp;
+               el.src = '/jpg' + queryString;
+           }
+           setInterval(function() { refreshImage(); }, %d);
+         </script>
+      )=====", refreshRate);        
+
+
+  sendFooter(client);     // close web page
+
+}  // handleJpeg
 
 
 // ******************************************************************************************************************
