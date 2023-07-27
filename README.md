@@ -89,12 +89,14 @@ as data (http://x.x.x.x/rgb).
 
 URLs:
 <br>http://x.x.x.x/              Hello message
+<br>http://x.x.x.x/jpg           capture image and display as a JPG
+<br>http://x.x.x.x/jpeg          as above but refreshes every 2 seconds    
 <br>http://x.x.x.x/photo         Capture an image and save to sd card
 <br>http://x.x.x.x/stream        Show live streaming video
 <br>http://x.x.x.x/img           Show most recent image saved to sd card
 <br>http://x.x.x.x/img?img=1     Show image number 1 on sd card
 <br>http://x.x.x.x/rgb           Captures an image and converts to RGB data (will not work with the highest 
-                             resolution images as there is not enough memory)
+                                 resolution images as there is not enough memory)
                                            
 GPIO PINS:
 <br>    13      free (used by sd card but free if using 1 bit mode)
