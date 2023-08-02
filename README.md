@@ -5,7 +5,8 @@ known bug: https://github.com/espressif/arduino-esp32/issues/5195
       
 ## ESP32Cam-demo sketch for use with the Arduino IDE or PlatformIO
 
-I try to show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it
+I try to show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it<br><br>
+Note: There is a version of this sketch with OTA updates included here: https://github.com/alanesq/esp32cam-demo/blob/master/esp32CamDemo-OTA_version.zip<br>
 
 <table><tr>
   <td><img src="/images/root.png" /></td>
