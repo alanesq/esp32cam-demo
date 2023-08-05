@@ -3,7 +3,7 @@
 *                         ESP32Cam development board demo sketch using Arduino IDE or PlatformIO
 *                                    Github: https://github.com/alanesq/ESP32Cam-demo
 *
-*                                     Tested with ESP32 board manager version  1.0.6
+*                                     Tested with ESP32 board manager version  2.0.11
 *
 *     Starting point sketch for projects using the esp32cam development board with the following features
 *        web server with live video streaming and RGB data from camera demonstrated.
@@ -86,7 +86,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "27Jul23";                            // Sketch version
+ char* sversion = "28Jul23";                            // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
@@ -255,6 +255,7 @@ void setup() {
    server.on("/img", handleImg);                 // show image from sd card
    server.on("/rgb", readRGBImage);              // demo converting image to RGB
    server.on("/test", handleTest);               // Testing procedure
+   server.on("/reboot", handleReboot);           // restart device
    server.onNotFound(handleNotFound);            // invalid url requested
 
  // NTP - internet time
@@ -707,9 +708,15 @@ byte storeImage() {
 
  // capture the image from camera
    int currentBrightness = brightLEDbrightness;
-   if (flashRequired) brightLed(255);   // change LED brightness (0 - 255)
+   if (flashRequired) {
+      brightLed(255);   // change LED brightness (0 - 255)
+      delay(100);
+   }
    camera_fb_t *fb = esp_camera_fb_get();             // capture image frame from camera
-   if (flashRequired) brightLed(currentBrightness);   // change LED brightness back to previous state
+   if (flashRequired){
+      delay(100);
+      brightLed(currentBrightness);   // change LED brightness back to previous state
+   }
    if (!fb) {
      if (serialDebug) Serial.println("Error: Camera capture failed");
      return 0;
@@ -1523,14 +1530,14 @@ int requestWebPage(String* page, String* received, int maxWaitTime=5000){
 
 
 // ----------------------------------------------------------------
-//       -show updating image    i.e. http://x.x.x.x/jpeg
+//       -show refreshing image    i.e. http://x.x.x.x/jpeg
 // ----------------------------------------------------------------
 
 void handleJpeg() {
 
-  int refreshRate = 2000;     // image refresh rate (ms)
+  const int refreshRate = 2000;     // image refresh rate (ms)
 
-  WiFiClient client = server.client();                                                        // open link with client
+  WiFiClient client = server.client();                 // open link with client
 
     // Start page
       client.write("HTTP/1.1 200 OK\r\n");
@@ -1657,6 +1664,24 @@ void handleTest() {
  sendFooter(client);     // close web page
 
 }  // handleTest
+
+
+// ----------------------------------------------------------------
+//   -reboot web page requested        i.e. http://x.x.x.x/reboot
+// ----------------------------------------------------------------
+// note: this can fail if the esp has just been reflashed and not restarted
+
+void handleReboot(){
+
+      String message = "Rebooting....";
+      server.send(200, "text/plain", message);   // send reply as plain text
+
+      // rebooting
+        delay(500);          // give time to send the above html
+        ESP.restart();
+        delay(5000);         // restart fails without this delay
+
+}
 
 
 // ******************************************************************************************************************
