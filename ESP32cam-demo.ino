@@ -681,8 +681,8 @@ void changeResolution(framesize_t tRes = FRAMESIZE_96X96) {
   delay(50);
   if (tRes == FRAMESIZE_96X96) {      // taken as none supplied so cycle through several
     if (FRAME_SIZE_IMAGE == FRAMESIZE_QVGA) tRes = FRAMESIZE_VGA;
-    else if (FRAME_SIZE_IMAGE == FRAMESIZE_VGA) tRes = FRAMESIZE_XGA;
-    //else if (FRAME_SIZE_IMAGE == FRAMESIZE_XGA) tRes = FRAMESIZE_UXGA;
+    else if (FRAME_SIZE_IMAGE == FRAMESIZE_VGA) tRes = FRAMESIZE_SVGA;
+    else if (FRAME_SIZE_IMAGE == FRAMESIZE_SVGA) tRes = FRAMESIZE_SXGA;
     else tRes = FRAMESIZE_QVGA;
   }
   FRAME_SIZE_IMAGE = tRes;
