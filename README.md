@@ -2,6 +2,8 @@
 
 NOTE: When using Arduino IDE I find it reboots if no sd card present and the LED stays on full all the time with latest esp32 board manager.  I am using version  1.0.6
 known bug: https://github.com/espressif/arduino-esp32/issues/5195
+
+I seem to have having trouble with XGA with more recent versions (i.e. 1024x768)
       
 ## ESP32Cam-demo sketch for use with the Arduino IDE or PlatformIO
 
