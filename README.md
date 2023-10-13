@@ -1,13 +1,10 @@
 
-
-NOTE: When using Arduino IDE I find it reboots if no sd card present and the LED stays on full all the time with latest esp32 board manager.  I am using version  1.0.6
-known bug: https://github.com/espressif/arduino-esp32/issues/5195
-
-I seem to have having trouble with XGA with more recent versions (i.e. 1024x768)
+Note: I seem to have having trouble with XGA with more recent versions (i.e. 1024x768)
       
 ## ESP32Cam-demo sketch for use with the Arduino IDE or PlatformIO
 
-I try to show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it<br><br>
+I show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it - I am not a professional programmer so am sure there is plenty of room for improvement...
+<br>It is just a collection of all I have discovered/learned in the process of using them myself<br><br>
 Note: There is a version of this sketch with OTA updates included here: https://github.com/alanesq/esp32cam-demo/blob/master/esp32CamDemo-OTA_version.zip<br>
 
 <table><tr>
@@ -15,8 +12,7 @@ Note: There is a version of this sketch with OTA updates included here: https://
   <td><img src="/images/rgb.png" /></td>
 </tr></table> 
 
-This can be used as a starting point sketch for projects using the esp32cam development board, 
-it has the following features.
+This can be used as a starting point sketch for projects using the esp32cam development board, it has the following features.
 <br>-Web server with live video streaming and control buttons
 <br>-SD card support (using 1-bit mode - gpio pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2) - I have heard there may be problems reading the sd card, I have only used it to write files myself?
 <br>-Stores captured image on sd-card or in spiffs if no sd card is present
@@ -62,9 +58,6 @@ see how it can be used).
 created using the Arduino IDE with ESP32 module installed  
 (See https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/)
 No additional libraries required
-
-
-BTW - If you has an ideas/info./suggestions to improve this sketch etc. please let me know - alanesq@disroot.org
 
 There is a very good Youtube video on using the ESP32Cam board here: https://www.youtube.com/watch?v=FmlxC0goKew&t=610s
 
