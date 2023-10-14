@@ -1391,7 +1391,7 @@ bool handleJPG() {
     // send the captured jpg data
       client.write((char *)fb->buf, fb->len);
 
-    // close client connection
+    // close network client connection
       delay(3);
       client.stop();
 
@@ -1541,26 +1541,26 @@ void readGreyscaleImage() {
 
   WiFiClient client = server.client();                 // open link with client
 
-  // change to greyscale image
+  // change camera to greyscale mode  (as by default it is in JPG colour mode)
     esp_camera_deinit();     // disable camera
     delay(50);
-    imageFormat = 2;   // greyscale
-    initialiseCamera();  
+    imageFormat = 2;         // this is used in 'initialiseCamera()' (1=jpg, 2=greyscale)
+    initialiseCamera();      // restart the camera with new settings
 
-  // capture the image from camera
+  // capture the image and use flash if required
     int currentBrightness = brightLEDbrightness;
     if (flashRequired) {
         brightLed(255);   // change LED brightness (0 - 255)
         delay(100);
     }
-    camera_fb_t *fb = esp_camera_fb_get();      // capture image
+    camera_fb_t *fb = esp_camera_fb_get();       // capture image
     if (flashRequired){
         delay(100);
         brightLed(currentBrightness);            // change LED brightness back to previous state
     }
-    if (!fb) if (serialDebug) Serial.println("Error: Camera capture failed");
+    if (!fb) client.println("Error: Camera image capture failed");
 
-  // read image data
+  // read image data and calculate average pixel value (as demonstration of reading the image data)
     unsigned long dataSize = fb->width * fb->height;
     unsigned long avrg = 0;
     for (int i=0; i < dataSize; i++) {
@@ -1568,16 +1568,18 @@ void readGreyscaleImage() {
     }
     client.println("<br>Average pixel = " + String(avrg / dataSize));
     
-  // close client connection
+  // close network client connection
     delay(3);
     client.stop();
-
-  // change back to JPG
-    esp_camera_deinit();     // disable camera
-    delay(50);
-    imageFormat = 1;   // jpg
-    initialiseCamera(); 
+    
+  // return image frame to free up memory
     esp_camera_fb_return(fb);                 // return camera frame buffer
+
+  // change camera back to JPG mode
+    esp_camera_deinit();  
+    delay(50);
+    imageFormat = 1; 
+    initialiseCamera(); 
   }
 
 
