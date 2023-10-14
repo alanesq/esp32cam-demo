@@ -33,6 +33,7 @@
 *     esp32cam-demo is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
 *        implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 *
+*                                                                                 https://alanesq.github.io/
 *
 *******************************************************************************************************************/
 
@@ -47,8 +48,8 @@
 
 //         Enter your Wifi Settings here
 
-  #define SSID_NAME "<your wifi ssid here>"
-  #define SSID_PASWORD "<your wifi password here>"
+  #define SSID_NAME "<wifi name>"
+  #define SSID_PASWORD "<wifi password>"
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -79,6 +80,7 @@
       void setupFlashPWM();
       void changeResolution(framesize_t);
       void handleData();
+      void readGreyscaleImage();
 */
 
 // ---------------------------------------------------------------
@@ -86,7 +88,9 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "28Jul23";                            // Sketch version
+ char* sversion = "14oct23";                            // Sketch version
+
+ int imageFormat = 1;                                   // default image format (1=JPG, 2=greyscale)
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
@@ -95,7 +99,7 @@
 
  const bool serialDebug = 1;                            // show debug info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
 
- #define useMCP23017 0                                  // if MCP23017 IO expander chip is being used (on pins 12 and 13)
+ #define useMCP23017 0                                  // set if MCP23017 IO expander chip is being used (on pins 12 and 13)
 
  // Camera related
    bool flashRequired = 1;                              // If flash to be used when capturing image (1 = yes)
@@ -104,7 +108,6 @@
                                                         //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA),
                                                         //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA),
                                                         //               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
-   #define PIXFORMAT PIXFORMAT_JPEG;                    // image format, Options =  YUV422, GRAYSCALE, RGB565, JPEG, RGB888
    int cameraImageExposure = 0;                         // Camera exposure (0 - 1200)   If gain and exposure both set to zero then auto adjust is enabled
    int cameraImageGain = 0;                             // Image gain (0 - 30)
    int cameraImageBrightness = 0;                       // Image brightness (-2 to +2)
@@ -149,6 +152,7 @@
 
 
 // ******************************************************************************************************************
+
 
 //#include "esp_camera.h"         // https://github.com/espressif/esp32-camera
 // #include "camera_pins.h"
@@ -197,9 +201,6 @@ WebServer server(80);           // serve web pages on port 80
  int imageCounter;                         // image file name on sd card counter
  String spiffsFilename = "/image.jpg";     // image name to use when storing in spiffs
  String ImageResDetails = "Unknown";       // image resolution info
-
-
-// ******************************************************************************************************************
 
 
 // ---------------------------------------------------------------
@@ -254,6 +255,7 @@ void setup() {
    server.on("/photo", handlePhoto);             // save image to sd card
    server.on("/img", handleImg);                 // show image from sd card
    server.on("/rgb", readRGBImage);              // demo converting image to RGB
+   server.on("/greydata", readGreyscaleImage);   // look at greyscale image data
    server.on("/test", handleTest);               // Testing procedure
    server.on("/reboot", handleReboot);           // restart device
    server.onNotFound(handleNotFound);            // invalid url requested
@@ -362,9 +364,6 @@ setupFlashPWM();    // configure PWM for the illumination LED
 }  // setup
 
 
-// ******************************************************************************************************************
-
-
 // ----------------------------------------------------------------
 //   -LOOP     LOOP     LOOP     LOOP     LOOP     LOOP     LOOP
 // ----------------------------------------------------------------
@@ -403,10 +402,6 @@ void loop() {
 }  // loop
 
 
-
-// ******************************************************************************************************************
-
-
 // ----------------------------------------------------------------
 //                        Initialise the camera
 // ----------------------------------------------------------------
@@ -434,7 +429,8 @@ bool initialiseCamera() {
    config.pin_pwdn = PWDN_GPIO_NUM;
    config.pin_reset = RESET_GPIO_NUM;
    config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
-   config.pixel_format = PIXFORMAT;              // Options =  YUV422, GRAYSCALE, RGB565, JPEG, RGB888
+   if (imageFormat == 1) config.pixel_format = PIXFORMAT_JPEG;        // colour jpg format
+   if (imageFormat == 2) config.pixel_format = PIXFORMAT_GRAYSCALE;        // greyscale format
    config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA),
                                                  //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA),
                                                  //              1600x1200 (UXGA)
@@ -462,9 +458,6 @@ bool initialiseCamera() {
 
    return (camerr == ESP_OK);                    // return boolean result of camera initialisation
 }
-
-
-// ******************************************************************************************************************
 
 
 // ----------------------------------------------------------------
@@ -535,12 +528,6 @@ bool cameraImageSettings() {
 //    s->set_ae_level(s, 0);                        // auto exposure levels (-2 to 2)
 //    s->set_bpc(s, 0);                             // black pixel correction
 //    s->set_wpc(s, 0);                             // white pixel correction
-
-
-// ******************************************************************************************************************
-
-
-//                          Misc small procedures
 
 
 // ----------------------------------------------------------------
@@ -687,13 +674,11 @@ void changeResolution(framesize_t tRes = FRAMESIZE_96X96) {
     else tRes = FRAMESIZE_QVGA;
   }
   FRAME_SIZE_IMAGE = tRes;
+
   initialiseCamera();
   if (serialDebug) Serial.println("Camera resolution changed to " + String(tRes));
   ImageResDetails = "Unknown";   // set next time image captured
 }
-
-
-// ******************************************************************************************************************
 
 
 // ----------------------------------------------------------------
@@ -745,6 +730,7 @@ byte storeImage() {
          if (serialDebug) Serial.println("Error: failed to write image data to spiffs file");
        }
      }
+     esp_camera_fb_return(fb);                               // return camera frame buffer
      if (sRes == 1 && serialDebug) {
        Serial.print("The picture has been saved to Spiffs as " + spiffsFilename);
        Serial.print(" - Size: ");
@@ -779,9 +765,6 @@ byte storeImage() {
  return sRes;
 
 } // storeImage
-
-
-// ******************************************************************************************************************
 
 
 // ----------------------------------------------------------------
@@ -1051,9 +1034,6 @@ void handleData(){
 }
 
 
-// ******************************************************************************************************************
-
-
 // ----------------------------------------------------------------
 //    -photo save to sd card/spiffs    i.e. http://x.x.x.x/photo
 // ----------------------------------------------------------------
@@ -1170,9 +1150,6 @@ bool handleImg() {
 }  // handleImg
 
 
-// ******************************************************************************************************************
-
-
 // ----------------------------------------------------------------
 //                      -invalid web page requested
 // ----------------------------------------------------------------
@@ -1201,9 +1178,6 @@ void handleNotFound() {
  tReply = "";      // clear variable
 
 }  // handleNotFound
-
-
-// ******************************************************************************************************************
 
 
 // ----------------------------------------------------------------
@@ -1353,10 +1327,6 @@ void readRGBImage() {
 }  // readRGBImage
 
 
-
-// ******************************************************************************************************************
-
-
 // ----------------------------------------------------------------
 //                      -get time from ntp server
 // ----------------------------------------------------------------
@@ -1425,8 +1395,7 @@ bool handleJPG() {
       delay(3);
       client.stop();
 
-    // return image frame so memory can be released
-      esp_camera_fb_return(fb);
+    esp_camera_fb_return(fb);                 // return camera frame buffer
 
     return 1;
 
@@ -1475,7 +1444,7 @@ void handleStream(){
        client.write(buf, strlen(buf));             // send result (image size)
        client.write((char *)fb->buf, fb->len);     // send the image data
        client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
-       esp_camera_fb_return(fb);                   // return image buffer so memory can be released
+       esp_camera_fb_return(fb);                  // return camera frame buffer
    }
  }
 
@@ -1485,9 +1454,6 @@ void handleStream(){
 
 
 }  // handleStream
-
-
-// ******************************************************************************************************************
 
 
 // ----------------------------------------------------------------
@@ -1524,9 +1490,6 @@ int requestWebPage(String* page, String* received, int maxWaitTime=5000){
   return httpCode;
 
 }  // requestWebPage
-
-
-// ******************************************************************************************************************
 
 
 // ----------------------------------------------------------------
@@ -1567,11 +1530,72 @@ void handleJpeg() {
 
 
   sendFooter(client);     // close web page
-
 }  // handleJpeg
 
 
-// ******************************************************************************************************************
+// ----------------------------------------------------------------
+//                  Capture greyscale image data
+// ----------------------------------------------------------------
+
+void readGreyscaleImage() {
+
+  WiFiClient client = server.client();                 // open link with client
+
+  // change to greyscale image
+    esp_camera_deinit();     // disable camera
+    delay(50);
+    imageFormat = 2;   // greyscale
+    initialiseCamera();  
+
+  // capture the image from camera
+    int currentBrightness = brightLEDbrightness;
+    if (flashRequired) {
+        brightLed(255);   // change LED brightness (0 - 255)
+        delay(100);
+    }
+    camera_fb_t *fb = esp_camera_fb_get();      // capture image
+    if (flashRequired){
+        delay(100);
+        brightLed(currentBrightness);            // change LED brightness back to previous state
+    }
+    if (!fb) if (serialDebug) Serial.println("Error: Camera capture failed");
+
+  // read image data
+    unsigned long dataSize = fb->width * fb->height;
+    unsigned long avrg = 0;
+    for (int i=0; i < dataSize; i++) {
+      avrg += fb->buf[i];
+    }
+    client.println("<br>Average pixel = " + String(avrg / dataSize));
+    
+  // close client connection
+    delay(3);
+    client.stop();
+
+  // change back to JPG
+    esp_camera_deinit();     // disable camera
+    delay(50);
+    imageFormat = 1;   // jpg
+    initialiseCamera(); 
+    esp_camera_fb_return(fb);                 // return camera frame buffer
+  }
+
+
+// ----------------------------------------------------------------
+//   -reboot web page requested        i.e. http://x.x.x.x/reboot
+// ----------------------------------------------------------------
+// note: this can fail if the esp has just been reflashed and not restarted
+
+void handleReboot(){
+
+      String message = "Rebooting....";
+      server.send(200, "text/plain", message);   // send reply as plain text
+
+      // rebooting
+        delay(500);          // give time to send the above html
+        ESP.restart();
+        delay(5000);         // restart fails without this delay
+}
 
 
 // ----------------------------------------------------------------
@@ -1664,24 +1688,6 @@ void handleTest() {
  sendFooter(client);     // close web page
 
 }  // handleTest
-
-
-// ----------------------------------------------------------------
-//   -reboot web page requested        i.e. http://x.x.x.x/reboot
-// ----------------------------------------------------------------
-// note: this can fail if the esp has just been reflashed and not restarted
-
-void handleReboot(){
-
-      String message = "Rebooting....";
-      server.send(200, "text/plain", message);   // send reply as plain text
-
-      // rebooting
-        delay(500);          // give time to send the above html
-        ESP.restart();
-        delay(5000);         // restart fails without this delay
-
-}
 
 
 // ******************************************************************************************************************
