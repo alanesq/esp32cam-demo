@@ -403,7 +403,7 @@ void loop() {
 //                        Initialise the camera
 // ----------------------------------------------------------------
 // returns TRUE if successful
-// custom: 
+// custom options: 
 //            1 = greyscale image format (defailt is JPG)
 
 bool initialiseCamera(int custom = 0) {
@@ -664,7 +664,7 @@ void resetCamera(bool type = 0) {
 //                    -change image resolution
 // ----------------------------------------------------------------
 // if required resolution not supplied it cycles through several
-// note: this stops PWM on the flash working for some reason
+//Note: there seems to be an issue with 1024x768 with later releases of esp software?
 void changeResolution(framesize_t tRes = FRAMESIZE_96X96) {
   esp_camera_deinit();     // disable camera
   delay(50);
@@ -1542,6 +1542,9 @@ void readGreyscaleImage() {
 
   WiFiClient client = server.client();                 // open link with client
 
+ // html header
+   sendHeader(client, "Access greyscale image data");  
+
   // change camera to greyscale mode  (as by default it is in JPG colour mode)
     esp_camera_deinit();     // disable camera
     delay(50);
@@ -1566,7 +1569,12 @@ void readGreyscaleImage() {
     for (int i=0; i < dataSize; i++) {     // Note: pixels x position = i % fb->width    y position = floor(i / fb->width)    
       avrg += fb->buf[i];
     }
-    client.println("<br>Greyscale Image: Average pixel = " + String(avrg / dataSize));
+    client.println("<br>Greyscale Image: The average brightness of the " + String(dataSize) + " pixels is " + String(avrg / dataSize));
+
+    client.write("<br><br><a href='/'>Return</a>\n");       // link back    
+
+  // close web page
+    sendFooter(client);    
     
   // close network client connection
     delay(3);
