@@ -54,34 +54,33 @@
 
 //   ---------------------------------------------------------------------------------------------------------
 
-/*
     // Required by PlatformIO
 
     #include <Arduino.h>
 
     // forward declarations
-      bool initialiseCamera();
+      bool initialiseCamera(int);
       bool cameraImageSettings();
       String localTime();
-      void flashLED(int reps);
+      void flashLED(int);
       byte storeImage();
       void handleRoot();
       void handlePhoto();
       bool handleImg();
       void handleNotFound();
       void readRGBImage();
-      bool getNTPtime(int sec);
+      bool getNTPtime(int);
       bool handleJPG(); 
-      bool handleJpeg();
+      void handleJpeg();
       void handleStream();
       int requestWebPage(String*, String*, int);
       void handleTest();
-      void brightLed(byte ledBrightness);
+      void brightLed(byte);
       void setupFlashPWM();
       void changeResolution(framesize_t);
       void handleData();
       void readGreyscaleImage();
-*/
+
 
 // ---------------------------------------------------------------
 //                           -SETTINGS
@@ -89,8 +88,6 @@
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
  char* sversion = "14oct23";                            // Sketch version
-
- int imageFormat = 1;                                   // default image format (1=JPG, 2=greyscale)
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
@@ -272,7 +269,7 @@ void setup() {
 
  // set up camera
      if (serialDebug) Serial.print(("\nInitialising camera: "));
-     if (initialiseCamera()) {
+     if (initialiseCamera(0)) {
        if (serialDebug) Serial.println("OK");
      }
      else {
@@ -406,8 +403,10 @@ void loop() {
 //                        Initialise the camera
 // ----------------------------------------------------------------
 // returns TRUE if successful
+// custom: 
+//            1 = greyscale image format (defailt is JPG)
 
-bool initialiseCamera() {
+bool initialiseCamera(int custom = 0) {
 
    camera_config_t config;
    config.ledc_channel = LEDC_CHANNEL_0;
@@ -429,13 +428,15 @@ bool initialiseCamera() {
    config.pin_pwdn = PWDN_GPIO_NUM;
    config.pin_reset = RESET_GPIO_NUM;
    config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
-   if (imageFormat == 1) config.pixel_format = PIXFORMAT_JPEG;        // colour jpg format
-   if (imageFormat == 2) config.pixel_format = PIXFORMAT_GRAYSCALE;        // greyscale format
-   config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA),
-                                                 //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA),
-                                                 //              1600x1200 (UXGA)
-   config.jpeg_quality = 12;                     // 0-63 lower number means higher quality (can cause failed image capture if set too low at higher resolutions)
-   config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
+   // image format 
+    if (custom == 1) config.pixel_format = PIXFORMAT_GRAYSCALE;        // greyscale format
+    else config.pixel_format = PIXFORMAT_JPEG;                         // colour jpg format
+  // image size
+    config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA),
+                                                  //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA),
+                                                  //              1600x1200 (UXGA)
+   config.jpeg_quality = 12;                      // 0-63 lower number means higher quality (can cause failed image capture if set too low at higher resolutions)
+   config.fb_count = 1;                           // if more than one, i2s runs in continuous mode. Use only with JPEG
 
    // check the esp32cam board has a psram chip installed (extra memory used for storing captured images)
    //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, SPIFFS must be enabled
@@ -454,7 +455,7 @@ bool initialiseCamera() {
      if (serialDebug) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
    }
 
-   cameraImageSettings();                        // apply custom camera settings
+   cameraImageSettings();                        // apply custom camera image settings
 
    return (camerr == ESP_OK);                    // return boolean result of camera initialisation
 }
@@ -649,12 +650,12 @@ void resetCamera(bool type = 0) {
       delay(300);
       digitalWrite(PWDN_GPIO_NUM, LOW);
       delay(300);
-      initialiseCamera();
+      initialiseCamera(0);
     } else {
     // reset via software (handy if you wish to change resolution or image type etc. - see test procedure)
       esp_camera_deinit();
       delay(50);
-      initialiseCamera();
+      initialiseCamera(0);
     }
 }
 
@@ -675,7 +676,7 @@ void changeResolution(framesize_t tRes = FRAMESIZE_96X96) {
   }
   FRAME_SIZE_IMAGE = tRes;
 
-  initialiseCamera();
+  initialiseCamera(0);
   if (serialDebug) Serial.println("Camera resolution changed to " + String(tRes));
   ImageResDetails = "Unknown";   // set next time image captured
 }
@@ -1544,8 +1545,7 @@ void readGreyscaleImage() {
   // change camera to greyscale mode  (as by default it is in JPG colour mode)
     esp_camera_deinit();     // disable camera
     delay(50);
-    imageFormat = 2;         // this is used in 'initialiseCamera()' (1=jpg, 2=greyscale)
-    initialiseCamera();      // restart the camera with new settings
+    initialiseCamera(1);      // restart the camera with greyscale custom setting (1)
 
   // capture the image and use flash if required
     int currentBrightness = brightLEDbrightness;
@@ -1563,10 +1563,10 @@ void readGreyscaleImage() {
   // read image data and calculate average pixel value (as demonstration of reading the image data)
     unsigned long dataSize = fb->width * fb->height;
     unsigned long avrg = 0;
-    for (int i=0; i < dataSize; i++) {
+    for (int i=0; i < dataSize; i++) {     // Note: pixels x position = i % fb->width    y position = floor(i / fb->width)    
       avrg += fb->buf[i];
     }
-    client.println("<br>Average pixel = " + String(avrg / dataSize));
+    client.println("<br>Greyscale Image: Average pixel = " + String(avrg / dataSize));
     
   // close network client connection
     delay(3);
@@ -1578,8 +1578,7 @@ void readGreyscaleImage() {
   // change camera back to JPG mode
     esp_camera_deinit();  
     delay(50);
-    imageFormat = 1; 
-    initialiseCamera(); 
+    initialiseCamera(0);    // default settings (0)
   }
 
 
