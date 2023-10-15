@@ -92,7 +92,7 @@ URLs:
 <br>http://x.x.x.x/stream        Show live streaming video
 <br>http://x.x.x.x/img           Show most recent image saved to sd card
 <br>http://x.x.x.x/img?img=1     Show image number 1 on sd card
-<br>http://x.x.x.x/rgb           Show how to capture a greyscale image and look at the raw data
+<br>http://x.x.x.x/greyscale     Show how to capture a greyscale image and look at the raw data
 <br>http://x.x.x.x/rgb           Captures an image and converts to RGB data (will not work with the highest 
                                  resolution images as there is not enough memory)
                                            
