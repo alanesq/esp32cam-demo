@@ -59,7 +59,7 @@
     #include <Arduino.h>
 
     // forward declarations
-      bool initialiseCamera(int);
+      bool initialiseCamera(bool);
       bool cameraImageSettings();
       void changeResolution(framesize_t);
       String localTime();
@@ -80,6 +80,7 @@
       void setupFlashPWM();
       void handleData();
       void readGreyscaleImage();
+      void resize_esp32cam_image_buffer(uint8_t*, int, int, uint8_t*, int, int);
 
 
 // ---------------------------------------------------------------
@@ -407,8 +408,9 @@ void loop() {
 // reset - if set to 1 all settings are reconfigured
 //         if set to zero you can change the settings and call this procedure to apply them
 
-bool initialiseCamera(int reset) {
+bool initialiseCamera(bool reset) {
 
+// set the camera parameters in 'config'
 if (reset) {
    config.ledc_channel = LEDC_CHANNEL_0;
    config.ledc_timer = LEDC_TIMER_0;
@@ -435,6 +437,7 @@ if (reset) {
                                                  //              1600x1200 (UXGA)
    config.jpeg_quality = 12;                     // 0-63 lower number means higher quality (can cause failed image capture if set too low at higher resolutions)
    config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
+}
 
    // check the esp32cam board has a psram chip installed (extra memory used for storing captured images)
    //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, SPIFFS must be enabled
@@ -442,7 +445,6 @@ if (reset) {
      if (serialDebug) Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
      config.frame_size = FRAMESIZE_CIF;
    }
-}
 
    //#if defined(CAMERA_MODEL_ESP_EYE)
    //  pinMode(13, INPUT_PULLUP);
@@ -454,7 +456,7 @@ if (reset) {
      if (serialDebug) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
    }
 
-   cameraImageSettings();                        // apply custom camera image settings
+   cameraImageSettings();                        // apply the camera image settings
 
    return (camerr == ESP_OK);                    // return boolean result of camera initialisation
 }
@@ -506,15 +508,15 @@ bool cameraImageSettings() {
 //    // more info on settings here: https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
 //    s->set_gain_ctrl(s, 0);                       // auto gain off (1 or 0)
 //    s->set_exposure_ctrl(s, 0);                   // auto exposure off (1 or 0)
-//    s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
-//    s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
-//    s->set_vflip(s, cameraImageInvert);           // Invert image (0 or 1)
+//    s->set_agc_gain(s, 1);                        // set gain manually (0 - 30)
+//    s->set_aec_value(s, 1);                       // set exposure manually  (0-1200)
+//    s->set_vflip(s, 1);                           // Invert image (0 or 1)
 //    s->set_quality(s, 10);                        // (0 - 63)
 //    s->set_gainceiling(s, GAINCEILING_32X);       // Image gain (GAINCEILING_x2, x4, x8, x16, x32, x64 or x128)
-//    s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
+//    s->set_brightness(s, 0);                      // (-2 to 2) - set brightness
 //    s->set_lenc(s, 1);                            // lens correction? (1 or 0)
 //    s->set_saturation(s, 0);                      // (-2 to 2)
-//    s->set_contrast(s, cameraImageContrast);      // (-2 to 2)
+//    s->set_contrast(s, 0);                        // (-2 to 2)
 //    s->set_sharpness(s, 0);                       // (-2 to 2)
 //    s->set_hmirror(s, 0);                         // (0 or 1) flip horizontally
 //    s->set_colorbar(s, 0);                        // (0 or 1) - show a testcard
@@ -942,8 +944,8 @@ void handleRoot() {
      client.write("<br><br>LINKS: \n");
      client.write("<a href='/photo'>Capture an image</a> - \n");
      client.write("<a href='/img'>View stored image</a> - \n");
-     client.write("<a href='/rgb'>Capture frame as RGB data</a> - \n");
-     client.write("<a href='/greydata'>Capture frame as data</a> - \n");
+     client.write("<a href='/rgb'>Capture frame and display as RGB data</a> - \n");
+     client.write("<a href='/greydata'>Capture Greyscale frame as data</a> - \n");
      client.write("<a href='/stream'>Live stream</a> - \n");
      client.write("<a href='/test'>Test procedure</a>\n");
 
@@ -953,7 +955,7 @@ void handleRoot() {
      }
 
     // capture and show a jpg image
-      client.write("<br><a href='/jpg'>");         // make it a link
+      client.write("<br><br><a href='/jpg'>");         // make it a link
       client.write("<img id='image1' src='/jpg' width='320' height='240' /> </a>");     // show image from http://x.x.x.x/jpg
 
     // javascript to refresh the image periodically
@@ -1534,6 +1536,38 @@ void handleJpeg() {
 
 
 // ----------------------------------------------------------------
+//                     resize greyscale image
+// ----------------------------------------------------------------
+//   src_buf: The source image buffer.
+//   src_width: The width of the source image buffer.
+//   src_height: The height of the source image buffer.
+//   dst_buf: The destination image buffer.
+//   dst_width: The width of the destination image buffer.
+//   dst_height: The height of the destination image buffer.
+void resize_esp32cam_image_buffer(uint8_t* src_buf, int src_width, int src_height,
+                                   uint8_t* dst_buf, int dst_width, int dst_height) {
+  // Calculate the horizontal and vertical resize ratios.
+  float h_ratio = (float)src_width / dst_width;
+  float v_ratio = (float)src_height / dst_height;
+
+  // Iterate over the destination image buffer and write the resized pixels.
+  for (int y = 0; y < dst_height; y++) {
+    for (int x = 0; x < dst_width; x++) {
+      // Calculate the source pixel coordinates.
+      int src_x = (int)(x * h_ratio);
+      int src_y = (int)(y * v_ratio);
+
+      // Read the source pixel value.
+      uint8_t src_pixel = src_buf[src_y * src_width + src_x];
+
+      // Write the resized pixel value to the destination image buffer.
+      dst_buf[y * dst_width + x] = src_pixel;
+    }
+  }
+}
+
+
+// ----------------------------------------------------------------
 //                  Capture greyscale image data
 // ----------------------------------------------------------------
 
@@ -1564,14 +1598,35 @@ void readGreyscaleImage() {
     if (!fb) client.println("Error: Camera image capture failed");
 
   // read image data and calculate average pixel value (as demonstration of reading the image data)
+  //      note:   image x = i % WIDTH, image y = floor(i / WIDTH)
     unsigned long dataSize = fb->width * fb->height;
     unsigned long avrg = 0;
-    for (int i=0; i < dataSize; i++) {     // Note: pixels x position = i % fb->width    y position = floor(i / fb->width)    
-      avrg += fb->buf[i];
+    for (int y=0; y < fb->height; y++) {
+      for (int x=0; x < fb->width; x++) {   
+        avrg += fb->buf[(y * fb->width) + x];
+      }
     }
     client.println("<br>Greyscale Image: The average brightness of the " + String(dataSize) + " pixels is " + String(avrg / dataSize));
-
     client.write("<br><br><a href='/'>Return</a>\n");       // link back    
+
+  // resize image
+    int newWidth = 64;   int newHeight = 32;
+    byte newBuf[newWidth * newHeight];
+    resize_esp32cam_image_buffer(fb->buf, fb->width, fb->height, newBuf, newWidth, newHeight);
+
+  // display image
+    char asciiArt[] = {'@','#','+','!',':','.',' '};       // dark to light characters
+    const int noAsciiChars = 7;                                // number of characters
+    client.write("<br><pre>");
+
+    for (int y=0; y < newHeight; y++) {
+      client.write("</pre><pre>");
+      for (int x=0; x < newWidth; x++) {   
+        int tpos = map(newBuf[y*newWidth+x],0,255,0,noAsciiChars-1);
+        client.write(asciiArt[tpos]);
+      }
+    }
+    client.write("<br></pre>");
 
   // close web page
     sendFooter(client);    
@@ -1660,6 +1715,11 @@ void handleTest() {
       ctx.font = "30px Arial";  ctx.fillText("Hello World", 50, imageHeight - 50);    // text
       ctx.stroke();
    </script>\n)=====");
+
+
+// // flip image horizontally
+//   sensor_t *s = esp_camera_sensor_get();
+//   s->set_hmirror(s, 1);
 
 
 /*
