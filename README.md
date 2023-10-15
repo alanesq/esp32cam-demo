@@ -47,6 +47,7 @@ I have tried to make the sketch as easy to follow/modify as possible with lots o
 as I found it quiet confusing as an ameteur trying to do much with this module and difficult to find easy to understand 
 examples/explanations of what I wanted to do, so I am publishing this sketch in the hope it will encourage/help others to have a 
 try with these powerful and VERY affordable modules.
+The greyscale procedure I think is the most interesting as it shows how to switch camera modes and process the raw data very well.
 BTW - For some examples of serving web pages with en ESP module you may like to have a look 
       at: https://github.com/alanesq/BasicWebserver/blob/master/misc/VeryBasicWebserver.ino
 
