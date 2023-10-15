@@ -61,6 +61,7 @@
     // forward declarations
       bool initialiseCamera(int);
       bool cameraImageSettings();
+      void changeResolution(framesize_t);
       String localTime();
       void flashLED(int);
       byte storeImage();
@@ -77,7 +78,6 @@
       void handleTest();
       void brightLed(byte);
       void setupFlashPWM();
-      void changeResolution(framesize_t);
       void handleData();
       void readGreyscaleImage();
 
@@ -87,7 +87,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "14oct23";                            // Sketch version
+ char* sversion = "15oct23";                            // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
@@ -125,6 +125,7 @@
 
  const int serialSpeed = 115200;                        // Serial data speed to use
 
+
 // camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
 // see: https://randomnerdtutorials.com/esp32-cam-camera-pin-gpios/
 // set camera resolution etc. in 'initialiseCamera()' and 'cameraImageSettings()'
@@ -145,7 +146,7 @@
  #define VSYNC_GPIO_NUM    25      // vsync_pin
  #define HREF_GPIO_NUM     23      // href_pin
  #define PCLK_GPIO_NUM     22      // pixel_clock_pin
-
+ camera_config_t config;           // camera settings
 
 
 // ******************************************************************************************************************
@@ -269,7 +270,7 @@ void setup() {
 
  // set up camera
      if (serialDebug) Serial.print(("\nInitialising camera: "));
-     if (initialiseCamera(0)) {
+     if (initialiseCamera(1)) {           // apply settings from 'config' and start camera
        if (serialDebug) Serial.println("OK");
      }
      else {
@@ -403,12 +404,12 @@ void loop() {
 //                        Initialise the camera
 // ----------------------------------------------------------------
 // returns TRUE if successful
-// custom options: 
-//            1 = greyscale image format (defailt is JPG)
+// reset - if set to 1 all settings are reconfigured
+//         if set to zero you can change the settings and call this procedure to apply them
 
-bool initialiseCamera(int custom = 0) {
+bool initialiseCamera(int reset) {
 
-   camera_config_t config;
+if (reset) {
    config.ledc_channel = LEDC_CHANNEL_0;
    config.ledc_timer = LEDC_TIMER_0;
    config.pin_d0 = Y2_GPIO_NUM;
@@ -428,15 +429,12 @@ bool initialiseCamera(int custom = 0) {
    config.pin_pwdn = PWDN_GPIO_NUM;
    config.pin_reset = RESET_GPIO_NUM;
    config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
-   // image format 
-    if (custom == 1) config.pixel_format = PIXFORMAT_GRAYSCALE;        // greyscale format
-    else config.pixel_format = PIXFORMAT_JPEG;                         // colour jpg format
-  // image size
-    config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA),
-                                                  //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA),
-                                                  //              1600x1200 (UXGA)
-   config.jpeg_quality = 12;                      // 0-63 lower number means higher quality (can cause failed image capture if set too low at higher resolutions)
-   config.fb_count = 1;                           // if more than one, i2s runs in continuous mode. Use only with JPEG
+   config.pixel_format = PIXFORMAT_JPEG;                         // colour jpg format
+   config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA),
+                                                 //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA),
+                                                 //              1600x1200 (UXGA)
+   config.jpeg_quality = 12;                     // 0-63 lower number means higher quality (can cause failed image capture if set too low at higher resolutions)
+   config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
 
    // check the esp32cam board has a psram chip installed (extra memory used for storing captured images)
    //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, SPIFFS must be enabled
@@ -444,6 +442,7 @@ bool initialiseCamera(int custom = 0) {
      if (serialDebug) Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
      config.frame_size = FRAMESIZE_CIF;
    }
+}
 
    //#if defined(CAMERA_MODEL_ESP_EYE)
    //  pinMode(13, INPUT_PULLUP);
@@ -541,7 +540,6 @@ void setupFlashPWM() {
     brightLed(brightLEDbrightness);
 }
 
-
 // change illumination LED brightness
  void brightLed(byte ledBrightness){
    brightLEDbrightness = ledBrightness;    // store setting
@@ -551,7 +549,7 @@ void setupFlashPWM() {
 
 
 // ----------------------------------------------------------------
-//          returns the current real time as a String
+//             returns the current time as a String
 // ----------------------------------------------------------------
 //   see: https://randomnerdtutorials.com/esp32-date-time-ntp-client-server-arduino/
 String localTime() {
@@ -650,12 +648,12 @@ void resetCamera(bool type = 0) {
       delay(300);
       digitalWrite(PWDN_GPIO_NUM, LOW);
       delay(300);
-      initialiseCamera(0);
+      initialiseCamera(1);
     } else {
     // reset via software (handy if you wish to change resolution or image type etc. - see test procedure)
       esp_camera_deinit();
       delay(50);
-      initialiseCamera(0);
+      initialiseCamera(1);
     }
 }
 
@@ -676,7 +674,7 @@ void changeResolution(framesize_t tRes = FRAMESIZE_96X96) {
   }
   FRAME_SIZE_IMAGE = tRes;
 
-  initialiseCamera(0);
+  initialiseCamera(1);
   if (serialDebug) Serial.println("Camera resolution changed to " + String(tRes));
   ImageResDetails = "Unknown";   // set next time image captured
 }
@@ -944,7 +942,8 @@ void handleRoot() {
      client.write("<br><br>LINKS: \n");
      client.write("<a href='/photo'>Capture an image</a> - \n");
      client.write("<a href='/img'>View stored image</a> - \n");
-     client.write("<a href='/rgb'>Capture Image as raw RGB data</a> - \n");
+     client.write("<a href='/rgb'>Capture frame as RGB data</a> - \n");
+     client.write("<a href='/greydata'>Capture frame as data</a> - \n");
      client.write("<a href='/stream'>Live stream</a> - \n");
      client.write("<a href='/test'>Test procedure</a>\n");
 
@@ -1546,9 +1545,10 @@ void readGreyscaleImage() {
    sendHeader(client, "Access greyscale image data");  
 
   // change camera to greyscale mode  (as by default it is in JPG colour mode)
-    esp_camera_deinit();     // disable camera
+    esp_camera_deinit();                           // disable camera
     delay(50);
-    initialiseCamera(1);      // restart the camera with greyscale custom setting (1)
+    config.pixel_format = PIXFORMAT_GRAYSCALE;     // change camera setting to greyscale (default is JPG)
+    initialiseCamera(0);                           // restart the camera without resetting the camera settings
 
   // capture the image and use flash if required
     int currentBrightness = brightLEDbrightness;
@@ -1586,7 +1586,7 @@ void readGreyscaleImage() {
   // change camera back to JPG mode
     esp_camera_deinit();  
     delay(50);
-    initialiseCamera(0);    // default settings (0)
+    initialiseCamera(1);    // reset settings 
   }
 
 
