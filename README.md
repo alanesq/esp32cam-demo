@@ -1,6 +1,4 @@
 
-Note: I seem to have having trouble with XGA with more recent versions (i.e. 1024x768)
-      
 ## ESP32Cam-demo sketch for use with the Arduino IDE or PlatformIO
 
 I show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it - I am not a professional programmer so am sure there is plenty of room for improvement...
@@ -37,9 +35,10 @@ It looks like the esp32cam suplied with them are not standard and have one of th
 So on esp32cam modules without this feature you have to plug the USB in whilst holding the program button to upload a sketch 
 I find I have to use the lowest serial upload speed or it fails (Select 'ESP32 dev module' in the Arduino IDE to have the option and 
 make sure PSRam is enabled). 
-There is also now a esp32cam with built in USB available called the "ESP32-CAM-CH340".
-The wifi is very poor whilst in the motherboard (I find this happens if you have something near the antenna on the esp32cam modules) 
+The wifi can be very poor whilst in the motherboard (I find this happens if you have something near the antenna on the esp32cam modules) 
 but if I rest my thumb above the antenna I find the signal works ok).  
+There is also now a esp32cam with built in USB available called the "ESP32-CAM-CH340" which has built in USB this also seems to struggle 
+with Wifi in a similar way.  
 Many of the ebay listing include an external antenna and I would suggest this would b a good option if ordering one.  
 So they are far from perfect but still for the price I think well worth having.
 
