@@ -11,6 +11,7 @@
 *        flash led is still available for use (pin 4) and does not flash when accessing sd card
 *        Stores image in Spiffs if no sd card present
 *        PWM control of the illumination/flash LED
+*        Shows how to read the raw image data (greyscale and RGB)
 *
 *     GPIO:
 *        You can use io pins 13 and 12 for input or output (but 12 must not be high at boot)
@@ -1610,22 +1611,22 @@ void readGreyscaleImage() {
         avrg += fb->buf[(y * fb->width) + x];
       }
     }
-    client.println("<br>Greyscale Image: The average brightness of the " + String(dataSize) + " pixels is " + String(avrg / dataSize));
+    client.println("Greyscale Image: The average brightness of the " + String(dataSize) + " pixels is " + String(avrg / dataSize));
     client.write("<br><br><a href='/'>Return</a>\n");       // link back    
 
   // resize the image
-    int newWidth = 100;   int newHeight = 21;
+    int newWidth = 100;   int newHeight = 36;
     byte newBuf[newWidth * newHeight];
     resize_esp32cam_image_buffer(fb->buf, fb->width, fb->height, newBuf, newWidth, newHeight);
 
   // display image as asciiArt
     char asciiArt[] = {' ','.',',',':',';','+','*','?','%','S','#','@'};   // characters to use (light to dark)
     int noAsciiChars = sizeof(asciiArt) / sizeof(asciiArt[0]);             // number of characters available
-    client.write("<br><pre>");
+    client.write("<br><pre>");                                             // 'pre' stops variable character spacing
     for (int y=0; y < newHeight; y++) {
-      client.write("</pre><pre>");
+      client.write("</pre><pre style='line-height: 0.2;'>");               // 'line-heigh' adjusts spacing between lines
       for (int x=0; x < newWidth; x++) {   
-        int tpos = map(newBuf[y*newWidth+x],0,255,0,noAsciiChars-1);
+        int tpos = map(newBuf[y*newWidth+x],0,255,0,noAsciiChars-1);       // convert pixel brightness to ascii character
         client.write(asciiArt[noAsciiChars - tpos]);
       }
     }
