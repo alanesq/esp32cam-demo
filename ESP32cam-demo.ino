@@ -88,7 +88,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "15oct23";                            // Sketch version
+ char* sversion = "16oct23";                            // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
@@ -942,11 +942,14 @@ void handleRoot() {
 
    // links to the other pages available
      client.write("<br><br>LINKS: \n");
-     client.write("<a href='/photo'>Capture an image</a> - \n");
+     client.write("<a href='/photo'>Store image</a> - \n");
      client.write("<a href='/img'>View stored image</a> - \n");
-     client.write("<a href='/rgb'>Capture frame and display as RGB data</a> - \n");
-     client.write("<a href='/greydata'>Capture Greyscale frame as data</a> - \n");
+     client.write("<a href='/rgb'>RGB frame as data</a> - \n");
+     client.write("<a href='/greydata'>Greyscale frame as data</a> \n");
+     client.write("<br>");
      client.write("<a href='/stream'>Live stream</a> - \n");
+     client.write("<a href='/jpg'>JPG</a> - \n");
+     client.write("<a href='/jpeg'>Updating JPG</a> - \n");
      client.write("<a href='/test'>Test procedure</a>\n");
 
     // addnl info if sd card present
@@ -1538,6 +1541,7 @@ void handleJpeg() {
 // ----------------------------------------------------------------
 //                     resize greyscale image
 // ----------------------------------------------------------------
+// Thanks to Bard A.I. for writing this for me ;-)
 //   src_buf: The source image buffer.
 //   src_width: The width of the source image buffer.
 //   src_height: The height of the source image buffer.
@@ -1575,14 +1579,14 @@ void readGreyscaleImage() {
 
   WiFiClient client = server.client();                 // open link with client
 
- // html header
+  // html header
    sendHeader(client, "Access greyscale image data");  
 
-  // change camera to greyscale mode  (as by default it is in JPG colour mode)
+  // change camera to greyscale mode  (by default it is in JPG colour mode)
     esp_camera_deinit();                           // disable camera
     delay(50);
     config.pixel_format = PIXFORMAT_GRAYSCALE;     // change camera setting to greyscale (default is JPG)
-    initialiseCamera(0);                           // restart the camera without resetting the camera settings
+    initialiseCamera(0);                           // restart the camera (0 = without resetting all the other camera settings)
 
   // capture the image and use flash if required
     int currentBrightness = brightLEDbrightness;
@@ -1609,21 +1613,20 @@ void readGreyscaleImage() {
     client.println("<br>Greyscale Image: The average brightness of the " + String(dataSize) + " pixels is " + String(avrg / dataSize));
     client.write("<br><br><a href='/'>Return</a>\n");       // link back    
 
-  // resize image
-    int newWidth = 64;   int newHeight = 32;
+  // resize the image
+    int newWidth = 100;   int newHeight = 21;
     byte newBuf[newWidth * newHeight];
     resize_esp32cam_image_buffer(fb->buf, fb->width, fb->height, newBuf, newWidth, newHeight);
 
-  // display image
-    char asciiArt[] = {'@','#','+','!',':','.',' '};       // dark to light characters
-    const int noAsciiChars = 7;                                // number of characters
+  // display image as asciiArt
+    char asciiArt[] = {' ','.',',',':',';','+','*','?','%','S','#','@'};   // characters to use (light to dark)
+    int noAsciiChars = sizeof(asciiArt) / sizeof(asciiArt[0]);             // number of characters available
     client.write("<br><pre>");
-
     for (int y=0; y < newHeight; y++) {
       client.write("</pre><pre>");
       for (int x=0; x < newWidth; x++) {   
         int tpos = map(newBuf[y*newWidth+x],0,255,0,noAsciiChars-1);
-        client.write(asciiArt[tpos]);
+        client.write(asciiArt[noAsciiChars - tpos]);
       }
     }
     client.write("<br></pre>");
@@ -1641,7 +1644,7 @@ void readGreyscaleImage() {
   // change camera back to JPG mode
     esp_camera_deinit();  
     delay(50);
-    initialiseCamera(1);    // reset settings 
+    initialiseCamera(1);    // reset settings (1=apply the cameras settings which includes JPG mode)
   }
 
 
