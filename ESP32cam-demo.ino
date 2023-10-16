@@ -101,8 +101,9 @@
  #define useMCP23017 0                                  // set if MCP23017 IO expander chip is being used (on pins 12 and 13)
 
  // Camera related
-   bool flashRequired = 1;                              // If flash to be used when capturing image (1 = yes)
-   framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_SVGA;       // Image resolution:
+   bool flashRequired = 0;                              // If flash to be used when capturing image (1 = yes)
+   const framesize_t cyclingRes[] = { FRAMESIZE_VGA, FRAMESIZE_SVGA, FRAMESIZE_XGA, FRAMESIZE_SXGA, FRAMESIZE_QVGA };    // resolutions to use
+                                                        // Image resolutions available:
                                                         //               default = "const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA"
                                                         //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA),
                                                         //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA),
@@ -156,6 +157,7 @@
 
 //#include "esp_camera.h"         // https://github.com/espressif/esp32-camera
 // #include "camera_pins.h"
+framesize_t FRAME_SIZE_IMAGE = cyclingRes[0];
 #include <WString.h>            // this is required for base64.h otherwise get errors with esp32 core 1.0.6 - jan23
 #include <base64.h>             // for encoding buffer to display image on page
 #include <WiFi.h>
@@ -664,21 +666,23 @@ void resetCamera(bool type = 0) {
 // ----------------------------------------------------------------
 //                    -change image resolution
 // ----------------------------------------------------------------
-// if required resolution not supplied it cycles through several
+// cycles through the available resolutions (set in cyclingRes[])
 //Note: there seems to be an issue with 1024x768 with later releases of esp software?
-void changeResolution(framesize_t tRes = FRAMESIZE_96X96) {
+// Resolutions:  160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA),
+//               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA),
+//               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
+void changeResolution() {
+  //  const framesize_t cyclingRes[] = { FRAMESIZE_QVGA, FRAMESIZE_VGA, FRAMESIZE_SVGA, FRAMESIZE_XGA, FRAMESIZE_SXGA };    // resolutions to cycle through
+  const int noAvail = sizeof(cyclingRes) / sizeof(cyclingRes[0]);
+  static int currentRes = 0;  
   esp_camera_deinit();     // disable camera
-  delay(50);
-  if (tRes == FRAMESIZE_96X96) {      // taken as none supplied so cycle through several
-    if (FRAME_SIZE_IMAGE == FRAMESIZE_QVGA) tRes = FRAMESIZE_VGA;
-    else if (FRAME_SIZE_IMAGE == FRAMESIZE_VGA) tRes = FRAMESIZE_SVGA;
-    else if (FRAME_SIZE_IMAGE == FRAMESIZE_SVGA) tRes = FRAMESIZE_SXGA;
-    else tRes = FRAMESIZE_QVGA;
-  }
-  FRAME_SIZE_IMAGE = tRes;
+  delay(200);
+  currentRes++;                               // change to next resolution available
+  if (currentRes >= noAvail) currentRes=0;    // reset loop
+  FRAME_SIZE_IMAGE = cyclingRes[currentRes];
 
   initialiseCamera(1);
-  if (serialDebug) Serial.println("Camera resolution changed to " + String(tRes));
+  if (serialDebug) Serial.println("Camera resolution changed to " + String(cyclingRes[currentRes]));
   ImageResDetails = "Unknown";   // set next time image captured
 }
 
