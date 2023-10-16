@@ -11,7 +11,10 @@
 *        flash led is still available for use (pin 4) and does not flash when accessing sd card
 *        Stores image in Spiffs if no sd card present
 *        PWM control of the illumination/flash LED
-*        Shows how to read the raw image data (greyscale and RGB)
+* 
+*     If ota.h file is in the sketch folder you can enable OTA updating of this sketch by setting '#define ENABLE_OTA 1'
+*        in settings section.  You can then update the sketch with a BIN file via OTA by accessing page   http://x.x.x.x/ota
+*        This can make updating the sketch more convenient, especially if you have installed the camera in a case etc.
 *
 *     GPIO:
 *        You can use io pins 13 and 12 for input or output (but 12 must not be high at boot)
@@ -59,10 +62,10 @@
 
     #include <Arduino.h>
 
-    // forward declarations (this is a list of all procedures in this sketch which Platform IO requires)
+    // forward declarations
       bool initialiseCamera(bool);            // this sets up and enables the camera (if bool=1 standard settings are applied but 0 allows you to apply custom settings)
       bool cameraImageSettings();             // this applies the image settings to the camera (brightness etc.)
-      void changeResolution(framesize_t);     // this changes the capture frame size
+      void changeResolution();                // this changes the capture frame size
       String localTime();                     // returns the current time as a String
       void flashLED(int);                     // flashes the onboard indicator led
       byte storeImage();                      // stores an image in Spiffs or SD card
@@ -91,6 +94,9 @@
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
  char* sversion = "16oct23";                            // Sketch version
 
+ #define ENABLE_OTA 0                                   // If OTA updating of this sketch is enabled (requires ota.h)
+ const String OTAPassword = "password";                 // Password reuired to enable OTA (supplied as - http://<ip address>?pwd=xxxx )
+
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
  uint16_t dataRefresh = 2;                              // how often to refresh data on root web page (seconds)
@@ -111,6 +117,7 @@
    int cameraImageExposure = 0;                         // Camera exposure (0 - 1200)   If gain and exposure both set to zero then auto adjust is enabled
    int cameraImageGain = 0;                             // Image gain (0 - 30)
    int cameraImageBrightness = 0;                       // Image brightness (-2 to +2)
+   const int camChangeDelay = 200;                      // delay when deinit camera executed
 
  const int TimeBetweenStatus = 600;                     // speed of flashing system running ok status light (milliseconds)
 
@@ -204,6 +211,13 @@ WebServer server(80);           // serve web pages on port 80
  String spiffsFilename = "/image.jpg";     // image name to use when storing in spiffs
  String ImageResDetails = "Unknown";       // image resolution info
 
+#if ENABLE_OTA
+  // OTA Stuff
+    void sendHeader(WiFiClient &client, char* hTitle);      // forward declarations
+    void sendFooter(WiFiClient &client);
+    bool OTAEnabled = 0;                   // flag to show if OTA has been enabled (via supply of password in http://x.x.x.x/ota)
+    #include "ota.h"                       // Over The Air updates (OTA)
+#endif
 
 // ---------------------------------------------------------------
 //    -SETUP     SETUP     SETUP     SETUP     SETUP     SETUP
@@ -261,6 +275,9 @@ void setup() {
    server.on("/test", handleTest);               // Testing procedure
    server.on("/reboot", handleReboot);           // restart device
    server.onNotFound(handleNotFound);            // invalid url requested
+#if ENABLE_OTA   
+  server.on("/ota", handleOTA);                 // ota updates web page
+#endif  
 
  // NTP - internet time
    if (serialDebug) Serial.println("\nGetting real time (NTP)");
@@ -657,7 +674,7 @@ void resetCamera(bool type = 0) {
     } else {
     // reset via software (handy if you wish to change resolution or image type etc. - see test procedure)
       esp_camera_deinit();
-      delay(50);
+      delay(camChangeDelay);
       initialiseCamera(1);
     }
 }
@@ -676,7 +693,7 @@ void changeResolution() {
   const int noAvail = sizeof(cyclingRes) / sizeof(cyclingRes[0]);
   static int currentRes = 0;  
   esp_camera_deinit();     // disable camera
-  delay(200);
+  delay(camChangeDelay);
   currentRes++;                               // change to next resolution available
   if (currentRes >= noAvail) currentRes=0;    // reset loop
   FRAME_SIZE_IMAGE = cyclingRes[currentRes];
@@ -928,6 +945,9 @@ void handleRoot() {
 //    // touch input on the two gpio pins
 //      client.printf("<p>Touch on pin 12: %d </p>\n", touchRead(T5) );
 //      client.printf("<p>Touch on pin 13: %d </p>\n", touchRead(T4) );
+
+   // OTA
+      if (OTAEnabled) client.write("<br>OTA IS ENABLED!"); 
 
    // Control buttons
      client.write("<br><br>");
@@ -1589,7 +1609,7 @@ void readGreyscaleImage() {
 
   // change camera to greyscale mode  (by default it is in JPG colour mode)
     esp_camera_deinit();                           // disable camera
-    delay(50);
+    delay(camChangeDelay);
     config.pixel_format = PIXFORMAT_GRAYSCALE;     // change camera setting to greyscale (default is JPG)
     initialiseCamera(0);                           // restart the camera (0 = without resetting all the other camera settings)
 
@@ -1648,7 +1668,7 @@ void readGreyscaleImage() {
 
   // change camera back to JPG mode
     esp_camera_deinit();  
-    delay(50);
+    delay(camChangeDelay);
     initialiseCamera(1);    // reset settings (1=apply the cameras settings which includes JPG mode)
   }
 
