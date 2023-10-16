@@ -58,29 +58,29 @@
 
     #include <Arduino.h>
 
-    // forward declarations
-      bool initialiseCamera(bool);
-      bool cameraImageSettings();
-      void changeResolution(framesize_t);
-      String localTime();
-      void flashLED(int);
-      byte storeImage();
-      void handleRoot();
-      void handlePhoto();
-      bool handleImg();
-      void handleNotFound();
-      void readRGBImage();
-      bool getNTPtime(int);
-      bool handleJPG(); 
-      void handleJpeg();
-      void handleStream();
-      int requestWebPage(String*, String*, int);
-      void handleTest();
-      void brightLed(byte);
-      void setupFlashPWM();
-      void handleData();
-      void readGreyscaleImage();
-      void resize_esp32cam_image_buffer(uint8_t*, int, int, uint8_t*, int, int);
+    // forward declarations (this is a list of all procedures in this sketch which Platform IO requires)
+      bool initialiseCamera(bool);            // this sets up and enables the camera (if bool=1 standard settings are applied but 0 allows you to apply custom settings)
+      bool cameraImageSettings();             // this applies the image settings to the camera (brightness etc.)
+      void changeResolution(framesize_t);     // this changes the capture frame size
+      String localTime();                     // returns the current time as a String
+      void flashLED(int);                     // flashes the onboard indicator led
+      byte storeImage();                      // stores an image in Spiffs or SD card
+      void handleRoot();                      // the root web page
+      void handlePhoto();                     // web page to capture an image from camera and save to spiffs or sd card
+      bool handleImg();                       // Display a previously stored image 
+      void handleNotFound();                  // if invalid web page is requested
+      void readRGBImage();                    // demo capturing an image and reading its raw RGB data
+      bool getNTPtime(int);                   // handle the NTP real time clock
+      bool handleJPG();                       // display a raw jpg image
+      void handleJpeg();                      // display a raw jpg image which periodically refreshes
+      void handleStream();                    // stream live video (note: this can get the camera very hot)
+      int requestWebPage(String*, String*, int);  // procedure allowing the sketch to read a web page its self
+      void handleTest();                      // test procedure for experimenting with bits of code etc.
+      void brightLed(byte);                   // turn the onboard flash LED on/off with varying brightness
+      void setupFlashPWM();                   // set up the PWM for the above flash
+      void handleData();                      // the root web page requests this periodically via Javascript in order to display updating information
+      void readGreyscaleImage();              // demo capturing a greyscale image and reading its raw RGB data
+      void resize_esp32cam_image_buffer(uint8_t*, int, int, uint8_t*, int, int);    // this resizes a captured greyscale image (used by above)
 
 
 // ---------------------------------------------------------------
