@@ -3,7 +3,10 @@
 
 I show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it - I am not a professional programmer so am sure there is plenty of room for improvement...
 <br>It is just a collection of all I have discovered/learned in the process of using them myself<br><br>
-Note: This sketch now has the facilty for OTA updates over the network, you need to copy the file ota.h in to your sketch folder and enable it in settings (#define ENABLE_OTA 1)<br>
+Note: This sketch now has the facilty for OTA updates over the network, you need to copy the file ota.h in to your sketch folder and enable it in settings (#define ENABLE_OTA 1)
+<br><br>If you have issues with the camera keep stopping working I have had a couple of these with dodgy camera modules so it is worth trying another one to see if this is the 
+source of your problems.
+<br>
 
 <table><tr>
   <td><img src="/images/root.png" /></td>
