@@ -102,7 +102,7 @@
 
  // Camera related
    bool flashRequired = 0;                              // If flash to be used when capturing image (1 = yes)
-   const framesize_t cyclingRes[] = { FRAMESIZE_VGA, FRAMESIZE_SVGA, FRAMESIZE_XGA, FRAMESIZE_SXGA, FRAMESIZE_QVGA };    // resolutions to use
+   const framesize_t cyclingRes[] = { FRAMESIZE_SVGA, FRAMESIZE_XGA, FRAMESIZE_SXGA, FRAMESIZE_QVGA, FRAMESIZE_VGA };    // resolutions to use
                                                         // Image resolutions available:
                                                         //               default = "const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA"
                                                         //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA),
