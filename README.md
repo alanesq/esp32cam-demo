@@ -10,6 +10,7 @@ Note: There is a version of this sketch with OTA updates included here: https://
 <table><tr>
   <td><img src="/images/root.png" /></td>
   <td><img src="/images/rgb.png" /></td>
+  <td><img src="/images/grey.png" /></td>
 </tr></table> 
 
 This can be used as a starting point sketch for projects using the esp32cam development board, it has the following features.
