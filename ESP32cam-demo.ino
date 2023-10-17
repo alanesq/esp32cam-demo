@@ -1612,6 +1612,7 @@ void readGreyscaleImage() {
     delay(camChangeDelay);
     config.pixel_format = PIXFORMAT_GRAYSCALE;     // change camera setting to greyscale (default is JPG)
     initialiseCamera(0);                           // restart the camera (0 = without resetting all the other camera settings)
+    cameraImageSettings();
 
   // capture the image and use flash if required
     int currentBrightness = brightLEDbrightness;
@@ -1637,26 +1638,26 @@ void readGreyscaleImage() {
         if (pixelVal < minV) minV = pixelVal;
       }
     }
-    client.println("Greyscale Image: The highest value pixel is " + String(maxV) + ", the lowest is " + String(minV));
+    client.println("Greyscale Image: The lowest value pixel is " + String(minV) + ", the highest is " + String(maxV));
     client.write("<br><br><a href='/'>Return</a>\n");       // link back    
 
   // resize the image
-    int newWidth = 110;   int newHeight = 38;         // 100x36
+    int newWidth = 115;   int newHeight = 42;         // much bigger than this seems to cause problems, probably a memory issue?
     byte newBuf[newWidth * newHeight];
     resize_esp32cam_image_buffer(fb->buf, fb->width, fb->height, newBuf, newWidth, newHeight);
 
   // display image as asciiArt
-    char asciiArt[] = {'@','#','S','%','?','*','+',';',':',',','.'};           // characters to use 
+    char asciiArt[] = {'@','#','S','%','?','*','+',';',':',',','.',' '};       // characters to use 
     int noAsciiChars = sizeof(asciiArt) / sizeof(asciiArt[0]);                 // number of characters available
-    client.write("<br><pre>");                                                 // 'pre' stops variable character spacing
+    client.write("<br><pre style='line-height: 1.1;'>");                       // 'pre' stops variable character spacing, 'line-heigh' adjusts spacing between lines - 0.2
     for (int y=0; y < newHeight; y++) {
-      client.write("</pre><pre style='line-height: 0.15;'>");                  // 'line-heigh' adjusts spacing between lines - 0.2
+      client.write("\n");                                                      // new line
       for (int x=0; x < newWidth; x++) {   
         int tpos = map(newBuf[y*newWidth+x], minV, maxV, 0, noAsciiChars - 1); // convert pixel brightness to ascii character
         client.write(asciiArt[tpos]);   
       }
     }
-    client.write("<br></pre>");
+    client.write("</pre><br>");
 
   // close web page
     sendFooter(client);    
