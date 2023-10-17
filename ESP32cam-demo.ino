@@ -976,6 +976,9 @@ void handleRoot() {
      client.write("<a href='/jpg'>JPG</a> - \n");
      client.write("<a href='/jpeg'>Updating JPG</a> - \n");
      client.write("<a href='/test'>Test procedure</a>\n");
+     #if ENABLE_OTA
+        client.write(" - <a href='/ota'>Update via OTA</a>\n");
+     #endif 
 
     // addnl info if sd card present
      if (sdcardPresent) {
