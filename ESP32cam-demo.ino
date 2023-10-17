@@ -92,7 +92,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "16oct23";                            // Sketch version
+ char* sversion = "17oct23";                            // Sketch version
 
  #define ENABLE_OTA 0                                   // If OTA updating of this sketch is enabled (requires ota.h)
  const String OTAPassword = "password";                 // Password reuired to enable OTA (supplied as - http://<ip address>?pwd=xxxx )
@@ -1629,29 +1629,31 @@ void readGreyscaleImage() {
   // read image data and calculate average pixel value (as demonstration of reading the image data)
   //      note:   image x = i % WIDTH, image y = floor(i / WIDTH)
     unsigned long dataSize = fb->width * fb->height;
-    unsigned long avrg = 0;
+    byte minV=255; byte maxV=0;
     for (int y=0; y < fb->height; y++) {
       for (int x=0; x < fb->width; x++) {   
-        avrg += fb->buf[(y * fb->width) + x];
+        byte pixelVal = fb->buf[(y * fb->width) + x];
+        if (pixelVal > maxV) maxV = pixelVal;
+        if (pixelVal < minV) minV = pixelVal;
       }
     }
-    client.println("Greyscale Image: The average brightness of the " + String(dataSize) + " pixels is " + String(avrg / dataSize));
+    client.println("Greyscale Image: The highest value pixel is " + String(maxV) + ", the lowest is " + String(minV));
     client.write("<br><br><a href='/'>Return</a>\n");       // link back    
 
   // resize the image
-    int newWidth = 100;   int newHeight = 36;
+    int newWidth = 110;   int newHeight = 38;         // 100x36
     byte newBuf[newWidth * newHeight];
     resize_esp32cam_image_buffer(fb->buf, fb->width, fb->height, newBuf, newWidth, newHeight);
 
   // display image as asciiArt
-    char asciiArt[] = {' ','.',',',':',';','+','*','?','%','S','#','@'};   // characters to use (light to dark)
-    int noAsciiChars = sizeof(asciiArt) / sizeof(asciiArt[0]);             // number of characters available
-    client.write("<br><pre>");                                             // 'pre' stops variable character spacing
+    char asciiArt[] = {'@','#','S','%','?','*','+',';',':',',','.'};           // characters to use 
+    int noAsciiChars = sizeof(asciiArt) / sizeof(asciiArt[0]);                 // number of characters available
+    client.write("<br><pre>");                                                 // 'pre' stops variable character spacing
     for (int y=0; y < newHeight; y++) {
-      client.write("</pre><pre style='line-height: 0.2;'>");               // 'line-heigh' adjusts spacing between lines
+      client.write("</pre><pre style='line-height: 0.15;'>");                  // 'line-heigh' adjusts spacing between lines - 0.2
       for (int x=0; x < newWidth; x++) {   
-        int tpos = map(newBuf[y*newWidth+x],0,255,0,noAsciiChars-1);       // convert pixel brightness to ascii character
-        client.write(asciiArt[noAsciiChars - tpos]);
+        int tpos = map(newBuf[y*newWidth+x], minV, maxV, 0, noAsciiChars - 1); // convert pixel brightness to ascii character
+        client.write(asciiArt[tpos]);   
       }
     }
     client.write("<br></pre>");
