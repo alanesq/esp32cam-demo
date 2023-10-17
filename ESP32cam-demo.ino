@@ -211,13 +211,14 @@ WebServer server(80);           // serve web pages on port 80
  String spiffsFilename = "/image.jpg";     // image name to use when storing in spiffs
  String ImageResDetails = "Unknown";       // image resolution info
 
-#if ENABLE_OTA
-  // OTA Stuff
-    void sendHeader(WiFiClient &client, char* hTitle);      // forward declarations
-    void sendFooter(WiFiClient &client);
-    bool OTAEnabled = 0;                   // flag to show if OTA has been enabled (via supply of password in http://x.x.x.x/ota)
-    #include "ota.h"                       // Over The Air updates (OTA)
-#endif
+// OTA Stuff
+  bool OTAEnabled = 0;                   // flag to show if OTA has been enabled (via supply of password in http://x.x.x.x/ota)
+  #if ENABLE_OTA
+      void sendHeader(WiFiClient &client, char* hTitle);      // forward declarations
+      void sendFooter(WiFiClient &client);
+      #include "ota.h"                       // Over The Air updates (OTA)
+  #endif
+
 
 // ---------------------------------------------------------------
 //    -SETUP     SETUP     SETUP     SETUP     SETUP     SETUP
