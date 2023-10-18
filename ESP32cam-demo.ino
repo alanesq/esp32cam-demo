@@ -42,25 +42,41 @@
 *******************************************************************************************************************/
 
 #if !defined ESP32
- #error This sketch is only for an ESP32Cam module
+ #error This sketch is only for an ESP32 Camera module
 #endif
 
 #include "esp_camera.h"         // https://github.com/espressif/esp32-camera
+#include <Arduino.h>
+#include "wifiSettings.h" 
+
 
 //   ---------------------------------------------------------------------------------------------------------
 
 
-//         Enter your Wifi Settings here
 
-  #define SSID_NAME "<wifi name>"
-  #define SSID_PASWORD "<wifi password>"
+//                          ====================================== 
+//                                   Enter your wifi settings
+//                          ====================================== 
+
+
+            /*                // delete this line //
+
+
+                        #define SSID_NAME "<WIFI SSID>"
+                        
+                        #define SSID_PASWORD "<WIFI PASSWORD>"
+                        
+                        #define ENABLE_OTA 0                         // If OTA updating of this sketch is enabled (requires ota.h file)
+                        const String OTAPassword = "password";       // Password for performing OTA update (i.e. http://x.x.x.x/ota)
+
+
+
+            */                // delete this line //
 
 
 //   ---------------------------------------------------------------------------------------------------------
 
     // Required by PlatformIO
-
-    #include <Arduino.h>
 
     // forward declarations
       bool initialiseCamera(bool);            // this sets up and enables the camera (if bool=1 standard settings are applied but 0 allows you to apply custom settings)
@@ -92,10 +108,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "17oct23";                            // Sketch version
-
- #define ENABLE_OTA 0                                   // If OTA updating of this sketch is enabled (requires ota.h)
- const String OTAPassword = "password";                 // Password reuired to enable OTA (supplied as - http://<ip address>?pwd=xxxx )
+ char* sversion = "18oct23";                            // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
@@ -111,7 +124,7 @@
    const framesize_t cyclingRes[] = { FRAMESIZE_SVGA, FRAMESIZE_XGA, FRAMESIZE_SXGA, FRAMESIZE_QVGA, FRAMESIZE_VGA };    // resolutions to use
                                                         // Image resolutions available:
                                                         //               default = "const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA"
-                                                        //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA),
+                                                        //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 240X240,
                                                         //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA),
                                                         //               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
    int cameraImageExposure = 0;                         // Camera exposure (0 - 1200)   If gain and exposure both set to zero then auto adjust is enabled
@@ -218,7 +231,6 @@ WebServer server(80);           // serve web pages on port 80
       void sendFooter(WiFiClient &client);
       #include "ota.h"                       // Over The Air updates (OTA)
   #endif
-
 
 // ---------------------------------------------------------------
 //    -SETUP     SETUP     SETUP     SETUP     SETUP     SETUP
@@ -910,7 +922,7 @@ void handleRoot() {
   //  info which is periodically updated using AJAX - https://www.w3schools.com/xml/ajax_intro.asp
 
     // empty lines which are populated via vbscript with live data from http://x.x.x.x/data in the form of comma separated text
-      int noLines = 5;      // number of text lines to be populated by javascript
+      int noLines = 6;      // number of text lines to be populated by javascript
       for (int i = 0; i < noLines; i++) {
         client.println("<span id='uline" + String(i) + "'></span><br>");
       }
@@ -979,7 +991,7 @@ void handleRoot() {
      client.write("<a href='/test'>Test procedure</a>\n");
      #if ENABLE_OTA
         client.write(" - <a href='/ota'>Update via OTA</a>\n");
-     #endif 
+     #endif
 
     // addnl info if sd card present
      if (sdcardPresent) {
@@ -1062,7 +1074,10 @@ void handleData(){
 
   // line5 - image resolution
     reply += "Image size: " + ImageResDetails;
+    reply += ",";
 
+  // line6 - free memory
+    reply += "Free memory: " + String(ESP.getFreeHeap() /1000) + "K";
 
    server.send(200, "text/plane", reply); //Send millis value only to client ajax request
 }
@@ -1225,6 +1240,7 @@ void handleNotFound() {
 //     You may want to disable auto white balance when experimenting with RGB otherwise the camera is always trying to adjust the
 //        image colours to mainly white.   (disable in the 'cameraImageSettings' procedure).
 //     It will fail on the higher resolutions as it requires more than the 4mb of available psram to store the data (1600x1200x3 bytes)
+//     See this sketch for example of saving and viewing RGB files: https://github.com/alanesq/misc/blob/main/saveAndViewRGBfiles.ino
 //     I learned how to read the RGB data from: https://github.com/Makerfabs/Project_Touch-Screen-Camera/blob/master/Camera_v2/Camera_v2.ino
 
 void readRGBImage() {
@@ -1317,7 +1333,6 @@ void readRGBImage() {
      client.stop();
      return;
    }
-
 
  //   ****** examples of using the resulting RGB data *****
 
@@ -1646,7 +1661,7 @@ void readGreyscaleImage() {
     client.write("<br><br><a href='/'>Return</a>\n");       // link back    
 
   // resize the image
-    int newWidth = 115;   int newHeight = 42;         // much bigger than this seems to cause problems, probably a memory issue?
+    int newWidth = 115;   int newHeight = 42;         // much bigger than this seems to cause problems, possible web page is too large?
     byte newBuf[newWidth * newHeight];
     resize_esp32cam_image_buffer(fb->buf, fb->width, fb->height, newBuf, newWidth, newHeight);
 
