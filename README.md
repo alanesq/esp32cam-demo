@@ -2,6 +2,7 @@
 ## ESP32Cam-demo sketch for use with the Arduino IDE 
 
 I show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it - I am not a professional programmer so am sure there is plenty of room for improvement...
+<br>This sketch has got a bit larger than I anticipated but this is just because it now has so many individual demonstartions of ways to use the camera, I have tried to make each part as easy to follow as possible with lots of comments etc..
 <br>The camera is not great quality and very poor in low light conditions but it is very cheap (around £5 each if buying several) and I think has lots of potential for interesting applications.
 <br>This sketch is just a collection of all I have discovered/learned in the process of using them myself<br><br>
 Note: This sketch now has the facilty for OTA updates over the network, you need to copy the file ota.h in to your sketch folder and enable it in settings (#define ENABLE_OTA 1)
