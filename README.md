@@ -164,6 +164,9 @@ Some sites I find handy when creating HTML:
 You may like to have a play with a Processing sketch I created which could be used to grab JPG images from this camera and motion detect: 
 https://github.com/alanesq/imageChangeMonitor  
 
+I have a demo sketch of how to capture and save a raw RGB file (see comments at top of how you can view the resulting file)
+https://github.com/alanesq/misc/blob/main/saveAndViewRGBfiles.ino
+
 If you have any handy info, tips, or improvements to my code etc. please feel let me know at: alanesq@disroot.org
 
 
