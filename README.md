@@ -2,10 +2,10 @@
 ## ESP32Cam-demo sketch for use with the Arduino IDE 
 
 I show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it - I am not a professional programmer so am sure there is plenty of room for improvement...
-<br>This sketch has got a bit larger than I anticipated but this is just because it now has so many individual demonstartions of ways to use the camera, I have tried to make each part as easy to follow as possible with lots of comments etc..
+<br>This sketch has got a bit larger than I anticipated but this is just because it now has so many individual demonstrations of ways to use the camera, I have tried to make each part as easy to follow as possible with lots of comments etc..
 <br>The camera is not great quality and very poor in low light conditions but it is very cheap (around £5 each if buying several) and I think has lots of potential for interesting applications.
 <br>This sketch is just a collection of all I have discovered/learned in the process of using them myself<br><br>
-Note: This sketch now has the facilty for OTA updates over the network, you need to copy the file ota.h in to your sketch folder and enable it in settings (#define ENABLE_OTA 1)
+Note: This sketch now has the facility for OTA updates over the network, you need to copy the file ota.h in to your sketch folder and enable it in settings (#define ENABLE_OTA 1)
 <br><br>If you have issues with the camera keep stopping working etc. I have had a couple of these with dodgy camera modules so it is worth trying another one to see if this is the 
 source of your problems.
 <br>
@@ -16,14 +16,14 @@ source of your problems.
   <td><img src="/images/grey.png" /></td>
 </tr></table> 
 
-This can be used as a starting point sketch for projects using the esp32cam development board, it has the following features.
+This can be used as a starting point sketch for projects using the ESP32cam development board, it has the following features.
 <br>-Web server with live video streaming and control buttons
 <br>-SD card support (using 1-bit mode - gpio pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2) - I have heard there may be problems reading the sd card, I have only used it to write files myself?
 <br>-Stores captured image on sd-card or in spiffs if no sd card is present
 <br>-IO pins available for general use are 12 and 13 (12 must not be pulled high at boot)
 <br>-Option to connect a MCP23017 chip to pins 12 and 13 to give you 16 gpio pins to use (this requires the Adafruit MCP23017 library)
 <br>-The flash led is still available for use on pin 4 when using an sd card
-<br>-PWM control of flash/illumination lED brighness implemented (i.e. to give brighness control)
+<br>-PWM control of flash/illumination lED brighness implemented (i.e. to give brightness control)
 <br>-Can read the image as RGB data  (i.e. 3 bytes per pixel for red, green and blue value)
 <br>-Act as web client (reading the web page in to a string) - see requestWebPage()
 
@@ -49,7 +49,7 @@ So they are far from perfect but still for the price I think well worth having.
 
 
 I have tried to make the sketch as easy to follow/modify as possible with lots of comments etc. and no additional libraries used, 
-as I found it quiet confusing as an ameteur trying to do much with this module and difficult to find easy to understand 
+as I found it quiet confusing as an amateur trying to do much with this module and difficult to find easy to understand 
 examples/explanations of what I wanted to do, so I am publishing this sketch in the hope it will encourage/help others to have a 
 try with these powerful and VERY affordable modules.
 The greyscale procedure I think is the most interesting as it shows how to switch camera modes and process the raw data very well.
@@ -86,7 +86,7 @@ It will live stream video from the camera
 If you have an sd card inserted then accessing    http://x/x/x/x/photo
 Will capture an image and save it to the sd card
 
-There is a procedure which demonstarates how to get RGB data from an image which will allow for processing the images 
+There is a procedure which demonstrates how to get RGB data from an image which will allow for processing the images 
 as data (http://x.x.x.x/rgb).
 
 URLs:
@@ -151,7 +151,7 @@ A very impressive sketch here which can record AVI video to sd card - https://gi
 
 A handy way to upload images to a computer/web server via php which is very reliable and easy to use: https://RandomNerdTutorials.com/esp32-cam-post-image-photo-server/
 
-How to crop images on the esp32cam: https://makexyz.fun/esp32-cam-cropping-images-on-device/
+How to crop images on the ESP32cam: https://makexyz.fun/esp32-cam-cropping-images-on-device/
 
 Some good info here: https://github.com/raphaelbs/esp32-cam-ai-thinker
 and here: https://randomnerdtutorials.com/projects-esp32-cam/
@@ -160,7 +160,7 @@ Very handy for testing out bits of ESP32 code:  https://wokwi.com/
 
 Some sites I find handy when creating HTML:
       test html: https://www.w3schools.com/tryit/tryit.asp?filename=tryhtml_hello 
-      check html for erros:   http://www.freeformatter.com/html-formatter.html#ad-output 
+      check html for errors:   http://www.freeformatter.com/html-formatter.html#ad-output 
       learn HTML:   https://www.w3schools.com/
       
 You may like to have a play with a Processing sketch I created which could be used to grab JPG images from this camera and motion detect: 
