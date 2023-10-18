@@ -59,9 +59,6 @@
 //                          ====================================== 
 
 
-            /*                // delete this line //
-
-
                         #define SSID_NAME "<WIFI SSID>"
                         
                         #define SSID_PASWORD "<WIFI PASSWORD>"
@@ -69,9 +66,6 @@
                         #define ENABLE_OTA 0                         // If OTA updating of this sketch is enabled (requires ota.h file)
                         const String OTAPassword = "password";       // Password for performing OTA update (i.e. http://x.x.x.x/ota)
 
-
-
-            */                // delete this line //
 
 
 //   ---------------------------------------------------------------------------------------------------------
