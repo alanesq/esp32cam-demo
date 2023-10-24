@@ -59,6 +59,9 @@
 //                          ====================================== 
 
 
+            /*                // delete this line //
+
+
                         #define SSID_NAME "<WIFI SSID>"
                         
                         #define SSID_PASWORD "<WIFI PASSWORD>"
@@ -66,6 +69,9 @@
                         #define ENABLE_OTA 0                         // If OTA updating of this sketch is enabled (requires ota.h file)
                         const String OTAPassword = "password";       // Password for performing OTA update (i.e. http://x.x.x.x/ota)
 
+
+
+            */                // delete this line //
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -93,8 +99,8 @@
       void brightLed(byte);                   // turn the onboard flash LED on/off with varying brightness
       void setupFlashPWM();                   // set up the PWM for the above flash
       void handleData();                      // the root web page requests this periodically via Javascript in order to display updating information
-      void readGreyscaleImage();              // demo capturing a greyscale image and reading its raw RGB data
-      void resize_esp32cam_image_buffer(uint8_t*, int, int, uint8_t*, int, int);    // this resizes a captured greyscale image (used by above)
+      void readGrayscaleImage();              // demo capturing a grayscale image and reading its raw RGB data
+      void resize_esp32cam_image_buffer(uint8_t*, int, int, uint8_t*, int, int);    // this resizes a captured grayscale image (used by above)
 
 
 // ---------------------------------------------------------------
@@ -102,7 +108,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "18oct23";                            // Sketch version
+ char* sversion = "22oct23";                            // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
@@ -278,7 +284,7 @@ void setup() {
    server.on("/photo", handlePhoto);             // save image to sd card
    server.on("/img", handleImg);                 // show image from sd card
    server.on("/rgb", readRGBImage);              // demo converting image to RGB
-   server.on("/greydata", readGreyscaleImage);   // look at greyscale image data
+   server.on("/graydata", readGrayscaleImage);   // look at grayscale image data
    server.on("/test", handleTest);               // Testing procedure
    server.on("/reboot", handleReboot);           // restart device
    server.onNotFound(handleNotFound);            // invalid url requested
@@ -467,7 +473,7 @@ if (reset) {
 }
 
    // check the esp32cam board has a psram chip installed (extra memory used for storing captured images)
-   //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, SPIFFS must be enabled
+   //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, PSRAM must be enabled
    if (!psramFound()) {
      if (serialDebug) Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
      config.frame_size = FRAMESIZE_CIF;
@@ -977,7 +983,7 @@ void handleRoot() {
      client.write("<a href='/photo'>Store image</a> - \n");
      client.write("<a href='/img'>View stored image</a> - \n");
      client.write("<a href='/rgb'>RGB frame as data</a> - \n");
-     client.write("<a href='/greydata'>Greyscale frame as data</a> \n");
+     client.write("<a href='/graydata'>Grayscale frame as data</a> \n");
      client.write("<br>");
      client.write("<a href='/stream'>Live stream</a> - \n");
      client.write("<a href='/jpg'>JPG</a> - \n");
@@ -1577,7 +1583,7 @@ void handleJpeg() {
 
 
 // ----------------------------------------------------------------
-//                     resize greyscale image
+//                     resize grayscale image
 // ----------------------------------------------------------------
 // Thanks to Bard A.I. for writing this for me ;-)
 //   src_buf: The source image buffer.
@@ -1610,20 +1616,20 @@ void resize_esp32cam_image_buffer(uint8_t* src_buf, int src_width, int src_heigh
 
 
 // ----------------------------------------------------------------
-//                  Capture greyscale image data
+//                  Capture grayscale image data
 // ----------------------------------------------------------------
 
-void readGreyscaleImage() {
+void readGrayscaleImage() {
 
   WiFiClient client = server.client();                 // open link with client
 
   // html header
-   sendHeader(client, "Access greyscale image data");  
+   sendHeader(client, "Access grayscale image data");  
 
-  // change camera to greyscale mode  (by default it is in JPG colour mode)
+  // change camera to grayscale mode  (by default it is in JPG colour mode)
     esp_camera_deinit();                           // disable camera
     delay(camChangeDelay);
-    config.pixel_format = PIXFORMAT_GRAYSCALE;     // change camera setting to greyscale (default is JPG)
+    config.pixel_format = PIXFORMAT_GRAYSCALE;     // change camera setting to grayscale (default is JPG)
     initialiseCamera(0);                           // restart the camera (0 = without resetting all the other camera settings)
     cameraImageSettings();
 
@@ -1651,7 +1657,7 @@ void readGreyscaleImage() {
         if (pixelVal < minV) minV = pixelVal;
       }
     }
-    client.println("Greyscale Image: The lowest value pixel is " + String(minV) + ", the highest is " + String(maxV));
+    client.println("grayscale Image: The lowest value pixel is " + String(minV) + ", the highest is " + String(maxV));
     client.write("<br><br><a href='/'>Return</a>\n");       // link back    
 
   // resize the image
@@ -1660,7 +1666,7 @@ void readGreyscaleImage() {
     resize_esp32cam_image_buffer(fb->buf, fb->width, fb->height, newBuf, newWidth, newHeight);
 
   // display image as asciiArt
-    char asciiArt[] = {'@','#','S','%','?','*','+',';',':',',','.',' '};       // characters to use 
+    char asciiArt[] = {'@','#','S','%','?','*','+',';',':',',','.',' ',' '};       // characters to use 
     int noAsciiChars = sizeof(asciiArt) / sizeof(asciiArt[0]);                 // number of characters available
     client.write("<br><pre style='line-height: 1.1;'>");                       // 'pre' stops variable character spacing, 'line-heigh' adjusts spacing between lines - 0.2
     for (int y=0; y < newHeight; y++) {
