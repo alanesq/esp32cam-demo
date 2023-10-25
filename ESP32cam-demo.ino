@@ -108,7 +108,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "22oct23";                            // Sketch version
+ char* sversion = "25oct23";                            // Sketch version
 
  bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
 
@@ -733,7 +733,12 @@ byte storeImage() {
       brightLed(255);   // change LED brightness (0 - 255)
       delay(100);
    }
-   camera_fb_t *fb = esp_camera_fb_get();             // capture image frame from camera
+  camera_fb_t * fb = NULL;
+  fb = esp_camera_fb_get();
+  // there is a bug where this buffer can be from previous capture so as workaround it is discarded and captured again
+    esp_camera_fb_return(fb); // dispose the buffered image
+    fb = NULL; // reset to capture errors
+    fb = esp_camera_fb_get(); // get fresh image   
    if (flashRequired){
       delay(100);
       brightLed(currentBrightness);   // change LED brightness back to previous state
@@ -1269,9 +1274,13 @@ void readRGBImage() {
  //   ****** the main code for converting an image to RGB data *****
 
    // capture a live image from camera (as a jpg)
-     camera_fb_t * fb = NULL;
-     tTimer = millis();                                                                                    // store time that image capture started
-     fb = esp_camera_fb_get();
+      tTimer = millis();                                                                                    // store time that image capture started
+      camera_fb_t * fb = NULL;
+      fb = esp_camera_fb_get();
+      // there is a bug where this buffer can be from previous capture so as workaround it is discarded and captured again
+        esp_camera_fb_return(fb); // dispose the buffered image
+        fb = NULL; // reset to capture errors
+        fb = esp_camera_fb_get(); // get fresh image
      if (!fb) {
        sendText(client,"error: failed to capture image from camera");
        client.write("<br><a href='/'>Return</a>\n");       // link back
@@ -1418,7 +1427,12 @@ bool handleJPG() {
     char buf[32];
 
     // capture the jpg image from camera
-        camera_fb_t * fb = esp_camera_fb_get();
+        camera_fb_t * fb = NULL;
+        fb = esp_camera_fb_get();
+        // there is a bug where this buffer can be from previous capture so as workaround it is discarded and captured again
+          esp_camera_fb_return(fb); // dispose the buffered image
+          fb = NULL; // reset to capture errors
+          fb = esp_camera_fb_get(); // get fresh image
         if (!fb) {
           if (serialDebug) Serial.println("Error: failed to capture image");
           return 0;
@@ -1639,7 +1653,12 @@ void readGrayscaleImage() {
         brightLed(255);   // change LED brightness (0 - 255)
         delay(100);
     }
-    camera_fb_t *fb = esp_camera_fb_get();       // capture image
+    camera_fb_t * fb = NULL;
+    fb = esp_camera_fb_get();
+    // there is a bug where this buffer can be from previous capture so as workaround it is discarded and captured again
+      esp_camera_fb_return(fb); // dispose the buffered image
+      fb = NULL; // reset to capture errors
+      fb = esp_camera_fb_get(); // get fresh image
     if (flashRequired){
         delay(100);
         brightLed(currentBrightness);            // change LED brightness back to previous state
