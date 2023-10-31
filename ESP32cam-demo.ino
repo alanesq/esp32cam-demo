@@ -3,7 +3,7 @@
 *                         ESP32Cam development board demo sketch using Arduino IDE or PlatformIO
 *                                    Github: https://github.com/alanesq/ESP32Cam-demo
 *
-*                                     Tested with ESP32 board manager version  2.0.11
+*                                Tested with ESP32 board manager version  2.0.11 (2.0.14?)
 *
 *     Starting point sketch for projects using the esp32cam development board with the following features
 *        web server with live video streaming and RGB data from camera demonstrated.
@@ -48,6 +48,7 @@
 #include "esp_camera.h"         // https://github.com/espressif/esp32-camera
 #include <Arduino.h>
 #include "wifiSettings.h" 
+#include <esp_task_wdt.h>       // watchdog timer   - see: https://iotassistant.io/esp32/enable-hardware-watchdog-timer-esp32-arduino-ide/
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -108,14 +109,17 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "25oct23";                            // Sketch version
+ char* sversion = "31oct23";                            // Sketch version
 
- bool sendRGBfile = 0;                                  // if set '/rgb' will just return raw rgb data which can be saved as a file rather than display a HTML pag
+ #define WDT_TIMEOUT 60                                 // timeout of watchdog timer (seconds) 
+
+ const bool sendRGBfile = 0;                            // if set to 1 '/rgb' will just return raw rgb data which can then be saved as a file rather than display a HTML pag
 
  uint16_t dataRefresh = 2;                              // how often to refresh data on root web page (seconds)
  uint16_t imagerefresh = 2;                             // how often to refresh the image on root web page (seconds)
 
  const bool serialDebug = 1;                            // show debug info. on serial port (1=enabled, disable if using pins 1 and 3 as gpio)
+ const int serialSpeed = 115200;                        // Serial data speed to use
 
  #define useMCP23017 0                                  // set if MCP23017 IO expander chip is being used (on pins 12 and 13)
 
@@ -145,8 +149,6 @@
 
  const int iopinA = 13;                                 // general io pin 13
  const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
-
- const int serialSpeed = 115200;                        // Serial data speed to use
 
 
 // camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
@@ -386,6 +388,11 @@ void setup() {
 
 setupFlashPWM();    // configure PWM for the illumination LED
 
+// watchdog timer (esp32)
+  if (serialDebug) Serial.println("Configuring watchdog timer");
+  esp_task_wdt_init(WDT_TIMEOUT, true);                      //enable panic so ESP32 restarts
+  esp_task_wdt_add(NULL);                                    //add current thread to WDT watch   
+
  // startup complete
    if (serialDebug) Serial.println("\nStarted...");
    flashLED(2);     // flash the onboard indicator led
@@ -428,6 +435,7 @@ void loop() {
  // flash status LED to show sketch is running ok
    if ((unsigned long)(millis() - lastStatus) >= TimeBetweenStatus) {
      lastStatus = millis();                                               // reset timer
+     esp_task_wdt_reset();                                                // reset watchdog timer (to prevent system restart)
      digitalWrite(indicatorLED,!digitalRead(indicatorLED));               // flip indicator led status
    }
 
