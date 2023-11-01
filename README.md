@@ -42,11 +42,8 @@ I find I have to use the lowest serial upload speed or it fails (Select 'ESP32 d
 make sure PSRam is enabled). 
 The wifi can be very poor whilst in the motherboard (I find this happens if you have something near the antenna on the esp32cam modules) 
 but if I rest my thumb above the antenna I find the signal works ok).  
-There is also now a esp32cam with built in USB available called the "ESP32-CAM-CH340" which has built in USB this also seems to struggle 
-with Wifi in a similar way.  
-Many of the ebay listing include an external antenna and I would suggest this would b a good option if ordering one.  
-So they are far from perfect but still for the price I think well worth having.
-
+There is also now a esp32cam with built in USB available called the "ESP32-CAM-CH340" 
+Many of the ebay listing include an external antenna and I would suggest this would be a good option if ordering one.  
 
 I have tried to make the sketch as easy to follow/modify as possible with lots of comments etc. and no additional libraries used, 
 as I found it quiet confusing as an amateur trying to do much with this module and difficult to find easy to understand 
@@ -144,7 +141,7 @@ https://github.com/alanesq/CameraWifiMotion
 
 When streaming video these units can get very hot so if you plan to do a lot of streaming this is worth checking to make sure it is not going to over heat.
 
-You can see a demo of accessing greyscale image data here:
+You can see a demo of accessing grayscale image data here:
     https://github.com/alanesq/esp32cam-demo/blob/master/Misc/esp32camdemo-greyscale.ino
     
 A very impressive sketch here which can record AVI video to sd card - https://github.com/mtnbkr88/ESP32CAMVideoRecorder
