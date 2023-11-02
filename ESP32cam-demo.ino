@@ -3,7 +3,7 @@
 *                         ESP32Cam development board demo sketch using Arduino IDE or PlatformIO
 *                                    Github: https://github.com/alanesq/ESP32Cam-demo
 *
-*                                Tested with ESP32 board manager version  2.0.11 (2.0.14?)
+*                                Tested with ESP32 board manager version  2.0.14
 *
 *     Starting point sketch for projects using the esp32cam development board with the following features
 *        web server with live video streaming and RGB data from camera demonstrated.
@@ -47,7 +47,6 @@
 
 #include "esp_camera.h"         // https://github.com/espressif/esp32-camera
 #include <Arduino.h>
-#include "wifiSettings.h" 
 #include <esp_task_wdt.h>       // watchdog timer   - see: https://iotassistant.io/esp32/enable-hardware-watchdog-timer-esp32-arduino-ide/
 
 
@@ -60,7 +59,7 @@
 //                          ====================================== 
 
 
-            /*                // delete this line //
+            #include "wifiSettings.h"     /*                // delete this line //
 
 
                         #define SSID_NAME "<WIFI SSID>"
@@ -72,7 +71,7 @@
 
 
 
-            */                // delete this line //
+                                           */              // delete this line //
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -109,7 +108,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "31oct23";                            // Sketch version
+ char* sversion = "02Nov23";                            // Sketch version
 
  #define WDT_TIMEOUT 60                                 // timeout of watchdog timer (seconds) 
 
@@ -471,12 +470,14 @@ if (reset) {
    config.pin_sscb_scl = SIOC_GPIO_NUM;
    config.pin_pwdn = PWDN_GPIO_NUM;
    config.pin_reset = RESET_GPIO_NUM;
-   config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
+   config.xclk_freq_hz = 10000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
    config.pixel_format = PIXFORMAT_JPEG;                         // colour jpg format
    config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA),
                                                  //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA),
                                                  //              1600x1200 (UXGA)
-   config.jpeg_quality = 12;                     // 0-63 lower number means higher quality (can cause failed image capture if set too low at higher resolutions)
+   config.jpeg_quality = 10;                     // 0-63 lower number means higher quality (can cause failed image capture if set too low at higher resolutions)
+   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+   //config.fb_location = CAMERA_FB_IN_PSRAM;      // store the captured frame in PSRAM
    config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
 }
 
@@ -484,13 +485,9 @@ if (reset) {
    //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, PSRAM must be enabled
    if (!psramFound()) {
      if (serialDebug) Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
-     config.frame_size = FRAMESIZE_CIF;
+     config.frame_size = FRAMESIZE_SVGA;
+     config.fb_location = CAMERA_FB_IN_DRAM;
    }
-
-   //#if defined(CAMERA_MODEL_ESP_EYE)
-   //  pinMode(13, INPUT_PULLUP);
-   //  pinMode(14, INPUT_PULLUP);
-   //#endif
 
    esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
    if (camerr != ESP_OK) {
@@ -527,7 +524,7 @@ bool cameraImageSettings() {
    if (cameraImageExposure == 0 && cameraImageGain == 0) {
      // enable auto adjust
        s->set_gain_ctrl(s, 1);                       // auto gain on
-       s->set_exposure_ctrl(s, 1);                   // auto exposure on
+       s->set_exposure_ctrl(s, 1);                   // auto exposure on 
        s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1)
        s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
    } else {
@@ -539,6 +536,9 @@ bool cameraImageSettings() {
        s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
        s->set_aec_value(s, cameraImageExposure);     // set exposure manually  (0-1200)
    }
+   
+   //s->set_vflip(s, 1);                               // flip image vertically
+   //s->set_hmirror(s, 1);                             // flip image horizontally
 
    return 1;
 }  // cameraImageSettings
@@ -587,7 +587,7 @@ void setupFlashPWM() {
  void brightLed(byte ledBrightness){
    brightLEDbrightness = ledBrightness;    // store setting
    ledcWrite(ledChannel, ledBrightness);   // change LED brightness (0 - 255)
-   if (serialDebug) Serial.println("Brightness changed to " + String(ledBrightness) );
+   if (serialDebug) Serial.println("LED brightness changed to " + String(ledBrightness) );
  }
 
 
@@ -1665,7 +1665,7 @@ void readGrayscaleImage() {
     fb = esp_camera_fb_get();
     // there is a bug where this buffer can be from previous capture so as workaround it is discarded and captured again
       esp_camera_fb_return(fb); // dispose the buffered image
-      fb = NULL; // reset to capture errors
+      fb = NULL;                // reset to capture errors
       fb = esp_camera_fb_get(); // get fresh image
     if (flashRequired){
         delay(100);
