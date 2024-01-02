@@ -1,14 +1,15 @@
 
 ## ESP32Cam-demo sketch for use with the Arduino IDE 
 
-I show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it - I am not a professional programmer so am sure there is plenty of room for improvement...
-<br>This sketch has got a bit larger than I anticipated but this is just because it now has so many individual demonstrations of ways to use the camera, I have tried to make each part as easy to follow as possible with lots of comments etc..
-<br>The camera is not great quality and very poor in low light conditions but it is very cheap (around £5 each if buying several) and I think has lots of potential for interesting applications.
-<br>This sketch is just a collection of all I have discovered/learned in the process of using them myself<br><br>
+I show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it - I am not a professional programmer so am sure there is plenty of room for improvement... <br>
+This sketch has got a bit larger than I anticipated but this is just because it now has so many individual demonstrations of ways to use the camera, I have tried to make each part as easy to follow as possible with lots of comments etc.. <br>
+The camera is not great quality and very poor in low light conditions but it is very cheap (around £5 each if buying several) and I think has lots of potential for interesting applications. <br>
+This sketch is just a collection of all I have discovered/learned in the process of using them myself<br>
+
 Note: This sketch now has the facility for OTA updates over the network, you need to copy the file ota.h in to your sketch folder and enable it in settings (#define ENABLE_OTA 1)
-<br><br>If you have issues with the camera keep stopping working etc. I have had a couple of these with dodgy camera modules so it is worth trying another one to see if this is the 
-source of your problems.
 <br>
+If you have issues with the camera keep stopping working etc. I have had a couple of these with dodgy camera modules so it is worth trying another one to see if this is the 
+source of your problems. <br>
 
 <table><tr>
   <td><img src="/images/root.png" /></td>
@@ -17,19 +18,19 @@ source of your problems.
 </tr></table> 
 
 This can be used as a starting point sketch for projects using the ESP32cam development board, it has the following features.
-<br>-Web server with live video streaming and control buttons
-<br>-SD card support (using 1-bit mode - gpio pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2) - I have heard there may be problems reading the sd card, I have only used it to write files myself?
-<br>-Stores captured image on sd-card or in spiffs if no sd card is present
-<br>-IO pins available for general use are 12 and 13 (12 must not be pulled high at boot)
-<br>-Option to connect a MCP23017 chip to pins 12 and 13 to give you 16 gpio pins to use (this requires the Adafruit MCP23017 library)
-<br>-The flash led is still available for use on pin 4 when using an sd card
-<br>-PWM control of flash/illumination lED brighness implemented (i.e. to give brightness control)
-<br>-Can read the image as RGB data  (i.e. 3 bytes per pixel for red, green and blue value)
-<br>-Act as web client (reading the web page in to a string) - see requestWebPage()
+ - Web server with live video streaming and control buttons
+ - SD card support (using 1-bit mode - gpio pins are usually 2, 4, 12 & 13 but using 1bit mode only uses pin 2) - I have heard there may be problems reading the sd card, I have only used it to write files myself?
+ - Stores captured image on sd-card or in spiffs if no sd card is present
+ - IO pins available for general use are 12 and 13 (12 must not be pulled high at boot)
+ - Option to connect a MCP23017 chip to pins 12 and 13 to give you 16 gpio pins to use (this requires the Adafruit MCP23017 library)
+ - The flash led is still available for use on pin 4 when using an sd card
+ - PWM control of flash/illumination lED brighness implemented (i.e. to give brightness control)
+ - Can read the image as RGB data  (i.e. 3 bytes per pixel for red, green and blue value)
+ - Act as web client (reading the web page in to a string) - see requestWebPage()
 
 The root web page uses AJAX to update info. on the page.  This is not done in the conventional way where variable data is passed but 
 instead passes complete lines of text, it may not be elegant but it makes changing what information is displayed much easier as all you 
-have to do is modify what info handleData() sends.
+have to do is modify what info handleData() sends. 
 
 BTW - I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/esp32cam-Timelapse
 
@@ -62,11 +63,11 @@ created using the Arduino IDE with ESP32 module installed
 (See https://randomnerdtutorials.com/installing-the-esp32-board-in-arduino-ide-windows-instructions/)
 No additional libraries required
 
-There is a very good Youtube video on using the ESP32Cam board here: https://www.youtube.com/watch?v=FmlxC0goKew&t=610s
+[Youtube video on using the ESP32Cam board](https://www.youtube.com/watch?v=FmlxC0goKew)
 
-Schematic: https://github.com/SeeedDocument/forum_doc/blob/master/reg/ESP32_CAM_V1.6.pdf 
+[Schematic](https://github.com/SeeedDocument/forum_doc/blob/master/reg/ESP32_CAM_V1.6.pdf)
 
-Info on camera settings:  https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
+[Info on camera settings](https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/)
 
 
 ----------------
@@ -141,24 +142,22 @@ https://github.com/alanesq/CameraWifiMotion
 
 When streaming video these units can get very hot so if you plan to do a lot of streaming this is worth checking to make sure it is not going to over heat.
 
-You can see a demo of accessing grayscale image data here:
-    https://github.com/alanesq/esp32cam-demo/blob/master/Misc/esp32camdemo-greyscale.ino
+[Demo of accessing grayscale image data](https://github.com/alanesq/esp32cam-demo/blob/master/Misc/esp32camdemo-greyscale.ino)
     
-A very impressive sketch here which can record AVI video to sd card - https://github.com/mtnbkr88/ESP32CAMVideoRecorder
+[sketch which can record AVI video to sd card](https://github.com/mtnbkr88/ESP32CAMVideoRecorder)
 
-A handy way to upload images to a computer/web server via php which is very reliable and easy to use: https://RandomNerdTutorials.com/esp32-cam-post-image-photo-server/
+[Handy way to upload images to a computer/web server via php which is very reliable and easy to use](https://RandomNerdTutorials.com/esp32-cam-post-image-photo-server/)
 
-How to crop images on the ESP32cam: https://makexyz.fun/esp32-cam-cropping-images-on-device/
+[How to crop images on the ESP32cam](https://makexyz.fun/esp32-cam-cropping-images-on-device/)
 
-Some good info here: https://github.com/raphaelbs/esp32-cam-ai-thinker
-and here: https://randomnerdtutorials.com/projects-esp32-cam/
+[Some good info here](https://github.com/raphaelbs/esp32-cam-ai-thinker) - [and here](https://randomnerdtutorials.com/projects-esp32-cam/)
 
-Very handy for testing out bits of ESP32 code:  https://wokwi.com/
+[Wokwi - handy for testing out bits of ESP32 code](https://wokwi.com/)
 
 Some sites I find handy when creating HTML:
-      test html: https://www.w3schools.com/tryit/tryit.asp?filename=tryhtml_hello 
-      check html for errors:   http://www.freeformatter.com/html-formatter.html#ad-output 
-      learn HTML:   https://www.w3schools.com/
+ - [test html](https://www.w3schools.com/tryit/tryit.asp?filename=tryhtml_hello )
+ - [check html for errors](http://www.freeformatter.com/html-formatter.html#ad-output)
+ - [learn HTML](https://www.w3schools.com/)
       
 You may like to have a play with a Processing sketch I created which could be used to grab JPG images from this camera and motion detect: 
 https://github.com/alanesq/imageChangeMonitor  
