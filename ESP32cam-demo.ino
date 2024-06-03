@@ -47,6 +47,8 @@
 
 #include "esp_camera.h"         // https://github.com/espressif/esp32-camera
 #include <Arduino.h>
+
+// WATCHDOG TIMER IS NOT WORKING WITH ESP32 3.0.0 (disabled in setup)- jun24
 #include <esp_task_wdt.h>       // watchdog timer   - see: https://iotassistant.io/esp32/enable-hardware-watchdog-timer-esp32-arduino-ide/
 
 
@@ -387,10 +389,10 @@ void setup() {
 
 setupFlashPWM();    // configure PWM for the illumination LED
 
-// watchdog timer (esp32)
-  if (serialDebug) Serial.println("Configuring watchdog timer");
-  esp_task_wdt_init(WDT_TIMEOUT, true);                      //enable panic so ESP32 restarts
-  esp_task_wdt_add(NULL);                                    //add current thread to WDT watch   
+// watchdog timer (esp32) - NOT WORKING WITH ESP32 3.0.0 (disabled in setup)- jun24
+//  if (serialDebug) Serial.println("Configuring watchdog timer");
+//  esp_task_wdt_init(WDT_TIMEOUT, true);                      //enable panic so ESP32 restarts
+//  esp_task_wdt_add(NULL);                                    //add current thread to WDT watch   
 
  // startup complete
    if (serialDebug) Serial.println("\nStarted...");
