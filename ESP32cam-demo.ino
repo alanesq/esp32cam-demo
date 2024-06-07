@@ -48,7 +48,6 @@
 #include "esp_camera.h"         // https://github.com/espressif/esp32-camera
 #include <Arduino.h>
 
-// WATCHDOG TIMER IS NOT WORKING WITH ESP32 3.0.0 (disabled in setup)- jun24
 #include <esp_task_wdt.h>       // watchdog timer   - see: https://iotassistant.io/esp32/enable-hardware-watchdog-timer-esp32-arduino-ide/
 
 
@@ -389,10 +388,30 @@ void setup() {
 
 setupFlashPWM();    // configure PWM for the illumination LED
 
-// watchdog timer (esp32) - NOT WORKING WITH ESP32 3.0.0 (disabled in setup)- jun24
-//  if (serialDebug) Serial.println("Configuring watchdog timer");
-//  esp_task_wdt_init(WDT_TIMEOUT, true);                      //enable panic so ESP32 restarts
-//  esp_task_wdt_add(NULL);                                    //add current thread to WDT watch   
+ // ESP32 Watchdog timer -    Note: esp32 board manager v3.x.x requires different code
+   #if defined ESP32
+     esp_task_wdt_deinit();                  // ensure a watchdog is not already configured
+     #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR == 3  
+       // v3 board manager detected
+       // Create and initialize the watchdog timer(WDT) configuration structure
+         if (serialDebug) Serial.println("v3 esp32 board manager detected");
+         esp_task_wdt_config_t wdt_config = {
+             .timeout_ms = WDT_TIMEOUT * 1000, // Convert seconds to milliseconds
+             .idle_core_mask = 1 << 1,         // Monitor core 1 only
+             .trigger_panic = true             // Enable panic
+         };
+       // Initialize the WDT with the configuration structure
+         esp_task_wdt_init(&wdt_config);       // Pass the pointer to the configuration structure
+         esp_task_wdt_add(NULL);               // Add current thread to WDT watch    
+         esp_task_wdt_reset();                 // reset timer
+         if (serialDebug) Serial.println("Watchdog Timer initialized at WDT_TIMEOUT seconds");
+     #else
+       // pre v3 board manager assumed
+         if (serialDebug) Serial.println("older esp32 board manager assumed");
+         esp_task_wdt_init(WDT_TIMEOUT, true);                      //enable panic so ESP32 restarts
+         esp_task_wdt_add(NULL);                                    //add current thread to WDT watch   
+     #endif
+   #endif  
 
  // startup complete
    if (serialDebug) Serial.println("\nStarted...");
