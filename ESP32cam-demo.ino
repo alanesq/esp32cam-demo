@@ -3,7 +3,7 @@
 *                         ESP32Cam development board demo sketch using Arduino IDE or PlatformIO
 *                                    Github: https://github.com/alanesq/ESP32Cam-demo
 *
-*                                Tested with ESP32 board manager version  2.0.14
+*                                Tested with ESP32 board manager version  3.0.1
 *
 *     Starting point sketch for projects using the esp32cam development board with the following features
 *        web server with live video streaming and RGB data from camera demonstrated.
@@ -47,7 +47,6 @@
 
 #include "esp_camera.h"         // https://github.com/espressif/esp32-camera
 #include <Arduino.h>
-
 #include <esp_task_wdt.h>       // watchdog timer   - see: https://iotassistant.io/esp32/enable-hardware-watchdog-timer-esp32-arduino-ide/
 
 
@@ -109,7 +108,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "02Nov23";                            // Sketch version
+ char* sversion = "12Jun24";                            // Sketch version
 
  #define WDT_TIMEOUT 60                                 // timeout of watchdog timer (seconds) 
 
@@ -197,41 +196,41 @@ framesize_t FRAME_SIZE_IMAGE = cyclingRes[0];
    
 // spiffs used to store images if no sd card present
  #include <SPIFFS.h>
- #include <FS.h>                // gives file access on spiffs
+ #include <FS.h>                               // gives file access on spiffs
 
-WebServer server(80);           // serve web pages on port 80
+WebServer server(80);                          // serve web pages on port 80
 
 // Used to disable brownout detection
  #include "soc/soc.h"
  #include "soc/rtc_cntl_reg.h"
 
 // sd-card
- #include "SD_MMC.h"                         // sd card - see https://randomnerdtutorials.com/esp32-cam-take-photo-save-microsd-card/
+ #include "SD_MMC.h"                           // sd card - see https://randomnerdtutorials.com/esp32-cam-take-photo-save-microsd-card/
  #include <SPI.h>
- #include <FS.h>                             // gives file access
- #define SD_CS 5                             // sd chip select pin = 5
+ #include <FS.h>                               // gives file access
+ #define SD_CS 5                               // sd chip select pin = 5
 
 // MCP23017 IO expander on pins 12 and 13 (optional)
  #if useMCP23017 == 1
    #include <Wire.h>
    #include "Adafruit_MCP23017.h"
    Adafruit_MCP23017 mcp;
-   // Wire.setClock(1700000); // set frequency to 1.7mhz
+   // Wire.setClock(1700000);                  // set frequency to 1.7mhz
  #endif
 
 // Define some global variables:
- uint32_t lastStatus = millis();           // last time status light changed status (to flash all ok led)
- bool sdcardPresent;                       // flag if an sd card is detected
- int imageCounter;                         // image file name on sd card counter
- String spiffsFilename = "/image.jpg";     // image name to use when storing in spiffs
- String ImageResDetails = "Unknown";       // image resolution info
+ uint32_t lastStatus = millis();               // last time status light changed status (to flash all ok led)
+ bool sdcardPresent;                           // flag if an sd card is detected
+ int imageCounter;                             // image file name on sd card counter
+ const String spiffsFilename = "/image.jpg";   // image name to use when storing in spiffs
+ String ImageResDetails = "Unknown";           // image resolution info
 
 // OTA Stuff
-  bool OTAEnabled = 0;                   // flag to show if OTA has been enabled (via supply of password in http://x.x.x.x/ota)
+  bool OTAEnabled = 0;                         // flag to show if OTA has been enabled (via supply of password in http://x.x.x.x/ota)
   #if ENABLE_OTA
       void sendHeader(WiFiClient &client, char* hTitle);      // forward declarations
       void sendFooter(WiFiClient &client);
-      #include "ota.h"                       // Over The Air updates (OTA)
+      #include "ota.h"                         // Over The Air updates (OTA)
   #endif
 
 // ---------------------------------------------------------------
@@ -331,7 +330,7 @@ void setup() {
 
  // SD Card - if one is detected set 'sdcardPresent' High
      if (!SD_MMC.begin("/sdcard", true)) {        // if loading sd card fails
-       // note: ('/sdcard", true)' = 1bit mode - see: https://www.reddit.com/r/esp32/comments/d71es9/a_breakdown_of_my_experience_trying_to_talk_to_an/
+       // note: ('/sdcard", true)' = 1bit mode - see: https://dr-mntn.net/2021/02/using-the-sd-card-in-1-bit-mode-on-the-esp32-cam-from-ai-thinker
        if (serialDebug) Serial.println("No SD Card detected");
        sdcardPresent = 0;                        // flag no sd card available
      } else {
@@ -388,30 +387,30 @@ void setup() {
 
 setupFlashPWM();    // configure PWM for the illumination LED
 
- // ESP32 Watchdog timer -    Note: esp32 board manager v3.x.x requires different code
-   #if defined ESP32
-     esp_task_wdt_deinit();                  // ensure a watchdog is not already configured
-     #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR == 3  
-       // v3 board manager detected
-       // Create and initialize the watchdog timer(WDT) configuration structure
-         if (serialDebug) Serial.println("v3 esp32 board manager detected");
-         esp_task_wdt_config_t wdt_config = {
-             .timeout_ms = WDT_TIMEOUT * 1000, // Convert seconds to milliseconds
-             .idle_core_mask = 1 << 1,         // Monitor core 1 only
-             .trigger_panic = true             // Enable panic
-         };
-       // Initialize the WDT with the configuration structure
-         esp_task_wdt_init(&wdt_config);       // Pass the pointer to the configuration structure
-         esp_task_wdt_add(NULL);               // Add current thread to WDT watch    
-         esp_task_wdt_reset();                 // reset timer
-         if (serialDebug) Serial.println("Watchdog Timer initialized at WDT_TIMEOUT seconds");
-     #else
-       // pre v3 board manager assumed
-         if (serialDebug) Serial.println("older esp32 board manager assumed");
-         esp_task_wdt_init(WDT_TIMEOUT, true);                      //enable panic so ESP32 restarts
-         esp_task_wdt_add(NULL);                                    //add current thread to WDT watch   
-     #endif
-   #endif  
+// ESP32 Watchdog timer -    Note: esp32 board manager v3.x.x requires different code
+  #if defined ESP32
+    esp_task_wdt_deinit();                  // ensure a watchdog is not already configured
+    #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR == 3
+      // v3 board manager detected
+      // Create and initialize the watchdog timer(WDT) configuration structure
+        if (serialDebug) Serial.println("v3 esp32 board manager detected");
+        esp_task_wdt_config_t wdt_config = {
+            .timeout_ms = WDT_TIMEOUT * 1000, // Convert seconds to milliseconds
+            .idle_core_mask = 1 << 1,         // Monitor core 1 only
+            .trigger_panic = true             // Enable panic
+        };
+      // Initialize the WDT with the configuration structure
+        esp_task_wdt_init(&wdt_config);       // Pass the pointer to the configuration structure
+        esp_task_wdt_add(NULL);               // Add current thread to WDT watch    
+        esp_task_wdt_reset();                 // reset timer
+        if (serialDebug) Serial.println("Watchdog Timer initialized at WDT_TIMEOUT seconds");
+    #else
+      // pre v3 board manager assumed
+        if (serialDebug) Serial.println("older esp32 board manager assumed");
+        esp_task_wdt_init(WDT_TIMEOUT, true);                      //enable panic so ESP32 restarts
+        esp_task_wdt_add(NULL);                                    //add current thread to WDT watch   
+    #endif
+  #endif  
 
  // startup complete
    if (serialDebug) Serial.println("\nStarted...");
@@ -597,11 +596,20 @@ bool cameraImageSettings() {
 // ----------------------------------------------------------------
 //       set up PWM for the illumination LED (flash)
 // ----------------------------------------------------------------
-// note: I am not sure PWM is very reliable on the esp32cam - requires more testing
+// notes: I am not sure PWM is very reliable on the esp32cam - requires more testing
+//        esp32 board manager v 3 requires different commands - jun24
+
 void setupFlashPWM() {
-    ledcSetup(ledChannel, ledFreq, ledRresolution);
-    ledcAttachPin(brightLED, ledChannel);
-    brightLed(brightLEDbrightness);
+      #if defined (ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR == 3
+        // board manager v3
+          ledcAttach(ledChannel, ledFreq, ledRresolution);
+          brightLed(brightLEDbrightness);        
+      #else
+        // board manager pre v3
+          ledcSetup(ledChannel, ledFreq, ledRresolution);
+          ledcAttachPin(brightLED, ledChannel);
+          brightLed(brightLEDbrightness);
+      #endif
 }
 
 // change illumination LED brightness
