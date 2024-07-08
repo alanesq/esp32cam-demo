@@ -3,7 +3,7 @@
 *                         ESP32Cam development board demo sketch using Arduino IDE or PlatformIO
 *                                    Github: https://github.com/alanesq/ESP32Cam-demo
 *
-*                                Tested with ESP32 board manager version  3.0.1
+*                                Tested with ESP32 board manager version  3.0.2
 *
 *     Starting point sketch for projects using the esp32cam development board with the following features
 *        web server with live video streaming and RGB data from camera demonstrated.
@@ -108,7 +108,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "12Jun24";                            // Sketch version
+ char* sversion = "08Jul24";                            // Sketch version
 
  #define WDT_TIMEOUT 60                                 // timeout of watchdog timer (seconds) 
 
@@ -486,8 +486,16 @@ if (reset) {
    config.pin_pclk = PCLK_GPIO_NUM;
    config.pin_vsync = VSYNC_GPIO_NUM;
    config.pin_href = HREF_GPIO_NUM;
-   config.pin_sscb_sda = SIOD_GPIO_NUM;
-   config.pin_sscb_scl = SIOC_GPIO_NUM;
+   // variations in version of esp32 board manager (v3 changed the names for some reason)
+     #if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR == 3  
+        config.pin_sccb_sda = SIOD_GPIO_NUM;    // v3.x
+        config.pin_sccb_scl = SIOC_GPIO_NUM;     
+     #else
+        config.pin_sscb_sda = SIOD_GPIO_NUM;    // pre v3
+        config.pin_sscb_scl = SIOC_GPIO_NUM;
+     #endif
+   config.pin_pwdn = PWDN_GPIO_NUM;
+   config.pin_reset = RESET_GPIO_NUM;   
    config.pin_pwdn = PWDN_GPIO_NUM;
    config.pin_reset = RESET_GPIO_NUM;
    config.xclk_freq_hz = 10000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
