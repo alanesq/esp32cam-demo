@@ -5,6 +5,8 @@
 *
 *                                Tested with ESP32 board manager version  3.0.2
 *
+*                                        NOTE: FLASH NOT WORKING - 30Sep24
+*
 *     Starting point sketch for projects using the esp32cam development board with the following features
 *        web server with live video streaming and RGB data from camera demonstrated.
 *        sd card support using 1-bit mode (data pins are usually 2,4,12&13 but using 1bit mode only uses pin 2)
@@ -62,9 +64,9 @@
             #include "wifiSettings.h"     /*                // delete this line //
 
 
-                        #define SSID_NAME "<WIFI SSID>"
+                        #define SSID_NAME "<WIFI SSID HERE>"
                         
-                        #define SSID_PASWORD "<WIFI PASSWORD>"
+                        #define SSID_PASWORD "<WIFI PASSWORD HERE>"
                         
                         #define ENABLE_OTA 0                         // If OTA updating of this sketch is enabled (requires ota.h file)
                         const String OTAPassword = "password";       // Password for performing OTA update (i.e. http://x.x.x.x/ota)
@@ -96,6 +98,7 @@
       void handleStream();                    // stream live video (note: this can get the camera very hot)
       int requestWebPage(String*, String*, int);  // procedure allowing the sketch to read a web page its self
       void handleTest();                      // test procedure for experimenting with bits of code etc.
+      void handleReboot();                    // handle request to restart device
       void brightLed(byte);                   // turn the onboard flash LED on/off with varying brightness
       void setupFlashPWM();                   // set up the PWM for the above flash
       void handleData();                      // the root web page requests this periodically via Javascript in order to display updating information
@@ -108,7 +111,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "08Jul24";                            // Sketch version
+ char* sversion = "30Sep24";                            // Sketch version
 
  #define WDT_TIMEOUT 60                                 // timeout of watchdog timer (seconds) 
 
@@ -409,7 +412,7 @@ setupFlashPWM();    // configure PWM for the illumination LED
         esp_task_wdt_init(WDT_TIMEOUT, true);                      //enable panic so ESP32 restarts
         esp_task_wdt_add(NULL);                                    //add current thread to WDT watch   
     #endif
-  #endif   
+  #endif  
 
  // startup complete
    if (serialDebug) Serial.println("\nStarted...");
@@ -609,10 +612,12 @@ bool cameraImageSettings() {
 void setupFlashPWM() {
       #if defined (ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR == 3
         // board manager v3
-          ledcAttach(ledChannel, ledFreq, ledRresolution);
+          if (serialDebug) Serial.println("LED configured for v3 board manager");
+          ledcAttach(brightLED, ledFreq, ledRresolution);    // was - ledcAttach(ledChannel, ledFreq, ledRresolution);
           brightLed(brightLEDbrightness);        
       #else
         // board manager pre v3
+          if (serialDebug) Serial.println("LED configured for pre v3 board manager");
           ledcSetup(ledChannel, ledFreq, ledRresolution);
           ledcAttachPin(brightLED, ledChannel);
           brightLed(brightLEDbrightness);
