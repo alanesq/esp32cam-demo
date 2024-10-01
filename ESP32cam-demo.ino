@@ -99,8 +99,6 @@
       int requestWebPage(String*, String*, int);  // procedure allowing the sketch to read a web page its self
       void handleTest();                      // test procedure for experimenting with bits of code etc.
       void handleReboot();                    // handle request to restart device
-      void brightLed(byte);                   // turn the onboard flash LED on/off with varying brightness
-      void setupFlashPWM();                   // set up the PWM for the above flash
       void handleData();                      // the root web page requests this periodically via Javascript in order to display updating information
       void readGrayscaleImage();              // demo capturing a grayscale image and reading its raw RGB data
       void resize_esp32cam_image_buffer(uint8_t*, int, int, uint8_t*, int, int);    // this resizes a captured grayscale image (used by above)
@@ -111,7 +109,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "30Sep24";                            // Sketch version
+ char* sversion = "01Oct24";                            // Sketch version
 
  #define WDT_TIMEOUT 60                                 // timeout of watchdog timer (seconds) 
 
@@ -388,7 +386,9 @@ void setup() {
    // read pin state with     mcp.digitalRead(8)
  #endif
 
-setupFlashPWM();    // configure PWM for the illumination LED
+// configure PWM for the illumination LED
+  pinMode(brightLED, OUTPUT);
+  analogWrite(brightLED, brightLEDbrightness);
 
 // ESP32 Watchdog timer -    Note: esp32 board manager v3.x.x requires different code
   #if defined ESP32
@@ -417,9 +417,9 @@ setupFlashPWM();    // configure PWM for the illumination LED
  // startup complete
    if (serialDebug) Serial.println("\nStarted...");
    flashLED(2);     // flash the onboard indicator led
-   brightLed(64);    // change bright LED
+   analogWrite(brightLED, 64);    // change bright LED
    delay(200);
-   brightLed(0);    // change bright LED
+   analogWrite(brightLED, 0);    // change bright LED
 
 }  // setup
 
@@ -604,35 +604,6 @@ bool cameraImageSettings() {
 
 
 // ----------------------------------------------------------------
-//       set up PWM for the illumination LED (flash)
-// ----------------------------------------------------------------
-// notes: I am not sure PWM is very reliable on the esp32cam - requires more testing
-//        esp32 board manager v 3 requires different commands - jun24
-
-void setupFlashPWM() {
-      #if defined (ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR == 3
-        // board manager v3
-          if (serialDebug) Serial.println("LED configured for v3 board manager");
-          ledcAttach(brightLED, ledFreq, ledRresolution);    // was - ledcAttach(ledChannel, ledFreq, ledRresolution);
-          brightLed(brightLEDbrightness);        
-      #else
-        // board manager pre v3
-          if (serialDebug) Serial.println("LED configured for pre v3 board manager");
-          ledcSetup(ledChannel, ledFreq, ledRresolution);
-          ledcAttachPin(brightLED, ledChannel);
-          brightLed(brightLEDbrightness);
-      #endif
-}
-
-// change illumination LED brightness
- void brightLed(byte ledBrightness){
-   brightLEDbrightness = ledBrightness;    // store setting
-   ledcWrite(ledChannel, ledBrightness);   // change LED brightness (0 - 255)
-   if (serialDebug) Serial.println("LED brightness changed to " + String(ledBrightness) );
- }
-
-
-// ----------------------------------------------------------------
 //             returns the current time as a String
 // ----------------------------------------------------------------
 //   see: https://randomnerdtutorials.com/esp32-date-time-ntp-client-server-arduino/
@@ -779,7 +750,7 @@ byte storeImage() {
  // capture the image from camera
    int currentBrightness = brightLEDbrightness;
    if (flashRequired) {
-      brightLed(255);   // change LED brightness (0 - 255)
+      analogWrite(brightLED, 255);   // change LED brightness (0 - 255)
       delay(100);
    }
   camera_fb_t * fb = NULL;
@@ -790,7 +761,7 @@ byte storeImage() {
     fb = esp_camera_fb_get(); // get fresh image   
    if (flashRequired){
       delay(100);
-      brightLed(currentBrightness);   // change LED brightness back to previous state
+      analogWrite(brightLED, currentBrightness);   // change LED brightness back to previous state
    }
    if (!fb) {
      if (serialDebug) Serial.println("Error: Camera capture failed");
@@ -875,10 +846,11 @@ void rootUserInput(WiFiClient &client) {
     // if button2 was pressed (Cycle illumination LED)
       if (server.hasArg("button2")) {
         if (serialDebug) Serial.println("Button 2 pressed");
-        if (brightLEDbrightness == 0) brightLed(10);                // turn led on dim
-        else if (brightLEDbrightness == 10) brightLed(40);          // turn led on medium
-        else if (brightLEDbrightness == 40) brightLed(255);         // turn led on full
-        else brightLed(0);                                          // turn led off
+        if (brightLEDbrightness == 0) brightLEDbrightness = 10;                // turn led on dim
+        else if (brightLEDbrightness == 10) brightLEDbrightness = 40;          // turn led on medium
+        else if (brightLEDbrightness == 40) brightLEDbrightness = 255;         // turn led on full
+        else brightLEDbrightness = 0;                                          // turn led off
+        analogWrite(brightLED, brightLEDbrightness);
       }
 
     // if button3 was pressed (toggle flash)
@@ -1699,7 +1671,7 @@ void readGrayscaleImage() {
   // capture the image and use flash if required
     int currentBrightness = brightLEDbrightness;
     if (flashRequired) {
-        brightLed(255);   // change LED brightness (0 - 255)
+        analogWrite(brightLED, 255);   // change LED brightness (0 - 255)
         delay(100);
     }
     camera_fb_t * fb = NULL;
@@ -1710,7 +1682,7 @@ void readGrayscaleImage() {
       fb = esp_camera_fb_get(); // get fresh image
     if (flashRequired){
         delay(100);
-        brightLed(currentBrightness);            // change LED brightness back to previous state
+        analogWrite(brightLED, currentBrightness);            // change LED brightness back to previous state
     }
     if (!fb) client.println("Error: Camera image capture failed");
 
