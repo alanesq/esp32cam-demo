@@ -58,15 +58,12 @@
 //                                   Enter your wifi settings
 //                          ====================================== 
 
-
                         #define SSID_NAME "<WIFI SSID HERE>"
                         
                         #define SSID_PASWORD "<WIFI PASSWORD HERE>"
                         
                         #define ENABLE_OTA 0                         // If OTA updating of this sketch is enabled (requires ota.h file)
                         const String OTAPassword = "password";       // Password for performing OTA update (i.e. http://x.x.x.x/ota)
-
-
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -101,8 +98,14 @@
 //                           -SETTINGS
 // ---------------------------------------------------------------
 
- char* stitle = "ESP32Cam-demo";                        // title of this sketch
+ char* stitle = "ESP32Cam";                             // title of this sketch
  char* sversion = "10Dec24";                            // Sketch version
+ 
+ framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_SVGA;         // default camera resolution
+    //           Resolutions available:
+    //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 240X240,
+    //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA default), 800x600 (SVGA),
+    //               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
 
  #define WDT_TIMEOUT 60                                 // timeout of watchdog timer (seconds) 
 
@@ -166,7 +169,6 @@
 
 //#include "esp_camera.h"         // https://github.com/espressif/esp32-camera
 // #include "camera_pins.h"
-framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_SVGA;        // default camera resolution
 #include <WString.h>            // this is required for base64.h otherwise get errors with esp32 core 1.0.6 - jan23
 #include <base64.h>             // for encoding buffer to display image on page
 #include <WiFi.h>
@@ -645,11 +647,12 @@ void sendHeader(WiFiClient &client, char* hTitle) {
               background-color: #FFFF00;
               text-align: center;
             }
-            input {
+            input, select {
               background-color: #FF9900;
               border: 2px #FF9900;
               color: blue;
               padding: 3px 6px;
+              margin: 3px;
               text-align: center;
               text-decoration: none;
               display: inline-block;
@@ -996,10 +999,6 @@ void handleRoot() {
      client.write("<input style='height: 35px;' name='button4' value='Wipe SPIFFS memory' type='submit'> \n");
 
   // change resolution
-  //           Resolutions available:
-  //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 240X240,
-  //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA default), 800x600 (SVGA),
-  //               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
     //client.write("<br><label for='options'>Change camera resolution:</label>\n");
     client.write("<br><select id='resolution' name='resolution'>\n");
     client.write("  <option value='n/a'>Change camera resolution</option>\n");   // for if none selected
@@ -1015,7 +1014,7 @@ void handleRoot() {
      client.printf("Brightness: <input type='number' style='width: 50px' name='bright' title='from -2 to +2' min='-2' max='2' value='%d'>  \n", cameraImageBrightness);
      client.printf("Exposure: <input type='number' style='width: 50px' name='exp' title='from 0 to 1200' min='0' max='1200' value='%d'>  \n", cameraImageExposure);
      client.printf("Gain: <input type='number' style='width: 50px' name='gain' title='from 0 to 30' min='0' max='30' value='%d'>\n", cameraImageGain);
-     client.println(" <input type='submit' name='submit' value='Submit change / Refresh Image'>");
+     client.println(" <input type='submit' name='submit' value='Submit changes'>");
      client.println("<br>Set exposure and gain to zero for auto adjust");
 
    // links to the other pages available
