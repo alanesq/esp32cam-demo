@@ -1,11 +1,9 @@
 /*******************************************************************************************************************
 *
 *                         ESP32Cam development board demo sketch using Arduino IDE or PlatformIO
-*                                    Github: https://github.com/alanesq/ESP32Cam-demo
+*                                   Github: https://github.com/alanesq/ESP32Cam-demo
 *
-*                                Tested with ESP32 board manager version  3.0.2
-*
-*                                        NOTE: FLASH NOT WORKING - 30Sep24
+*                                    Tested with ESP32 board manager version  3.0.7
 *
 *     Starting point sketch for projects using the esp32cam development board with the following features
 *        web server with live video streaming and RGB data from camera demonstrated.
@@ -61,9 +59,6 @@
 //                          ====================================== 
 
 
-            #include "wifiSettings.h"     /*                // delete this line //
-
-
                         #define SSID_NAME "<WIFI SSID HERE>"
                         
                         #define SSID_PASWORD "<WIFI PASSWORD HERE>"
@@ -73,8 +68,6 @@
 
 
 
-                                           */              // delete this line //
-
 
 //   ---------------------------------------------------------------------------------------------------------
 
@@ -83,7 +76,7 @@
     // forward declarations
       bool initialiseCamera(bool);            // this sets up and enables the camera (if bool=1 standard settings are applied but 0 allows you to apply custom settings)
       bool cameraImageSettings();             // this applies the image settings to the camera (brightness etc.)
-      void changeResolution();                // this changes the capture frame size
+      void changeResolution(framesize_t);     // change camera resolution
       String localTime();                     // returns the current time as a String
       void flashLED(int);                     // flashes the onboard indicator led
       byte storeImage();                      // stores an image in Spiffs or SD card
@@ -109,7 +102,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam-demo";                        // title of this sketch
- char* sversion = "01Oct24";                            // Sketch version
+ char* sversion = "10Dec24";                            // Sketch version
 
  #define WDT_TIMEOUT 60                                 // timeout of watchdog timer (seconds) 
 
@@ -125,12 +118,6 @@
 
  // Camera related
    bool flashRequired = 0;                              // If flash to be used when capturing image (1 = yes)
-   const framesize_t cyclingRes[] = { FRAMESIZE_SVGA, FRAMESIZE_XGA, FRAMESIZE_SXGA, FRAMESIZE_QVGA, FRAMESIZE_VGA };    // resolutions to use
-                                                        // Image resolutions available:
-                                                        //               default = "const framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_VGA"
-                                                        //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 240X240,
-                                                        //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA),
-                                                        //               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
    int cameraImageExposure = 0;                         // Camera exposure (0 - 1200)   If gain and exposure both set to zero then auto adjust is enabled
    int cameraImageGain = 0;                             // Image gain (0 - 30)
    int cameraImageBrightness = 0;                       // Image brightness (-2 to +2)
@@ -179,7 +166,7 @@
 
 //#include "esp_camera.h"         // https://github.com/espressif/esp32-camera
 // #include "camera_pins.h"
-framesize_t FRAME_SIZE_IMAGE = cyclingRes[0];
+framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_SVGA;        // default camera resolution
 #include <WString.h>            // this is required for base64.h otherwise get errors with esp32 core 1.0.6 - jan23
 #include <base64.h>             // for encoding buffer to display image on page
 #include <WiFi.h>
@@ -225,6 +212,7 @@ WebServer server(80);                          // serve web pages on port 80
  int imageCounter;                             // image file name on sd card counter
  const String spiffsFilename = "/image.jpg";   // image name to use when storing in spiffs
  String ImageResDetails = "Unknown";           // image resolution info
+ int currentRes = 0;                           // current selected camera resolution
 
 // OTA Stuff
   bool OTAEnabled = 0;                         // flag to show if OTA has been enabled (via supply of password in http://x.x.x.x/ota)
@@ -274,6 +262,7 @@ void setup() {
      Serial.print("IP address: ");
      Serial.println(WiFi.localIP());
    }
+   server.enableCORS();   // allow html to request pages without it being blocked
    server.begin();                               // start web server
    digitalWrite(indicatorLED,HIGH);              // small indicator led off
 
@@ -494,7 +483,7 @@ if (reset) {
         config.pin_sccb_scl = SIOC_GPIO_NUM;     
      #else
         config.pin_sscb_sda = SIOD_GPIO_NUM;    // pre v3
-        config.pin_sscb_scl = SIOC_GPIO_NUM;
+        config.pin_sscb_scl = SIOC_GPIO_NUM; 
      #endif
    config.pin_pwdn = PWDN_GPIO_NUM;
    config.pin_reset = RESET_GPIO_NUM;   
@@ -555,12 +544,18 @@ bool cameraImageSettings() {
      // enable auto adjust
        s->set_gain_ctrl(s, 1);                       // auto gain on
        s->set_exposure_ctrl(s, 1);                   // auto exposure on 
+       s->set_saturation(s, -1);                     // Slightly decrease saturation
+       s->set_contrast(s, -1);                       // Slightly decrease contrast
+       s->set_whitebal(s, 1);                        // Enable auto white balanc
        s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1)
        s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
    } else {
      // Apply manual settings
        s->set_gain_ctrl(s, 0);                       // auto gain off
        s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1)
+       s->set_saturation(s, -1);                     // Slightly decrease saturation
+       s->set_contrast(s, -1);                       // Slightly decrease contrast
+       s->set_whitebal(s, 1);                        // Enable auto white balanc
        s->set_exposure_ctrl(s, 0);                   // auto exposure off
        s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
        s->set_agc_gain(s, cameraImageGain);          // set gain manually (0 - 30)
@@ -716,23 +711,17 @@ void resetCamera(bool type = 0) {
 // ----------------------------------------------------------------
 //                    -change image resolution
 // ----------------------------------------------------------------
-// cycles through the available resolutions (set in cyclingRes[])
-//Note: there seems to be an issue with 1024x768 with later releases of esp software?
+// Change camera resolution
 // Resolutions:  160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA),
 //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA),
 //               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
-void changeResolution() {
-  //  const framesize_t cyclingRes[] = { FRAMESIZE_QVGA, FRAMESIZE_VGA, FRAMESIZE_SVGA, FRAMESIZE_XGA, FRAMESIZE_SXGA };    // resolutions to cycle through
-  const int noAvail = sizeof(cyclingRes) / sizeof(cyclingRes[0]);
-  static int currentRes = 0;  
+void changeResolution(framesize_t newRes) {
   esp_camera_deinit();     // disable camera
   delay(camChangeDelay);
-  currentRes++;                               // change to next resolution available
-  if (currentRes >= noAvail) currentRes=0;    // reset loop
-  FRAME_SIZE_IMAGE = cyclingRes[currentRes];
+  FRAME_SIZE_IMAGE = newRes;
 
   initialiseCamera(1);
-  if (serialDebug) Serial.println("Camera resolution changed to " + String(cyclingRes[currentRes]));
+  if (serialDebug) Serial.println("Camera resolution changed");
   ImageResDetails = "Unknown";   // set next time image captured
 }
 
@@ -837,6 +826,23 @@ void rootUserInput(WiFiClient &client) {
     // if button1 was pressed (toggle io pin A)
     //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1");
 
+    // if image resultion was selected
+      if (server.hasArg("submit")) {           // only if submit button was pressed
+        if (serialDebug) Serial.println("SUBMIT has been clicked");
+        if (server.hasArg("resolution")) {   
+          String option = server.arg("resolution");
+          if (serialDebug) Serial.println("camera resolution selected = " + option);
+          framesize_t qres = FRAMESIZE_SVGA;   // default
+          if (option == "QVGA") qres = FRAMESIZE_QVGA;
+          if (option == "VGA") qres = FRAMESIZE_VGA;
+          if (option == "SVGA") qres = FRAMESIZE_SVGA;
+          if (option == "XGA") qres = FRAMESIZE_XGA;
+          if (option == "SXGA") qres = FRAMESIZE_SXGA;
+          if (qres != FRAME_SIZE_IMAGE) changeResolution(qres);    // change cameras resolution
+        }
+      }
+
+
     // if button1 was pressed (toggle io pin B)
       if (server.hasArg("button1")) {
         if (serialDebug) Serial.println("Button 1 pressed");
@@ -867,12 +873,6 @@ void rootUserInput(WiFiClient &client) {
         } else {
           if (serialDebug) Serial.println("Spiffs memory has been formatted");
         }
-      }
-
-    // if button4 was pressed (change resolution)
-      if (server.hasArg("button5")) {
-        if (serialDebug) Serial.println("Button 5 pressed");
-        changeResolution();   // cycle through some options
       }
 
     // if brightness was adjusted - cameraImageBrightness
@@ -994,7 +994,21 @@ void handleRoot() {
      client.write("<input style='height: 35px;' name='button2' value='Cycle illumination LED' type='submit'> \n");
      client.write("<input style='height: 35px;' name='button3' value='Toggle Flash' type='submit'> \n");
      client.write("<input style='height: 35px;' name='button4' value='Wipe SPIFFS memory' type='submit'> \n");
-     client.write("<input style='height: 35px;' name='button5' value='Change Resolution' type='submit'><br> \n");
+
+  // change resolution
+  //           Resolutions available:
+  //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 240X240,
+  //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA default), 800x600 (SVGA),
+  //               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
+    //client.write("<br><label for='options'>Change camera resolution:</label>\n");
+    client.write("<br><select id='resolution' name='resolution'>\n");
+    client.write("  <option value='n/a'>Change camera resolution</option>\n");   // for if none selected
+    client.write("  <option value='QVGA'>QVGA</option>\n");
+    client.write("  <option value='VGA'>VGA</option>\n");
+    client.write("  <option value='SVGA'>SVGA</option>\n");
+    client.write("  <option value='XGA'>XGA</option>\n");
+    client.write("  <option value='SXGA'>SXGA</option>\n");
+    client.write("</select>\n");
 
    // Image setting controls
      client.println("<br>CAMERA SETTINGS: ");
@@ -1102,8 +1116,9 @@ void handleData(){
     reply += "Image size: " + ImageResDetails;
     reply += ",";
 
-  // line6 - free memory
+  // line6 - memory
     reply += "Free memory: " + String(ESP.getFreeHeap() /1000) + "K";
+    if (!psramFound()) reply += " (No PSRAM found!)";
 
    server.send(200, "text/plane", reply); //Send millis value only to client ajax request
 }
@@ -1781,30 +1796,31 @@ void handleTest() {
 
 
 
-// demo of drawing on the camera image using javascript / html canvas
-//   could be of use to show area of interest on the image etc. - see https://www.w3schools.com/html/html5_canvas.asp
-// creat a DIV and put image in it with a html canvas on top of it
-  int imageWidth = 640;   // image dimensions on web page
-  int imageHeight = 480;
-  client.println("<div style='display:inline-block;position:relative;'>");
-  client.println("<img style='position:absolute;z-index:10;' src='/jpg' width='" + String(imageWidth) + "' height='" + String(imageHeight) + "' />");
-  client.println("<canvas style='position:relative;z-index:20;' id='myCanvas' width='" + String(imageWidth) + "' height='" + String(imageHeight) + "'></canvas>");
-  client.println("</div>");
-// javascript to draw on the canvas
-  client.println("<script>");
-  client.println("var imageWidth = " + String(imageWidth) + ";");
-  client.println("var imageHeight = " + String(imageHeight) + ";");
-  client.print (R"=====(
-    // connect to the canvas
-      var c = document.getElementById("myCanvas");
-      var ctx = c.getContext("2d");
-      ctx.strokeStyle = "red";
-    // draw on image
-      ctx.rect(imageWidth / 2, imageHeight / 2, 60, 40);                              // box
-      ctx.moveTo(20, 20); ctx.lineTo(200, 100);                                       // line
-      ctx.font = "30px Arial";  ctx.fillText("Hello World", 50, imageHeight - 50);    // text
-      ctx.stroke();
-   </script>\n)=====");
+
+// // demo of drawing on the camera image using javascript / html canvas
+// //   could be of use to show area of interest on the image etc. - see https://www.w3schools.com/html/html5_canvas.asp
+// // creat a DIV and put image in it with a html canvas on top of it
+//   int imageWidth = 640;   // image dimensions on web page
+//   int imageHeight = 480;
+//   client.println("<div style='display:inline-block;position:relative;'>");
+//   client.println("<img style='position:absolute;z-index:10;' src='/jpg' width='" + String(imageWidth) + "' height='" + String(imageHeight) + "' />");
+//   client.println("<canvas style='position:relative;z-index:20;' id='myCanvas' width='" + String(imageWidth) + "' height='" + String(imageHeight) + "'></canvas>");
+//   client.println("</div>");
+// // javascript to draw on the canvas
+//   client.println("<script>");
+//   client.println("var imageWidth = " + String(imageWidth) + ";");
+//   client.println("var imageHeight = " + String(imageHeight) + ";");
+//   client.print (R"=====(
+//     // connect to the canvas
+//       var c = document.getElementById("myCanvas");
+//       var ctx = c.getContext("2d");
+//       ctx.strokeStyle = "red";
+//     // draw on image
+//       ctx.rect(imageWidth / 2, imageHeight / 2, 60, 40);                              // box
+//       ctx.moveTo(20, 20); ctx.lineTo(200, 100);                                       // line
+//       ctx.font = "30px Arial";  ctx.fillText("Hello World", 50, imageHeight - 50);    // text
+//       ctx.stroke();
+//    </script>\n)=====");
 
 
 // // flip image horizontally
