@@ -36,7 +36,9 @@ The root web page uses AJAX to update info. on the page.  This is not done in th
 instead passes complete lines of text, it may not be elegant but it makes changing what information is displayed much easier as all you 
 have to do is modify what info handleData() sends. 
 
-BTW - I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/esp32cam-Timelapse
+I have created a processing sketch (well myself and ChatGPT created it together;-) which works with this sketch to provide motion detection which is well worth a try:  https://github.com/alanesq/esp32cam-demo/tree/master/Misc/motionDetect
+
+I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/esp32cam-Timelapse
 
 LATEST NEWS!!!
 There is now a very cheap motherboard available for the esp32cam which make it as easy to use as any other esp development board. 
