@@ -3,7 +3,7 @@
 *                         ESP32Cam development board demo sketch using Arduino IDE or PlatformIO
 *                                   Github: https://github.com/alanesq/ESP32Cam-demo
 *
-*                                    Tested with ESP32 board manager version  3.0.7
+*                         Tested with ESP32 board manager version 3.1.1, Arduino IDE 2.3.4
 *
 *     Starting point sketch for projects using the esp32cam development board with the following features
 *        web server with live video streaming and RGB data from camera demonstrated.
@@ -58,12 +58,15 @@
 //                                   Enter your wifi settings
 //                          ====================================== 
 
+
                         #define SSID_NAME "<WIFI SSID HERE>"
                         
                         #define SSID_PASWORD "<WIFI PASSWORD HERE>"
                         
                         #define ENABLE_OTA 0                         // If OTA updating of this sketch is enabled (requires ota.h file)
                         const String OTAPassword = "password";       // Password for performing OTA update (i.e. http://x.x.x.x/ota)
+
+
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -99,7 +102,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam";                             // title of this sketch
- char* sversion = "10Dec24";                            // Sketch version
+ char* sversion = "23Feb25";                            // Sketch version
  
  framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_SVGA;         // default camera resolution
     //           Resolutions available:
@@ -129,6 +132,7 @@
  const int TimeBetweenStatus = 600;                     // speed of flashing system running ok status light (milliseconds)
 
  const int indicatorLED = 33;                           // onboard small LED pin (33)
+ const bool flashIndicatorLED = 1;                      // if led is to flash to indicate camera is operating ok
 
  // Bright LED (Flash)
    const int brightLED = 4;                             // onboard Illumination/flash LED pin (4)
@@ -280,6 +284,8 @@ void setup() {
    server.on("/graydata", readGrayscaleImage);   // look at grayscale image data
    server.on("/test", handleTest);               // Testing procedure
    server.on("/reboot", handleReboot);           // restart device
+   server.on("/ping", handlePing);               // for checking camera is responding
+   server.on("/switch", handleSwitch);           // switch gpio pin via a url
    server.onNotFound(handleNotFound);            // invalid url requested
 #if ENABLE_OTA   
   server.on("/ota", handleOTA);                 // ota updates web page
@@ -448,7 +454,7 @@ void loop() {
    if ((unsigned long)(millis() - lastStatus) >= TimeBetweenStatus) {
      lastStatus = millis();                                               // reset timer
      esp_task_wdt_reset();                                                // reset watchdog timer (to prevent system restart)
-     digitalWrite(indicatorLED,!digitalRead(indicatorLED));               // flip indicator led status
+     if (flashIndicatorLED) digitalWrite(indicatorLED,!digitalRead(indicatorLED));     // flip indicator led status
    }
 
 }  // loop
@@ -824,7 +830,7 @@ byte storeImage() {
 //            -Action any user input on root web page
 // ----------------------------------------------------------------
 
-void rootUserInput(WiFiClient &client) {
+void rootUserInput(WiFiClient &client) {         
 
     // if button1 was pressed (toggle io pin A)
     //        Note:  if using an input box etc. you would read the value with the command:    String Bvalue = server.arg("demobutton1");
@@ -1115,9 +1121,10 @@ void handleData(){
     reply += "Image size: " + ImageResDetails;
     reply += ",";
 
-  // line6 - memory
+  // line6 - memory - wifi
     reply += "Free memory: " + String(ESP.getFreeHeap() /1000) + "K";
     if (!psramFound()) reply += " (No PSRAM found!)";
+    reply += "&ensp; Wifi strength: " + String(WiFi.RSSI()) + "dBm";
 
    server.send(200, "text/plane", reply); //Send millis value only to client ajax request
 }
@@ -1764,6 +1771,48 @@ void handleReboot(){
         ESP.restart();
         delay(5000);         // restart fails without this delay
 }
+
+
+// ----------------------------------------------------------------
+//   -switch GPIO pin via URL    i.e. http://x.x.x.x/switch?on=1
+// ----------------------------------------------------------------
+
+void handleSwitch() {
+
+  WiFiClient client = server.client();             // open link with client
+
+  String reply = "error - no command received";    // default message
+
+    // switch gpio pin
+      if (server.hasArg("on")) {   
+          String Tvalue = server.arg("on");        // read value
+          if (Tvalue != NULL) {
+            int val = Tvalue.toInt();        
+            if (val == 0) {
+              digitalWrite(iopinB, LOW);
+              reply = "Switched off";
+            }
+            if (val == 1) {
+              digitalWrite(iopinB, HIGH);
+              reply = "Switched on";
+            }
+          }
+      }     
+  
+  server.send(200, "text/plain", reply);           // send reply as plain "ok"
+}      
+
+
+// ----------------------------------------------------------------
+//      -ping web page requested     i.e. http://x.x.x.x/ping
+// ----------------------------------------------------------------
+
+void handlePing() {
+
+  WiFiClient client = server.client();         // open link with client
+  
+  server.send(200, "text/plain", "ok");        // send reply as plain "ok"
+}        
 
 
 // ----------------------------------------------------------------
