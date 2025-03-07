@@ -94,12 +94,13 @@ There is a procedure which demonstrates how to get RGB data from an image which 
 as data (http://x.x.x.x/rgb).
 
 URLs:
-<br>http://x.x.x.x/              Hello message
+<br>http://x.x.x.x/              Main page
 <br>http://x.x.x.x/jpg           capture image and display as a JPG
 <br>http://x.x.x.x/jpeg          as above but refreshes every 2 seconds    
 <br>http://x.x.x.x/photo         Capture an image and save to sd card
 <br>http://x.x.x.x/stream        Show live streaming video
 <br>http://x.x.x.x/img           Show most recent image saved to sd card
+<br>http://x.x.x.x//switch?on=1  Switch the GPIO pin on  ('on=0' to turn it off)
 <br>http://x.x.x.x/img?img=1     Show image number 1 on sd card
 <br>http://x.x.x.x/greyscale     Show how to capture a greyscale image and look at the raw data
 <br>http://x.x.x.x/rgb           Captures an image and converts to RGB data (will not work with the highest 
