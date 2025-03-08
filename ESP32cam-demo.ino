@@ -102,7 +102,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESP32Cam";                             // title of this sketch
- char* sversion = "23Feb25";                            // Sketch version
+ char* sversion = "08Mar25";                            // Sketch version
  
  framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_SVGA;         // default camera resolution
     //           Resolutions available:
@@ -1464,48 +1464,49 @@ bool getNTPtime(int sec) {
 // ----------------------------------------------------------------
 
 bool handleJPG() {
-
-    WiFiClient client = server.client();          // open link with client
+    WiFiClient client = server.client();          
     char buf[32];
 
-    // capture the jpg image from camera
-        camera_fb_t * fb = NULL;
+    camera_fb_t * fb = NULL;
+
+    for (int attempts = 0; attempts < 3; attempts++) {
         fb = esp_camera_fb_get();
-        // there is a bug where this buffer can be from previous capture so as workaround it is discarded and captured again
-          esp_camera_fb_return(fb); // dispose the buffered image
-          fb = NULL; // reset to capture errors
-          fb = esp_camera_fb_get(); // get fresh image
-        if (!fb) {
-          if (serialDebug) Serial.println("Error: failed to capture image");
-          return 0;
-        }
+        if (fb && fb->buf && fb->len > 0) break;  
+        esp_camera_fb_return(fb);
+        fb = NULL;
+        delay(100); // Delay before retry
+    }
 
-    // store image resolution info.
-      ImageResDetails = String(fb->width) + "x" + String(fb->height);
+    if (!fb) {
+        if (serialDebug) Serial.println("Error: failed to capture image after retries");
+        return 0;
+    }
 
-    // html to send a jpg
-      const char HEADER[] = "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\n";
-      const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";
-      const int hdrLen = strlen(HEADER);
-      const int cntLen = strlen(CTNTTYPE);
-      client.write(HEADER, hdrLen);
-      client.write(CTNTTYPE, cntLen);
-      sprintf( buf, "%d\r\n\r\n", fb->len);      // put text size in to 'buf' char array and send
-      client.write(buf, strlen(buf));
+    ImageResDetails = String(fb->width) + "x" + String(fb->height);
 
-    // send the captured jpg data
-      client.write((char *)fb->buf, fb->len);
+    const char HEADER[] = "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\n";
+    const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";
+    client.write(HEADER, strlen(HEADER));
+    client.write(CTNTTYPE, strlen(CTNTTYPE));
 
-    // close network client connection
-      delay(3);
-      client.stop();
+    sprintf(buf, "%d\r\n\r\n", fb->len);
+    client.write(buf, strlen(buf));
 
-    esp_camera_fb_return(fb);                 // return camera frame buffer
+    if (client.connected()) {
+        client.write((char *)fb->buf, fb->len);
+    } else {
+        if (serialDebug) Serial.println("Error: client disconnected during transmission");
+    }
+
+    delay(3);
+    client.flush();
+    client.stop();
+
+    esp_camera_fb_return(fb);
+    fb = NULL;
 
     return 1;
-
-}  // handleJPG
-
+}
 
 
 // ----------------------------------------------------------------
