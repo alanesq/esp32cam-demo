@@ -1,3 +1,5 @@
+// new esp32 manager - esp32cam - regular
+
 /*******************************************************************************************************************
 *
 *                         ESP32Cam development board demo sketch using Arduino IDE or PlatformIO
@@ -101,8 +103,8 @@
 //                           -SETTINGS
 // ---------------------------------------------------------------
 
- char* stitle = "ESP32Cam";                             // title of this sketch
- char* sversion = "08Mar25";                            // Sketch version
+ char* stitle = "BackCam";                              // title of this sketch
+ char* sversion = "11Mar25";                            // Sketch version
  
  framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_SVGA;         // default camera resolution
     //           Resolutions available:
@@ -554,12 +556,13 @@ bool cameraImageSettings() {
        s->set_exposure_ctrl(s, 1);                   // auto exposure on 
        s->set_saturation(s, -1);                     // Slightly decrease saturation
        s->set_contrast(s, -1);                       // Slightly decrease contrast
-       s->set_whitebal(s, 1);                        // Enable auto white balanc
+       s->set_whitebal(s, 1);                        // Enable white balance
        s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1)
        s->set_brightness(s, cameraImageBrightness);  // (-2 to 2) - set brightness
    } else {
      // Apply manual settings
        s->set_gain_ctrl(s, 0);                       // auto gain off
+       s->set_whitebal(s, 1);                        // Enable white balance
        s->set_awb_gain(s, 1);                        // Auto White Balance enable (0 or 1)
        s->set_saturation(s, -1);                     // Slightly decrease saturation
        s->set_contrast(s, -1);                       // Slightly decrease contrast
@@ -572,6 +575,12 @@ bool cameraImageSettings() {
    
    //s->set_vflip(s, 1);                               // flip image vertically
    //s->set_hmirror(s, 1);                             // flip image horizontally
+
+  // Discard initial frames to ensure new settings apply
+  for (int i = 0; i < 5; i++) {
+      camera_fb_t *fb = esp_camera_fb_get();
+      esp_camera_fb_return(fb);
+  }
 
    return 1;
 }  // cameraImageSettings
@@ -753,10 +762,7 @@ byte storeImage() {
    }
   camera_fb_t * fb = NULL;
   fb = esp_camera_fb_get();
-  // there is a bug where this buffer can be from previous capture so as workaround it is discarded and captured again
-    esp_camera_fb_return(fb); // dispose the buffered image
-    fb = NULL; // reset to capture errors
-    fb = esp_camera_fb_get(); // get fresh image   
+
    if (flashRequired){
       delay(100);
       analogWrite(brightLED, currentBrightness);   // change LED brightness back to previous state
@@ -850,7 +856,6 @@ void rootUserInput(WiFiClient &client) {
           if (qres != FRAME_SIZE_IMAGE) changeResolution(qres);    // change cameras resolution
         }
       }
-
 
     // if button1 was pressed (toggle io pin B)
       if (server.hasArg("button1")) {
@@ -1319,10 +1324,7 @@ void readRGBImage() {
       tTimer = millis();                                                                                    // store time that image capture started
       camera_fb_t * fb = NULL;
       fb = esp_camera_fb_get();
-      // there is a bug where this buffer can be from previous capture so as workaround it is discarded and captured again
-        esp_camera_fb_return(fb); // dispose the buffered image
-        fb = NULL; // reset to capture errors
-        fb = esp_camera_fb_get(); // get fresh image
+
      if (!fb) {
        sendText(client,"error: failed to capture image from camera");
        client.write("<br><a href='/'>Return</a>\n");       // link back
@@ -1470,11 +1472,12 @@ bool handleJPG() {
     camera_fb_t * fb = NULL;
 
     for (int attempts = 0; attempts < 3; attempts++) {
+        delay(30);                                // help stabilize the frame?
         fb = esp_camera_fb_get();
-        if (fb && fb->buf && fb->len > 0) break;  
-        esp_camera_fb_return(fb);
+        if (fb && fb->buf && fb->len > 0) break;  // frame has been captured
+        if (fb) esp_camera_fb_return(fb);
         fb = NULL;
-        delay(100); // Delay before retry
+        delay(100);                               // delay before retry
     }
 
     if (!fb) {
@@ -1499,7 +1502,7 @@ bool handleJPG() {
     }
 
     delay(3);
-    client.flush();
+    client.clear();
     client.stop();
 
     esp_camera_fb_return(fb);
@@ -1698,34 +1701,43 @@ void readGrayscaleImage() {
     }
     camera_fb_t * fb = NULL;
     fb = esp_camera_fb_get();
-    // there is a bug where this buffer can be from previous capture so as workaround it is discarded and captured again
-      esp_camera_fb_return(fb); // dispose the buffered image
-      fb = NULL;                // reset to capture errors
-      fb = esp_camera_fb_get(); // get fresh image
+
     if (flashRequired){
         delay(100);
         analogWrite(brightLED, currentBrightness);            // change LED brightness back to previous state
     }
     if (!fb) client.println("Error: Camera image capture failed");
 
-  // read image data and calculate average pixel value (as demonstration of reading the image data)
-  //      note:   image x = i % WIDTH, image y = floor(i / WIDTH)
-    unsigned long dataSize = fb->width * fb->height;
-    byte minV=255; byte maxV=0;
-    for (int y=0; y < fb->height; y++) {
-      for (int x=0; x < fb->width; x++) {   
-        byte pixelVal = fb->buf[(y * fb->width) + x];
-        if (pixelVal > maxV) maxV = pixelVal;
-        if (pixelVal < minV) minV = pixelVal;
-      }
-    }
-    client.println("grayscale Image: The lowest value pixel is " + String(minV) + ", the highest is " + String(maxV));
-    client.write("<br><br><a href='/'>Return</a>\n");       // link back    
+  // // read image data and calculate average pixel value (as demonstration of reading the image data)
+  // //      note:   image x = i % WIDTH, image y = floor(i / WIDTH)
+  //   unsigned long dataSize = fb->width * fb->height;
+  //   byte minV=255; byte maxV=0;
+  //   for (int y=0; y < fb->height; y++) {
+  //     for (int x=0; x < fb->width; x++) {   
+  //       byte pixelVal = fb->buf[(y * fb->width) + x];
+  //       if (pixelVal > maxV) maxV = pixelVal;
+  //       if (pixelVal < minV) minV = pixelVal;
+  //     }
+  //   }
+  //   client.print("Grayscale image: The lowest value pixel is " + String(minV) + ", the highest is " + String(maxV));  
+  //   client.print("<br>");
 
   // resize the image
     int newWidth = 115;   int newHeight = 42;         // much bigger than this seems to cause problems, possible web page is too large?
     byte newBuf[newWidth * newHeight];
     resize_esp32cam_image_buffer(fb->buf, fb->width, fb->height, newBuf, newWidth, newHeight);
+
+  // Get the min and max values in the new resized image
+    byte newminV=255; byte newmaxV=0;
+    for (int y=0; y < newHeight; y++) {
+      for (int x=0; x < newWidth; x++) {   
+        byte pixelVal = newBuf[(y * newWidth) + x];
+        if (pixelVal > newmaxV) newmaxV = pixelVal;
+        if (pixelVal < newminV) newminV = pixelVal;
+      }
+    }
+    client.println("Resized image: The lowest value pixel is " + String(newminV) + ", the highest is " + String(newmaxV));
+    client.write("<br><br><a href='/'>Return</a>\n");       // link back    
 
   // display image as asciiArt
     char asciiArt[] = {'@','#','S','%','?','*','+',';',':',',','.',' ',' '};       // characters to use 
@@ -1734,8 +1746,8 @@ void readGrayscaleImage() {
     for (int y=0; y < newHeight; y++) {
       client.write("\n");                                                      // new line
       for (int x=0; x < newWidth; x++) {   
-        int tpos = map(newBuf[y*newWidth+x], minV, maxV, 0, noAsciiChars - 1); // convert pixel brightness to ascii character
-        client.write(asciiArt[tpos]);   
+        int tpos = map(newBuf[y*newWidth+x], newminV, newmaxV, 0, noAsciiChars - 1); // convert pixel brightness to ascii character  
+        client.write(asciiArt[tpos]); 
       }
     }
     client.write("</pre><br>");
