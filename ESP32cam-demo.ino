@@ -1,5 +1,3 @@
-// new esp32 manager - esp32cam - regular
-
 /*******************************************************************************************************************
 *
 *                         ESP32Cam development board demo sketch using Arduino IDE or PlatformIO
@@ -77,7 +75,7 @@
 
     // forward declarations
       bool initialiseCamera(bool);            // this sets up and enables the camera (if bool=1 standard settings are applied but 0 allows you to apply custom settings)
-      bool cameraImageSettings();             // this applies the image settings to the camera (brightness etc.)
+      bool cameraImageSettings(bool);         // this applies the image settings to the camera (brightness etc.)
       void changeResolution(framesize_t);     // change camera resolution
       String localTime();                     // returns the current time as a String
       void flashLED(int);                     // flashes the onboard indicator led
@@ -103,8 +101,8 @@
 //                           -SETTINGS
 // ---------------------------------------------------------------
 
- char* stitle = "BackCam";                              // title of this sketch
- char* sversion = "11Mar25";                            // Sketch version
+ char* stitle = "ESP32CamDemo";                         // title of this sketch
+ char* sversion = "01Apr25";                            // Sketch version
  
  framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_SVGA;         // default camera resolution
     //           Resolutions available:
@@ -523,7 +521,7 @@ if (reset) {
      if (serialDebug) Serial.printf("ERROR: Camera init failed with error 0x%x", camerr);
    }
 
-   cameraImageSettings();                        // apply the camera image settings
+   cameraImageSettings(0);                       // apply the camera image settings
 
    return (camerr == ESP_OK);                    // return boolean result of camera initialisation
 }
@@ -534,11 +532,12 @@ if (reset) {
 // ----------------------------------------------------------------
 // Adjust image properties (brightness etc.)
 // Defaults to auto adjustments if exposure and gain are both set to zero
+// if 'flush' is set then several frames are captured to ensure settings take effect straight away
 // - Returns TRUE if successful
 // More info: https://randomnerdtutorials.com/esp32-cam-ov2640-camera-settings/
 //            interesting info on exposure times here: https://github.com/raduprv/esp32-cam_ov2640-timelapse
 
-bool cameraImageSettings() {
+bool cameraImageSettings(bool flush) {   
 
   if (serialDebug) Serial.println("Applying camera settings");
 
@@ -576,10 +575,13 @@ bool cameraImageSettings() {
    //s->set_vflip(s, 1);                               // flip image vertically
    //s->set_hmirror(s, 1);                             // flip image horizontally
 
-  // Discard initial frames to ensure new settings apply
-  for (int i = 0; i < 5; i++) {
-      camera_fb_t *fb = esp_camera_fb_get();
-      esp_camera_fb_return(fb);
+  // Discard initial frames to ensure new settings apply 
+  // This is a pain as it takes a while but without this the first few frames will not have the new setting applied
+  if (flush == 1) {
+    for (int i = 0; i < 5; i++) {
+        camera_fb_t *fb = esp_camera_fb_get();
+        esp_camera_fb_return(fb);
+    }
   }
 
    return 1;
@@ -897,7 +899,7 @@ void rootUserInput(WiFiClient &client) {
             if (val >= -2 && val <= 2 && val != cameraImageBrightness) {
               if (serialDebug) Serial.printf("Brightness changed to %d\n", val);
               cameraImageBrightness = val;
-              cameraImageSettings();           // Apply camera image settings
+              cameraImageSettings(0);           // Apply camera image settings
             }
           }
         }
@@ -911,7 +913,7 @@ void rootUserInput(WiFiClient &client) {
             if (val >= 0 && val <= 1200 && val != cameraImageExposure) {
               if (serialDebug) Serial.printf("Exposure changed to %d\n", val);
               cameraImageExposure = val;
-              cameraImageSettings();           // Apply camera image settings
+              cameraImageSettings(0);           // Apply camera image settings
             }
           }
         }
@@ -925,7 +927,7 @@ void rootUserInput(WiFiClient &client) {
               if (val >= 0 && val <= 31 && val != cameraImageGain) {
                 if (serialDebug) Serial.printf("Gain changed to %d\n", val);
                 cameraImageGain = val;
-                cameraImageSettings();          // Apply camera image settings
+                cameraImageSettings(0);          // Apply camera image settings
               }
             }
          }
@@ -1471,13 +1473,16 @@ bool handleJPG() {
 
     camera_fb_t * fb = NULL;
 
+    // drop first frame to ensure it is not an old image
+      fb = esp_camera_fb_get();
+      esp_camera_fb_return(fb);
+
     for (int attempts = 0; attempts < 3; attempts++) {
-        delay(30);                                // help stabilize the frame?
         fb = esp_camera_fb_get();
         if (fb && fb->buf && fb->len > 0) break;  // frame has been captured
         if (fb) esp_camera_fb_return(fb);
         fb = NULL;
-        delay(100);                               // delay before retry
+        delay(60);                                // delay before retry
     }
 
     if (!fb) {
@@ -1691,7 +1696,7 @@ void readGrayscaleImage() {
     delay(camChangeDelay);
     config.pixel_format = PIXFORMAT_GRAYSCALE;     // change camera setting to grayscale (default is JPG)
     initialiseCamera(0);                           // restart the camera (0 = without resetting all the other camera settings)
-    cameraImageSettings();
+    cameraImageSettings(1);
 
   // capture the image and use flash if required
     int currentBrightness = brightLEDbrightness;
