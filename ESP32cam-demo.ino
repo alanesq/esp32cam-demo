@@ -101,7 +101,7 @@
 //                           -SETTINGS
 // ---------------------------------------------------------------
 
- char* stitle = "ESP32CamDemo";                         // title of this sketch
+ char* stitle = "BackCam";                             // title of this sketch
  char* sversion = "01Apr25";                            // Sketch version
  
  framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_SVGA;         // default camera resolution
@@ -510,11 +510,14 @@ if (reset) {
 
    // check the esp32cam board has a psram chip installed (extra memory used for storing captured images)
    //    Note: if not using "AI thinker esp32 cam" in the Arduino IDE, PSRAM must be enabled
-   if (!psramFound()) {
-     if (serialDebug) Serial.println("Warning: No PSRam found so defaulting to image size 'CIF'");
-     config.frame_size = FRAMESIZE_SVGA;
-     config.fb_location = CAMERA_FB_IN_DRAM;
-   }
+    if (!psramFound()) {
+      if (serialDebug) Serial.println("Warning: No PSRam found so defaulting to smaller image size 'VGA' in DRAM");
+      config.frame_size = FRAMESIZE_VGA;     
+      config.fb_location = CAMERA_FB_IN_DRAM;
+    } else {
+      // If PSRAM IS found, explicitly set fb_location  
+      config.fb_location = CAMERA_FB_IN_PSRAM;
+    }
 
    esp_err_t camerr = esp_camera_init(&config);  // initialise the camera
    if (camerr != ESP_OK) {
@@ -783,10 +786,12 @@ byte storeImage() {
        if (serialDebug) Serial.println("Failed to create file in Spiffs - will format and try again");
        if (!SPIFFS.format()) {                              // format spiffs
          if (serialDebug) Serial.println("Spiffs format failed");
+         return 0;
        } else {
          file = SPIFFS.open(spiffsFilename, FILE_WRITE);    // try again to create new file
          if (!file) {
            if (serialDebug) Serial.println("Still unable to create file in spiffs");
+           return 0;
          }
        }
      }
@@ -795,6 +800,8 @@ byte storeImage() {
          sRes = 1;    // flag as saved ok
        } else {
          if (serialDebug) Serial.println("Error: failed to write image data to spiffs file");
+         file.close();
+         return 0;
        }
      }
      esp_camera_fb_return(fb);                               // return camera frame buffer
@@ -1097,43 +1104,45 @@ void handleData(){
       SDtotalSpace = SD_MMC.totalBytes() / (1024 * 1024);
       SDfreeSpace = SDtotalSpace - SDusedSpace;
     }
-   String reply = "";
+
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/plain", "");
 
   // line1 - sd card
     if (!sdcardPresent) {
-      reply += "<span style='color:blue;'>NO SD CARD DETECTED</span>";
+      server.sendContent("<span style='color:blue;'>NO SD CARD DETECTED</span>");
     } else {
-      reply += "SD Card: " + String(SDusedSpace) + "MB used - " + String(SDfreeSpace) + "MB free";
+      server.sendContent("SD Card: " + String(SDusedSpace) + "MB used - " + String(SDfreeSpace) + "MB free");
     }
-    reply += ",";
+    server.sendContent(",");
 
   // line2 - illumination/flash led
-    reply += "Illumination led brightness=" + String(brightLEDbrightness);
-    reply += " &ensp; Flash is ";     // Note: '&ensp;' leaves a gap
-    reply += (flashRequired) ? "Enabled" : "Off";
-    reply += ",";
+    server.sendContent("Illumination led brightness=" + String(brightLEDbrightness));
+    server.sendContent(" &ensp; Flash is ");     // Note: '&ensp;' leaves a gap
+    server.sendContent( (flashRequired) ? "Enabled" : "Off" );
+    server.sendContent(",");
 
   // line3 - Current real time
-    reply += "Current time: " + localTime();
-    reply += ",";
+    server.sendContent("Current time: " + localTime());
+    server.sendContent(",");
 
   // line4 - gpio pin status
-    reply += "GPIO output pin 12 is: ";
-    reply += (digitalRead(iopinB)==1) ? "ON" : "OFF";
-    reply += " &ensp; GPIO input pin 13 is: ";
-    reply += (digitalRead(iopinA)==1) ? "ON" : "OFF";
-    reply += ",";
+    server.sendContent("GPIO output pin 12 is: ");
+    server.sendContent( (digitalRead(iopinB)==1) ? "ON" : "OFF" );
+    server.sendContent(" &ensp; GPIO input pin 13 is: ");
+    server.sendContent( (digitalRead(iopinA)==1) ? "ON" : "OFF" );
+    server.sendContent(",");
 
   // line5 - image resolution
-    reply += "Image size: " + ImageResDetails;
-    reply += ",";
+    server.sendContent("Image size: " + ImageResDetails);
+    server.sendContent(",");
 
   // line6 - memory - wifi
-    reply += "Free memory: " + String(ESP.getFreeHeap() /1000) + "K";
-    if (!psramFound()) reply += " (No PSRAM found!)";
-    reply += "&ensp; Wifi strength: " + String(WiFi.RSSI()) + "dBm";
+    server.sendContent("Free memory: " + String(ESP.getFreeHeap() /1000) + "K");
+    if (!psramFound()) server.sendContent(" (No PSRAM found!)");
+    server.sendContent("&ensp; Wifi strength: " + String(WiFi.RSSI()) + "dBm");
 
-   server.send(200, "text/plane", reply); //Send millis value only to client ajax request
+  // server.client().stop();
 }
 
 
@@ -1367,16 +1376,18 @@ void readRGBImage() {
      sendText(client,"Free psram after rgb data allocated = " + String(heap_caps_get_free_size(MALLOC_CAP_SPIRAM) / 1024) + "K");
 
    // convert the captured jpg image (fb) to rgb data (store in 'rgb' array)
-     tTimer = millis();                                                                                   // store time that image conversion process started
-     bool jpeg_converted = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);
-     if (!jpeg_converted) {
-       sendText(client,"error: failed to convert image to RGB data");
-       if (!sendRGBfile) {
-         client.write("<br><a href='/'>Return</a>\n");    // link back
-         sendFooter(client);                              // close web page
-       }
-       return;
-     }
+      tTimer = millis();                                                                                   // store time that image conversion process started
+      bool jpeg_converted = fmt2rgb888(fb->buf, fb->len, PIXFORMAT_JPEG, rgb);
+      if (!jpeg_converted) {
+          sendText(client,"error: failed to convert image to RGB data");
+          heap_caps_free(ptrVal);   
+          esp_camera_fb_return(fb);   
+          if (!sendRGBfile) {
+              client.write("<br><a href='/'>Return</a>\n");    // link back
+              sendFooter(client);                              // close web page
+          }
+          return;
+      }
      sendText(client, "Conversion from jpg to RGB took " + String(millis() - tTimer) + " milliseconds");// report how long the conversion took
 
 
@@ -1711,7 +1722,15 @@ void readGrayscaleImage() {
         delay(100);
         analogWrite(brightLED, currentBrightness);            // change LED brightness back to previous state
     }
-    if (!fb) client.println("Error: Camera image capture failed");
+    if (!fb) {
+        client.println("Error: Camera image capture failed");
+        // Ensure we switch back even on failure
+        esp_camera_deinit();
+        delay(camChangeDelay);
+        initialiseCamera(1);
+        sendFooter(client); // Close page if needed
+        return; // Exit
+    }
 
   // // read image data and calculate average pixel value (as demonstration of reading the image data)
   // //      note:   image x = i % WIDTH, image y = floor(i / WIDTH)
@@ -1729,7 +1748,19 @@ void readGrayscaleImage() {
 
   // resize the image
     int newWidth = 115;   int newHeight = 42;         // much bigger than this seems to cause problems, possible web page is too large?
-    byte newBuf[newWidth * newHeight];
+    size_t newBufSize = newWidth * newHeight;
+    byte* newBuf = (byte*)malloc(newBufSize); 
+    if (!newBuf) {
+        client.println("Error: Failed to allocate memory for resized buffer");
+        esp_camera_fb_return(fb); // Clean up camera buffer
+        // Switch back to JPG before returning
+        esp_camera_deinit();
+        delay(camChangeDelay);
+        initialiseCamera(1);
+        sendFooter(client); // Close page if needed
+        return; // Exit
+    }
+
     resize_esp32cam_image_buffer(fb->buf, fb->width, fb->height, newBuf, newWidth, newHeight);
 
   // Get the min and max values in the new resized image
@@ -1764,7 +1795,8 @@ void readGrayscaleImage() {
     delay(3);
     client.stop();
     
-  // return image frame to free up memory
+  // free up memory
+    free(newBuf);
     esp_camera_fb_return(fb);                 // return camera frame buffer
 
   // change camera back to JPG mode
