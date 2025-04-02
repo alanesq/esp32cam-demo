@@ -5,8 +5,11 @@ Note: the new v3 of the esp32 board manager has kindly changed a lot of stuff re
 I have now updated the sketch to work with both.   [more info here](https://docs.espressif.com/projects/arduino-esp32/en/latest/migration_guides/2.x_to_3.0.html) <br>
 
 
-I show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it - I am not a professional programmer so am sure there is plenty of room for improvement... <br>
+I show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it - I am not a professional programmer so am sure there is plenty of room for improvement... <br><br>
+
 This sketch has got a bit larger than I anticipated but this is just because it now has so many individual demonstrations of ways to use the camera, I have tried to make each part as easy to follow as possible with lots of comments etc.. <br>
+In fact I actually use this sketch for most of my projects.  The /jpg url is very handy for external apps to grab images, e.g. I have created a Processing sketch which works very well for motion sensing   [link here](https://github.com/alanesq/esp32cam-demo/tree/master/Misc/motionDetect) <br><br>
+
 The camera is not great quality and very poor in low light conditions but it is very cheap (around £5 each if buying several) and I think has lots of potential for interesting applications. <br>
 This sketch is just a collection of all I have discovered/learned in the process of using them myself<br>
 
@@ -35,8 +38,6 @@ This can be used as a starting point sketch for projects using the ESP32cam deve
 The root web page uses AJAX to update info. on the page.  This is not done in the conventional way where variable data is passed but 
 instead passes complete lines of text, it may not be elegant but it makes changing what information is displayed much easier as all you 
 have to do is modify what info handleData() sends. 
-
-I have created a processing sketch (well myself and ChatGPT created it together;-) which works with this sketch to provide motion detection which is well worth a try:  https://github.com/alanesq/esp32cam-demo/tree/master/Misc/motionDetect
 
 I have created a timelapse sketch based on this one which may be of interest: https://github.com/alanesq/esp32cam-Timelapse
 
