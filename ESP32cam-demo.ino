@@ -1022,11 +1022,11 @@ void handleRoot() {
     //client.write("<br><label for='options'>Change camera resolution:</label>\n");
     client.write("<br><select id='resolution' name='resolution'>\n");
     client.write("  <option value='n/a'>Change camera resolution</option>\n");   // for if none selected
-    client.write("  <option value='QVGA'>QVGA</option>\n");
-    client.write("  <option value='VGA'>VGA</option>\n");
-    client.write("  <option value='SVGA'>SVGA</option>\n");
-    client.write("  <option value='XGA'>XGA</option>\n");
-    client.write("  <option value='SXGA'>SXGA</option>\n");
+    client.write("  <option value='QVGA'>320x240 QVGA</option>\n");
+    client.write("  <option value='VGA'>640x480 VGA</option>\n");
+    client.write("  <option value='SVGA'>800x600 SVGA</option>\n");
+    client.write("  <option value='XGA'>1024x768 XGA</option>\n");
+    client.write("  <option value='SXGA'>1280x1024 SXGA</option>\n");
     client.write("</select>\n");
 
    // Image setting controls
