@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+
+<!--
+
+      Display all cameras with resize and zoom
+      Hold shift to zoom/pan the image
+      
+      enter camera IP details under "const cameras"
+      
+      16May25
+
+-->
+
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Camera Viewer Shift-Flipped</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    #toolbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 10000;
+      background: #222;
+      color: #fff;
+      padding: 5px;
+    }
+    #toolbar button {
+      margin-right: 5px;
+      padding: 5px 10px;
+      background: #333;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .img-container {
+      position: absolute;
+      border: 2px solid #444;
+      overflow: hidden;
+      user-select: none;
+      z-index: 1;
+      background: #000;
+    }
+    .img-container.active {
+      z-index: 1000;
+    }
+    .img-inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      cursor: grab;
+      overflow: hidden;
+    }
+    .img-inner img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform-origin: top left;
+      user-select: none;
+      pointer-events: none;
+    }
+    .close-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: red;
+      color: white;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+
+<div id="toolbar"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+<script>
+  let isShiftPressed = false;
+  window.addEventListener('keydown', e => { if (e.key === 'Shift') isShiftPressed = true; });
+  window.addEventListener('keyup', e => { if (e.key === 'Shift') isShiftPressed = false; });
+  window.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+
+  // Camera details 
+  // Camera should supply a jpg image - for esp32cam see: https://github.com/alanesq/esp32cam-demo
+  const cameras = [
+    { src: "http://192.168.1.100/jpg", id: "Front" },
+    { src: "http://192.168.1.110/jpg", id: "Side" },
+    { src: "http://192.168.1.120/jpg", id: "Back" }
+  ];
+
+  const toolbar = document.getElementById('toolbar');
+  cameras.forEach(cam => {
+    const btn = document.createElement('button');
+    btn.textContent = cam.id;
+    btn.onclick = () => createCameraWindow(cam);
+    toolbar.appendChild(btn);
+  });
+
+  function createCameraWindow(cam) {
+    if (document.getElementById(cam.id)) return;
+
+    const div = document.createElement('div');
+    div.className = 'img-container';
+    div.id = cam.id;
+    div.style = 'left:10px; top:60px; width:320px; height:240px;';
+    div.innerHTML = `
+      <button class="close-btn" onclick="this.parentElement.remove()">×</button>
+      <div class="img-inner"><img /></div>
+    `;
+    document.body.appendChild(div);
+    initContainer(div, cam.src);
+  }
+
+  function initContainer(container, src) {
+    const inner = container.querySelector('.img-inner');
+    const img = inner.querySelector('img');
+
+    const state = {
+      scale: 1,
+      panX: 0,
+      panY: 0,
+      isPanning: false,
+      startX: 0,
+      startY: 0,
+      imgNaturalWidth: 0,
+      imgNaturalHeight: 0,
+    };
+    container._zoomPanState = state;
+
+    interact(container)
+      .draggable({
+        listeners: {
+          start(event) { if (isShiftPressed) event.interaction.stop(); },
+          move(event) {
+            if (isShiftPressed) return;
+            container.style.left = (parseFloat(container.style.left) || 0) + event.dx + 'px';
+            container.style.top = (parseFloat(container.style.top) || 0) + event.dy + 'px';
+          }
+        }
+      })
+      .resizable({
+            edges: { left: true, right: true, bottom: true, top: true },
+            modifiers: [
+              interact.modifiers.aspectRatio({ ratio: 4 / 3 }),
+              interact.modifiers.restrictSize({ min: { width: 100, height: 75 } })
+            ],
+        listeners: {
+          move(event) {
+            container.style.width = event.rect.width + 'px';
+            container.style.height = event.rect.height + 'px';
+            const scaleX = container.clientWidth / state.imgNaturalWidth;
+            const scaleY = container.clientHeight / state.imgNaturalHeight;
+            state.scale = Math.min(scaleX, scaleY);
+            state.panX = 0;
+            state.panY = 0;
+            updateImageTransform(img, state);
+          }
+        }
+      });
+
+    inner.addEventListener('wheel', e => {
+      if (!isShiftPressed) return;
+      e.preventDefault();
+      const rect = inner.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const prevScale = state.scale;
+      state.scale += -e.deltaY * 0.001;
+      state.scale = Math.min(Math.max(0.5, state.scale), 5);
+      state.panX = mouseX - ((mouseX - state.panX) * (state.scale / prevScale));
+      state.panY = mouseY - ((mouseY - state.panY) * (state.scale / prevScale));
+      clampPan();
+      updateImageTransform(img, state);
+    });
+
+    inner.addEventListener('mousedown', e => {
+      if (!isShiftPressed) return;
+      e.preventDefault();
+      state.isPanning = true;
+      state.startX = e.clientX - state.panX;
+      state.startY = e.clientY - state.panY;
+      inner.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (!state.isPanning) return;
+      state.panX = e.clientX - state.startX;
+      state.panY = e.clientY - state.startY;
+      clampPan();
+      updateImageTransform(img, state);
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (state.isPanning) {
+        state.isPanning = false;
+        inner.style.cursor = 'grab';
+      }
+    });
+
+    img.ondragstart = () => false;
+
+    function clampPan() {
+      const cw = container.clientWidth, ch = container.clientHeight;
+      const iw = state.imgNaturalWidth * state.scale;
+      const ih = state.imgNaturalHeight * state.scale;
+      state.panX = Math.max(Math.min(0, cw - iw), state.panX);
+      state.panY = Math.max(Math.min(0, ch - ih), state.panY);
+    }
+
+    function updateImageTransform(image, s) {
+      image.style.left = s.panX + 'px';
+      image.style.top = s.panY + 'px';
+      image.style.transform = `scale(${s.scale})`;
+    }
+
+    container.addEventListener('mousedown', () => {
+      document.querySelectorAll('.img-container').forEach(c => c.classList.remove('active'));
+      container.classList.add('active');
+    });
+
+    function fetchNextFrame() {
+      const imgUrl = `${src}?t=${Date.now()}`;
+      let timedOut = false;
+
+      const timeoutId = setTimeout(() => {
+        timedOut = true;
+        fetchNextFrame();
+      }, 4000);
+
+      const tempImg = new Image();
+      tempImg.onload = () => {
+        if (timedOut) return;
+        clearTimeout(timeoutId);
+        img.src = tempImg.src;
+        state.imgNaturalWidth = tempImg.naturalWidth;
+        state.imgNaturalHeight = tempImg.naturalHeight;
+
+        if (!state.initialized) {
+          const scaleX = container.clientWidth / state.imgNaturalWidth;
+          const scaleY = container.clientHeight / state.imgNaturalHeight;
+          state.scale = Math.min(scaleX, scaleY);
+          state.panX = 0;
+          state.panY = 0;
+          state.initialized = true;
+        }
+
+        updateImageTransform(img, state);
+        setTimeout(fetchNextFrame, 600);
+      };
+      tempImg.onerror = () => {
+        if (!timedOut) {
+          clearTimeout(timeoutId);
+          setTimeout(fetchNextFrame, 600);
+        }
+      };
+      tempImg.src = imgUrl;
+    }
+
+    fetchNextFrame();
+  }
+
+  // cameras.forEach(cam => createCameraWindow(cam));   // display cameras at startup
+</script>
+</body>
+</html>
+
