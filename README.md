@@ -4,8 +4,8 @@
 I show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it - I am not a professional programmer so am sure there is plenty of room for improvement... <br><br>
 
 This sketch has got a bit larger than I anticipated but this is just because it now has so many individual demonstrations of ways to use the camera, I have tried to make each part as easy to follow as possible with lots of comments etc.. <br>
-In fact I actually use this sketch for most of my projects.  The /jpg url is very handy for external apps to grab images, e.g. I have created a Processing sketch which works very well as a motion sensing security camera   [link here](https://github.com/alanesq/esp32cam-demo/tree/master/Misc/motionDetect) <br>
-I also have  nice mutli camera viewer HTML file which allows resizing and zooming of the camera images (created by ChatGPT)  [link here]([https://github.com/alanesq/esp32cam-demo/tree/master/Misc/motionDetect](https://github.com/alanesq/esp32cam-demo/blob/master/Misc/multiCameraViewer.htm)) <br><br>
+In fact I actually just use this sketch for most of my projects now.  The /jpg url is very handy for external apps to grab images, e.g. I have created a Processing sketch which works very well as a motion sensing security camera   [link here](https://github.com/alanesq/esp32cam-demo/tree/master/Misc/motionDetect) <br>
+I also have  nice mutli camera viewer HTML file which allows resizing and zooming of the camera images (created by ChatGPT)  [link here](https://github.com/alanesq/esp32cam-demo/blob/master/Misc/multiCameraViewer.htm)<br><br>
 
 The camera is not great quality and very poor in low light conditions but it is very cheap (around £5 each if buying several) and I think has lots of potential for interesting applications. <br>
 This sketch is just a collection of all I have discovered/learned in the process of using them myself<br>
