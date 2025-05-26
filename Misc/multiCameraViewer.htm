@@ -1,110 +1,171 @@
 <!DOCTYPE html>
 
 <!--
-  Displays camera feeds in resizable and zoomable windows.
-  Hold Shift to zoom/pan.
-  Add camera IPs under "const cameras".
-                                               23May25
+
+  Displays camera feeds in resizable and zoomable windows
+  with motion detection.
+  
+  This was an experiment to see what could be acheived using
+  A.I. to write all the code.
+
+  Add camera IPs under "ADD YOUR CAMERA IPs HERE"
+  
+  Modify load settings keys under 'load settings with keypress'
+  
+                                               26May25
 -->
 
 
-
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>Camera Viewer Shift-Flipped</title>
+    <title>Camera Viewer with Motion Detection</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <style>
         /* Basic styles for the entire page */
         body {
-            margin: 0; /* Removes default body margins */
-            background: #111; /* Sets a dark background color */
-            overflow: hidden; /* Prevents scrollbars on the main page */
-            font-family: sans-serif; /* Sets a standard, easy-to-read font */
+            margin: 0;
+            background: #111;
+            overflow: hidden;
+            font-family: sans-serif;
         }
 
         /* Styles for the toolbar at the top */
         #toolbar {
-            position: fixed; /* Keeps the toolbar in place when scrolling (though scrolling is disabled) */
-            top: 0; /* Positions it at the top */
-            left: 0; /* Positions it at the left */
-            z-index: 10000; /* Ensures the toolbar is always on top of other elements */
-            background: #222; /* Dark background for the toolbar */
-            color: #fff; /* White text color */
-            padding: 5px; /* Adds some space inside the toolbar */
+            position: relative;
+            background: transparent;
+            width: 100%;
+            height: 0;
+            overflow: visible;
         }
 
         /* Styles for buttons within the toolbar */
         #toolbar button {
-            margin-right: 5px; /* Adds space between buttons */
-            padding: 5px 10px; /* Adds space inside buttons */
-            background: #333; /* Dark background for buttons */
-            color: white; /* White text on buttons */
-            border: none; /* Removes default button borders */
-            cursor: pointer; /* Changes the mouse cursor to a pointer when hovering */
+            margin-right: 5px;
+            padding: 5px 10px;
+            background: #333;
+            color: white;
+            border: none;
+            cursor: pointer;
         }
 
         /* Styles for the containers holding each camera image */
         .img-container {
-            position: absolute; /* Allows positioning relative to the body */
-            border: 2px solid #444; /* Adds a border around each camera window */
-            overflow: hidden; /* Hides parts of the image that go outside the container (needed for zoom/pan) */
-            user-select: none; /* Prevents text selection within the container */
-            z-index: 1; /* Default stacking order */
-            background: #000; /* Black background for the container itself */
+            position: absolute;
+            border: 2px solid #444;
+            overflow: hidden;
+            user-select: none;
+            z-index: 1;
+            background: #000;
         }
 
-        /* Style for the 'active' camera container (the one last clicked) */
         .img-container.active {
-            z-index: 1000; /* Brings the active container to the front */
+            z-index: 1000;
         }
 
         /* Styles for the inner div used for zoom/pan */
         .img-inner {
-            width: 100%; /* Fills the parent container */
-            height: 100%; /* Fills the parent container */
-            position: relative; /* Needed for positioning the image inside */
-            cursor: grab; /* Shows a 'grab' cursor, indicating it can be moved (for panning) */
-            overflow: hidden; /* Hides parts of the image that go outside this inner div */
+            width: 100%;
+            height: 100%;
+            position: relative;
+            cursor: grab;
+            overflow: hidden;
         }
 
-        /* Styles for the camera image itself */
         .img-inner img {
-            position: absolute; /* Allows precise positioning for panning */
-            top: 0; /* Default top position */
-            left: 0; /* Default left position */
-            transform-origin: top left; /* Sets the point around which scaling (zoom) happens */
-            user-select: none; /* Prevents image selection */
-            pointer-events: none; /* Prevents the image from capturing mouse events (they go to the parent) */
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: top left;
+            user-select: none;
+            pointer-events: none;
         }
 
-        /* Styles for the close button on each camera window */
+        /* Styles for the close button */
         .close-btn {
-            position: absolute; /* Positions it within the camera container */
-            top: 4px; /* Space from the top */
-            right: 4px; /* Space from the right */
-            background: red; /* Red background for visibility */
-            color: white; /* White 'X' */
-            border: none; /* No border */
-            font-size: 16px; /* Size of the 'X' */
-            cursor: pointer; /* Pointer cursor */
-            z-index: 10; /* Ensures it's above the image but below the toolbar if overlapped */
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: #333;
+            color: white;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            z-index: 10;
         }
 
-        /* Styles for the camera title displayed on each window */
+        /* Styles for the camera title */
         .cam-title {
-            position: absolute; /* Positions it within the camera container */
-            top: 4px; /* Space from the top */
-            left: 8px; /* Space from the left */
-            color: #fff; /* White text */
-            background: rgba(0,0,0,0.5); /* Semi-transparent black background */
-            padding: 2px 6px; /* Space inside the title box */
-            font-size: 14px; /* Text size */
-            z-index: 5; /* Above the image */
-            pointer-events: none; /* Allows clicks to pass through to the container */
+            position: absolute;
+            top: 4px;
+            left: 8px;
+            color: #fff;
+            background: rgba(0,0,0,0.5);
+            padding: 2px 6px;
+            font-size: 14px;
+            z-index: 5;
+            pointer-events: none;
         }
+
+        /* Styles for motion detection controls */
+        .motion-controls {
+            position: absolute;
+            bottom: 4px;
+            left: 8px;
+            background: rgba(0,0,0,0.5);
+            padding: 3px 6px;
+            border-radius: 3px;
+            z-index: 10;
+            color: white;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+        }
+
+        .motion-controls label {
+            margin-right: 5px;
+            cursor: pointer;
+        }
+
+        .motion-controls input[type="checkbox"] {
+            margin-right: 5px;
+            cursor: pointer;
+        }
+
+        .motion-controls input[type="range"] {
+            width: 80px;
+            height: 10px;
+            cursor: pointer;
+            display: none; /* Hidden by default */
+            margin-left: 5px;
+            vertical-align: middle;
+        }
+         .motion-controls input[type="range"].visible {
+            display: inline-block; /* Show when checkbox is checked */
+         }
+         .motion-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background-color: rgba(255, 0, 0, 0.7);
+            display: none; /* Hidden by default */
+            z-index: 100;
+            pointer-events: none; /* Allow clicks through */
+            animation: pulse 0.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
+            to   { transform: translate(-50%, -50%) scale(1.2); opacity: 0.3; }
+        }
+
     </style>
 </head>
 <body>
@@ -112,373 +173,640 @@
 
 <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
 <script>
-    // Global variable to track if the Shift key is currently pressed.
     let isShiftPressed = false;
+    let audioContext = null; // Global AudioContext
+    let lastBeepTime = 0;
+    const beepCooldown = 1000; // 1 second cooldown
 
-    // Listens for key presses.
+    // --- DEBUGGING ---
+    const DEBUG_MOTION = true; // Set to true to enable detailed motion logs
+
+    function debugLog(message) {
+        if (DEBUG_MOTION) {
+            console.log(`[${new Date().toLocaleTimeString()}] ${message}`);
+        }
+    }
+    // --- END DEBUGGING ---
+
+
+    const keyConfigMap = [
+        { key: 'm', config: 'main' },
+        { key: 's', config: 'small' },
+        { key: 'f', config: 'front' },
+    ];
+
     window.addEventListener('keydown', e => {
-        // If Shift is pressed, set the variable to true.
         if (e.key === 'Shift') isShiftPressed = true;
-        // If 'b' is pressed, toggle the visibility of the toolbar.
         if (e.key === 'b') {
             const tb = document.getElementById('toolbar');
-            tb.style.display = tb.style.display === 'none' ? 'block' : 'none';
+            // Correctly toggle display for toolbar, which might not have explicit display style initially
+            const currentDisplay = window.getComputedStyle(tb).display;
+            tb.style.display = (currentDisplay === 'none' || tb.style.display === 'none') ? 'block' : 'none';
+        }
+        if (e.key === 'c') resetCameras();
+
+        const match = keyConfigMap.find(item => e.key === item.key);
+        if (match) {
+            const data = localStorage.getItem('cameraState_' + match.config);
+            if (data) {
+                // resetCameras(); // loadState will handle resetting
+                localStorage.setItem('cameraState', data); // Set the active state
+                loadState();
+            }
         }
     });
 
-    // Listens for key releases. If Shift is released, set the variable to false.
     window.addEventListener('keyup', e => { if (e.key === 'Shift') isShiftPressed = false; });
-
-    // Listens for mouse wheel events. Prevents default browser zoom when Ctrl is held.
     window.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
 
-    // Array containing camera information (URL and a friendly ID).
-    // ADD YOUR CAMERA IPs HERE.
+    // ADD YOUR CAMERA IPs HERE
     const cameras = [
         { src: "http://192.168.1.100/jpg", id: "Front" },
         { src: "http://192.168.1.101/jpg", id: "Side" },
-        { src: "http://192.168.1.102/jpg", id: "Back" }
+        { src: "http://192.168.1.102/jpg", id: "Back" },
     ];
 
-    // Get a reference to the toolbar div.
     const toolbar = document.getElementById('toolbar');
-    // Create a container for the buttons, to be placed at the bottom-left.
     const camButtonContainer = document.createElement('span');
     camButtonContainer.style.position = 'fixed';
     camButtonContainer.style.bottom = '10px';
     camButtonContainer.style.left = '10px';
-    toolbar.appendChild(camButtonContainer); // Add the button container to the (invisible) toolbar.
+    camButtonContainer.style.zIndex = '2000'; // Ensure toolbar buttons are above camera windows
+    toolbar.appendChild(camButtonContainer);
 
-    // Create a button for each camera in the 'cameras' array.
+
     cameras.forEach(cam => {
         const btn = document.createElement('button');
-        btn.textContent = cam.id; // Set button text to camera ID.
-        btn.onclick = () => createCameraWindow(cam); // When clicked, create a window for this camera.
-        camButtonContainer.appendChild(btn); // Add the button to the container.
+        btn.textContent = cam.id;
+        btn.onclick = () => createCameraWindow(cam);
+        camButtonContainer.appendChild(btn);
     });
 
-    // Create a 'Save Config' button.
-    const saveBtn = document.createElement('button');
-    saveBtn.textContent = 'Save Config';
-    saveBtn.onclick = () => {
-        const name = prompt('Enter config name:'); // Ask for a name.
-        // If a name is given, save the current state (from 'cameraState') under that name.
+    function createButton(text, onClick, marginLeft = '5px') {
+        const btn = document.createElement('button');
+        btn.textContent = text;
+        btn.onclick = onClick;
+        btn.style.marginLeft = marginLeft;
+        camButtonContainer.appendChild(btn);
+        return btn;
+    }
+
+    createButton('Save', () => {
+        const name = prompt('Enter config name:');
         if (name) localStorage.setItem('cameraState_' + name, localStorage.getItem('cameraState'));
-    };
-    camButtonContainer.appendChild(saveBtn);
+    }, '20px');
 
-    // Create a 'Load Config' button.
-    const loadBtn = document.createElement('button');
-    loadBtn.textContent = 'Load Config';
-    loadBtn.onclick = () => {
-        const name = prompt('Enter config name:'); // Ask for the name to load.
-        const data = localStorage.getItem('cameraState_' + name); // Get the saved data.
+    createButton('Load', () => {
+        const name = prompt('Enter config name:');
+        if (!name) return;
+        const data = localStorage.getItem('cameraState_' + name);
         if (data) {
-            // If data exists, remove all current camera windows.
-            document.querySelectorAll('.img-container').forEach(el => el.remove());
-            // Set the loaded data as the current 'cameraState'.
-            localStorage.setItem('cameraState', data);
-            // Load the state, which will recreate the windows.
+            localStorage.setItem('cameraState', data); // Set the active state to be loaded
             loadState();
+        } else {
+            alert(`Config "${name}" not found.`);
         }
-    };
-    camButtonContainer.appendChild(loadBtn);
+    });
 
-    // Create a 'Reset' button.
-    const resetBtn = document.createElement('button');
-    resetBtn.textContent = 'Reset';
-    resetBtn.onclick = resetCameras; // Calls the reset function when clicked.
-    camButtonContainer.appendChild(resetBtn);
+    createButton('Export', () => {
+        const data = localStorage.getItem('cameraState');
+        if (data) {
+            const blob = new Blob([data], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'camera_config.json';
+            a.click();
+            URL.revokeObjectURL(a.href); // Clean up
+        } else {
+            alert('No current state to export.');
+        }
+    });
 
-    // Create an 'About' button.
-    const infoBtn = document.createElement('button');
-    infoBtn.textContent = 'About';
-    infoBtn.onclick = showInstructions; // Calls the show instructions function when clicked.
-    camButtonContainer.appendChild(infoBtn);
+    createButton('Import', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/json';
+        input.onchange = () => {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = e => {
+                try {
+                    JSON.parse(e.target.result); // Validate JSON
+                    localStorage.setItem('cameraState', e.target.result);
+                    loadState();
+                } catch (err) {
+                    alert('Error parsing JSON file: ' + err.message);
+                }
+            };
+            reader.onerror = () => alert('Error reading file.');
+            reader.readAsText(file);
+        };
+        input.click();
+    });
 
-    // Function to display an alert with instructions.
+    createButton('Reset', resetCameras, '20px');
+    createButton('About', showInstructions, '20px');
+
     function showInstructions() {
-        alert(`CCTV Camera Viewer with zoom/pan
+        alert(`CCTV Camera Viewer with Motion Detection
           - Click a camera button to open its feed.
-          - Multiple instances allowed.
-          - Save/load configurations with custom names.
+          - Save/load/import/export configurations.
           - Drag/resize windows.
           - SHIFT + Scroll to zoom, SHIFT + drag to pan.
+          - Motion Detection: Check box to enable, 
+            use slider for sensitivity.
           - Press 'b' to hide/show the toolbar.
+          - Quick load configs: 'm', 's', 'f'.
+          - Reset to close all feeds (or press 'C').
         `);
     }
 
-    // Function to remove all camera windows and clear the saved state.
-    function resetCameras() {
-        document.querySelectorAll('.img-container').forEach(el => el.remove());
-        localStorage.removeItem('cameraState');
+    function closeCameraWindow(buttonElement) {
+        const container = buttonElement.parentElement;
+        if (container && container._zoomPanState) {
+            debugLog(`Closing camera ${container.id}. Setting isActive=false.`);
+            container._zoomPanState.isActive = false; // Signal to stop fetching
+        }
+        if (container) container.remove();
+        saveState();
     }
 
-    // Function to save the current state of all camera windows to localStorage.
+    function resetCameras() {
+        debugLog('Resetting all cameras.');
+        document.querySelectorAll('.img-container').forEach(el => {
+            if (el._zoomPanState) {
+                debugLog(`Reset: Setting isActive=false for ${el.id}`);
+                el._zoomPanState.isActive = false;
+            }
+            el.remove();
+        });
+        localStorage.removeItem('cameraState'); // Clears the *active* saved state
+        // Also clear any named configs if desired, or just the active one
+        // For instance, to clear all 'cameraState_...'
+        // Object.keys(localStorage).forEach(key => {
+        //   if (key.startsWith('cameraState_')) localStorage.removeItem(key);
+        // });
+    }
+
+
     function saveState() {
-        const state = {}; // Create an object to hold the state.
-        // Go through each camera container.
+        const stateToSave = {};
         document.querySelectorAll('.img-container').forEach(c => {
-            const s = c._zoomPanState; // Get its zoom/pan state (attached in initContainer).
-            const id = c.getAttribute('data-cam-id'); // Get its camera ID.
-            state[id] = state[id] || []; // Ensure an array exists for this camera ID.
-            // Add the window's properties (position, size, zoom, pan, unique ID) to the array.
-            state[id].push({
-                left: c.style.left,
-                top: c.style.top,
-                width: c.style.width,
-                height: c.style.height,
-                scale: s.scale,
-                panX: s.panX,
-                panY: s.panY,
-                uniqueId: c.id
+            if (!c._zoomPanState) return; // Should not happen if initialized
+            const s = c._zoomPanState;
+            const id = c.getAttribute('data-cam-id');
+            stateToSave[id] = stateToSave[id] || [];
+            stateToSave[id].push({
+                left: c.style.left, top: c.style.top,
+                width: c.style.width, height: c.style.height,
+                scale: s.scale, panX: s.panX, panY: s.panY,
+                uniqueId: c.id,
+                motionEnabled: s.motionEnabled,
+                motionSensitivity: s.motionSensitivity
             });
         });
-        // Store the state object as a JSON string in localStorage under 'cameraState'.
-        localStorage.setItem('cameraState', JSON.stringify(state));
+        localStorage.setItem('cameraState', JSON.stringify(stateToSave));
+        debugLog('State saved.');
     }
 
-    // Function to load the state from localStorage and create windows.
     function loadState() {
-        // Get the state from localStorage, or an empty object if none exists.
-        const state = JSON.parse(localStorage.getItem('cameraState') || '{}');
-        // Loop through each camera defined in the 'cameras' array.
-        for (const cam of cameras) {
-            // If there are saved states for this camera, create a window for each saved state.
-            (state[cam.id] || []).forEach(cfg => createCameraWindow(cam, cfg));
+        debugLog('Loading state...');
+        // First, clear all existing cameras and their loops properly
+        document.querySelectorAll('.img-container').forEach(el => {
+            if (el._zoomPanState) {
+                debugLog(`Load: Setting isActive=false for old ${el.id}`);
+                el._zoomPanState.isActive = false;
+            }
+            el.remove();
+        });
+
+        const stateString = localStorage.getItem('cameraState');
+        if (!stateString) {
+            debugLog('No state found in localStorage to load.');
+            return;
+        }
+
+        let stateToLoad;
+        try {
+            stateToLoad = JSON.parse(stateString);
+        } catch (e) {
+            console.error("Error parsing saved state:", e);
+            alert("Error loading saved state. It might be corrupted.");
+            localStorage.removeItem('cameraState'); // Clear corrupted state
+            return;
+        }
+
+        if (Object.keys(stateToLoad).length === 0) {
+            debugLog('Saved state is empty. Nothing to load.');
+            return;
+        }
+
+        for (const camDef of cameras) { // Iterate over defined cameras
+            if (stateToLoad[camDef.id]) { // If this camera type has saved instances
+                 (stateToLoad[camDef.id] || []).forEach(cfg => {
+                    debugLog(`Loading config for ${camDef.id} (unique: ${cfg.uniqueId})`);
+                    createCameraWindow(camDef, cfg);
+                });
+            }
+        }
+        debugLog('State loaded.');
+    }
+
+
+    function initAudio() {
+        if (!audioContext) {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                debugLog("AudioContext initialized.");
+            } catch (e) {
+                console.error("Web Audio API is not supported in this browser");
+                return; // Important to return if context fails
+            }
+        }
+         if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().then(() => debugLog("AudioContext resumed."))
+                               .catch(e => console.error("Error resuming AudioContext:", e));
         }
     }
 
-    // Function to create a new camera window.
-    // 'cam' is the camera object, 'saved' is an optional saved state object.
+    function playBeep(cameraIdentifier = "unknown") {
+        const now = Date.now();
+        if (!audioContext || audioContext.state !== 'running') {
+            debugLog(`playBeep (${cameraIdentifier}): AudioContext not ready or not running. State: ${audioContext ? audioContext.state : 'null'}`);
+            return;
+        }
+        if (now - lastBeepTime < beepCooldown) {
+            // debugLog(`playBeep (${cameraIdentifier}): Beep cooldown active.`); // Can be spammy
+            return;
+        }
+        lastBeepTime = now;
+        debugLog(`playBeep triggered by ${cameraIdentifier}`);
+
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Reduced volume slightly
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.1);
+    }
+
+    document.body.addEventListener('click', initAudio, { once: true });
+    document.body.addEventListener('keydown', initAudio, { once: true });
+
     function createCameraWindow(cam, saved = null) {
-        // Generate a unique ID for this window, either from saved state or using the current time.
         const uniqueId = saved?.uniqueId || `${cam.id}_${Date.now()}`;
-        // Create the main div for the window.
+        // Check if a window with this uniqueId already exists (e.g., from a partial loadState)
+        if (document.getElementById(uniqueId)) {
+            debugLog(`Window with ID ${uniqueId} already exists. Skipping creation.`);
+            return;
+        }
+
+        debugLog(`Creating window for ${cam.id} (unique: ${uniqueId}). Saved: ${!!saved}`);
         const div = document.createElement('div');
         div.className = 'img-container';
         div.id = uniqueId;
-        div.setAttribute('data-cam-id', cam.id); // Store the camera ID.
+        div.setAttribute('data-cam-id', cam.id);
 
-        // If a saved state is provided, set the window's position and size.
         if (saved) {
-            div.style = `left:${saved.left}; top:${saved.top}; width:${saved.width}; height:${saved.height};`;
+            div.style.left = saved.left;
+            div.style.top = saved.top;
+            div.style.width = saved.width;
+            div.style.height = saved.height;
         } else {
-            // Otherwise, set a default random position and size.
-            const x = Math.random() * (300 - 10) + 50;
-            const y = Math.random() * (200 - 50) + 50;
+            const x = Math.random() * 200 + 20; // Keep initial windows more on screen
+            const y = Math.random() * 150 + 20;
             div.style = `left:${x}px; top:${y}px; width:320px; height:240px;`;
         }
 
-        // Set the inner HTML of the window (close button, title, image container).
         div.innerHTML = `
-          <button class="close-btn" onclick="this.parentElement.remove(); saveState();">×</button> <div class="cam-title">${cam.id}</div> <div class="img-inner"><img /></div> `;
-        // Add the new window to the page body.
+          <button class="close-btn" onclick="closeCameraWindow(this)">×</button>
+          <div class="cam-title">${cam.id}</div>
+          <div class="img-inner"><img crossorigin="anonymous" /></div>
+          <div class="motion-indicator"></div>
+          <div class="motion-controls">
+              <label for="motion_check_${uniqueId}">Motion:</label>
+              <input type="checkbox" id="motion_check_${uniqueId}" class="motion-checkbox">
+              <input type="range" id="motion_slider_${uniqueId}" class="motion-slider" min="1" max="100" value="50">
+          </div>
+        `;
         document.body.appendChild(div);
-        // Initialize the window's interactivity (drag, resize, zoom, pan, image loading).
         initContainer(div, cam.src, saved);
     }
 
-    // Function to initialize interactivity and image loading for a camera window.
-    function initContainer(container, src, saved) {
-        const inner = container.querySelector('.img-inner'); // Get the inner div.
-        const img = inner.querySelector('img'); // Get the image element.
-        // Create a state object to hold zoom, pan, and image size info.
-        const state = {
-            scale: saved?.scale || 1, // Start with saved scale or 1.
-            panX: saved?.panX || 0, // Start with saved panX or 0.
-            panY: saved?.panY || 0, // Start with saved panY or 0.
-            isPanning: false, // Flag for when panning is active.
-            startX: 0, // Starting mouse X for panning.
-            startY: 0, // Starting mouse Y for panning.
-            imgNaturalWidth: 0, // Original width of the camera image.
-            imgNaturalHeight: 0, // Original height of the camera image.
-            initialized: !!saved // Flag to check if it's the first load or a restore.
-        };
-        // Attach this state object to the container element itself for easy access.
-        container._zoomPanState = state;
+    function compareFrames(ctx1, ctx2, width, height, sensitivity) {
+        const imgData1 = ctx1.getImageData(0, 0, width, height).data;
+        const imgData2 = ctx2.getImageData(0, 0, width, height).data;
+        let diffCount = 0;
+        const threshold = 25;
+        const requiredDiffPixels = (101 - sensitivity) * (width * height / 400);
 
-        // Use interact.js to make the container draggable and resizable.
+        for (let i = 0; i < imgData1.length; i += 4) {
+            const gray1 = (imgData1[i] + imgData1[i + 1] + imgData1[i + 2]) / 3;
+            const gray2 = (imgData2[i] + imgData2[i + 1] + imgData2[i + 2]) / 3;
+            if (Math.abs(gray1 - gray2) > threshold) diffCount++;
+        }
+        const motionDetected = diffCount > requiredDiffPixels;
+        // debugLog(`compareFrames: diffCount=${diffCount}, required=${requiredDiffPixels.toFixed(2)}, detected=${motionDetected}`); // Very spammy
+        return motionDetected;
+    }
+
+    function initContainer(container, src, saved) {
+        const inner = container.querySelector('.img-inner');
+        const img = inner.querySelector('img');
+        const motionCheckbox = container.querySelector('.motion-checkbox');
+        const motionSlider = container.querySelector('.motion-slider');
+        const motionIndicator = container.querySelector('.motion-indicator');
+
+        const motionControlsDiv = container.querySelector('.motion-controls');
+        motionControlsDiv.addEventListener('mousedown', (event) => event.stopPropagation());
+        motionControlsDiv.addEventListener('pointerdown', (event) => event.stopPropagation());
+
+        const canvas1 = document.createElement('canvas');
+        const canvas2 = document.createElement('canvas');
+        const ctx1 = canvas1.getContext('2d', { willReadFrequently: true });
+        const ctx2 = canvas2.getContext('2d', { willReadFrequently: true });
+        const motionWidth = 64;
+        const motionHeight = 48;
+        canvas1.width = canvas2.width = motionWidth;
+        canvas1.height = canvas2.height = motionHeight;
+        let prevImageLoaded = false;
+
+        const state = {
+            scale: saved?.scale || 1, panX: saved?.panX || 0, panY: saved?.panY || 0,
+            isPanning: false, startX: 0, startY: 0,
+            imgNaturalWidth: 0, imgNaturalHeight: 0,
+            initialized: !!saved,
+            motionEnabled: saved?.motionEnabled || false,
+            motionSensitivity: saved?.motionSensitivity || 50,
+            lastMotionTime: 0,
+            isActive: true // NEW: Flag to control the fetch loop
+        };
+        container._zoomPanState = state; // Attach state to the DOM element
+
+        debugLog(`[${container.id}] Initializing. MotionEnabled: ${state.motionEnabled}, Sensitivity: ${state.motionSensitivity}, IsActive: ${state.isActive}`);
+
+        motionCheckbox.checked = state.motionEnabled;
+        motionSlider.value = state.motionSensitivity;
+        if (state.motionEnabled) motionSlider.classList.add('visible');
+
+        motionCheckbox.addEventListener('change', () => {
+            initAudio(); // Ensure audio is ready
+            const newMotionEnabledState = motionCheckbox.checked;
+            debugLog(`[${container.id}] Checkbox changed. Old motionEnabled: ${state.motionEnabled}, New: ${newMotionEnabledState}`);
+            state.motionEnabled = newMotionEnabledState;
+            motionSlider.classList.toggle('visible', state.motionEnabled);
+
+            // Reset prevImageLoaded whenever motion is toggled on OR off
+            // This ensures a clean start when re-enabled and stops lingering comparisons
+            debugLog(`[${container.id}] Resetting prevImageLoaded to false due to checkbox change.`);
+            prevImageLoaded = false;
+
+            if (!state.motionEnabled) {
+                motionIndicator.style.display = 'none';
+            }
+            saveState();
+        });
+
+        motionSlider.addEventListener('input', () => {
+            state.motionSensitivity = parseInt(motionSlider.value, 10);
+            // No saveState() on input for performance, only on change
+        });
+        motionSlider.addEventListener('change', () => {
+            state.motionSensitivity = parseInt(motionSlider.value, 10);
+            debugLog(`[${container.id}] Sensitivity changed to ${state.motionSensitivity}`);
+            saveState();
+        });
+
+        interact(container)
+            .draggable({ /* ... listeners ... */ }) // Keep existing interactjs setup
+            .resizable({ /* ... listeners ... */ }); // Keep existing interactjs setup
+
+        // ... (Keep existing interact, draggable, resizable, wheel, mousedown, mousemove, mouseup, clampPan, updateImageTransform, container mousedown listeners) ...
+        // The following are copy-pasted but should be verified if you made changes there not shown in the original problem
         interact(container)
             .draggable({
                 listeners: {
-                    // Stop dragging if Shift is pressed (allows panning instead).
                     start(event) { if (isShiftPressed) event.interaction.stop(); },
-                    // When moving...
                     move(event) {
-                        // ...only move if Shift is NOT pressed.
-                        if (isShiftPressed) return;
-                        // Update the container's left and top styles based on how much it was dragged.
+                        if (isShiftPressed || !state.isActive) return; // Added !state.isActive check
                         container.style.left = (parseFloat(container.style.left) || 0) + event.dx + 'px';
                         container.style.top = (parseFloat(container.style.top) || 0) + event.dy + 'px';
-                        saveState(); // Save the new position.
-                    }
+                    },
+                    end() { if (!isShiftPressed && state.isActive) saveState(); }
                 }
             })
             .resizable({
-                edges: { left: true, right: true, bottom: true, top: true }, // Allow resizing from all edges.
+                edges: { left: true, right: true, bottom: true, top: true },
                 modifiers: [
-                    // Keep the aspect ratio at 4:3.
-                    interact.modifiers.aspectRatio({ ratio: 4 / 3 }),
-                    // Set a minimum size.
+                    interact.modifiers.aspectRatio({ ratio: 'preserve' }), // Use 'preserve' for natural aspect ratio
                     interact.modifiers.restrictSize({ min: { width: 100, height: 75 } })
                 ],
                 listeners: {
-                    // When resizing...
                     move(event) {
-                        // Update the container's width and height.
+                        if (!state.isActive) return;
                         container.style.width = event.rect.width + 'px';
                         container.style.height = event.rect.height + 'px';
-                        // When resizing, reset zoom/pan to fit the image to the new size.
-                        const scaleX = container.clientWidth / state.imgNaturalWidth;
-                        const scaleY = container.clientHeight / state.imgNaturalHeight;
-                        state.scale = Math.min(scaleX, scaleY);
-                        state.panX = 0;
-                        state.panY = 0;
-                        updateImageTransform(img, state); // Apply the new transform.
-                        saveState(); // Save the new size.
-                    }
+                        // Recalculate scale to fit, reset pan, only if natural dimensions are known
+                        if (state.imgNaturalWidth > 0 && state.imgNaturalHeight > 0) {
+                            const scaleX = container.clientWidth / state.imgNaturalWidth;
+                            const scaleY = container.clientHeight / state.imgNaturalHeight;
+                            state.scale = Math.min(scaleX, scaleY); // Fit mode
+                            state.panX = 0; state.panY = 0;
+                            updateImageTransform(img, state);
+                        }
+                    },
+                    end() { if (state.isActive) saveState(); }
                 }
             });
 
-        // Add a wheel event listener to the inner container for zooming.
         inner.addEventListener('wheel', e => {
-            // Only zoom if Shift is pressed.
-            if (!isShiftPressed) return;
-            e.preventDefault(); // Prevent page scrolling.
-            const rect = inner.getBoundingClientRect(); // Get container position.
-            // Calculate mouse position relative to the container.
+            if (!isShiftPressed || !state.isActive) return;
+            e.preventDefault();
+            const rect = inner.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
-            const prevScale = state.scale; // Store old scale.
-            // Adjust scale based on wheel direction (up/down).
-            state.scale += -e.deltaY * 0.0005;
-            // Clamp the scale 
+            const prevScale = state.scale;
+            state.scale += -e.deltaY * 0.0005 * state.scale; // Scale relative to current scale
             state.scale = Math.min(Math.max(0.1, state.scale), 10);
-            // Adjust pan to keep the point under the mouse in the same place (zoom towards mouse).
             state.panX = mouseX - ((mouseX - state.panX) * (state.scale / prevScale));
             state.panY = mouseY - ((mouseY - state.panY) * (state.scale / prevScale));
-            clampPan(); // Ensure pan stays within bounds.
-            updateImageTransform(img, state); // Apply new transform.
-            // Note: saveState() is called in updateImageTransform.
+            clampPan();
+            updateImageTransform(img, state);
+            // No saveState() on wheel, usually saved on mouseup after pan or resize end
         });
 
-        // Add a mousedown event listener for starting panning.
         inner.addEventListener('mousedown', e => {
-            // Only pan if Shift is pressed.
-            if (!isShiftPressed) return;
-            e.preventDefault(); // Prevent default drag behavior.
-            state.isPanning = true; // Set panning flag.
-            // Record starting mouse position and current pan.
+            if (!isShiftPressed || !state.isActive) return;
+            e.preventDefault();
+            state.isPanning = true;
             state.startX = e.clientX - state.panX;
             state.startY = e.clientY - state.panY;
-            inner.style.cursor = 'grabbing'; // Change cursor to 'grabbing'.
+            inner.style.cursor = 'grabbing';
         });
 
-        // Add a mousemove listener to the whole window for panning.
-        window.addEventListener('mousemove', e => {
-            // If currently panning...
-            if (state.isPanning) {
-                // Update pan based on mouse movement.
+        window.addEventListener('mousemove', e => { // Global listener
+            if (state.isPanning && state.isActive) { // Check state.isActive here too
                 state.panX = e.clientX - state.startX;
                 state.panY = e.clientY - state.startY;
-                clampPan(); // Keep pan within bounds.
-                updateImageTransform(img, state); // Apply new transform.
+                clampPan();
+                updateImageTransform(img, state);
             }
         });
 
-        // Add a mouseup listener to the whole window to stop panning.
-        window.addEventListener('mouseup', () => {
-            // If panning was active...
-            if (state.isPanning) {
-                state.isPanning = false; // Reset flag.
-                inner.style.cursor = 'grab'; // Reset cursor.
-                saveState(); // Save the final pan position.
+        window.addEventListener('mouseup', () => { // Global listener
+            if (state.isPanning && state.isActive) { // Check state.isActive
+                state.isPanning = false;
+                inner.style.cursor = 'grab';
+                saveState();
             }
         });
 
-        // Function to prevent the image from being panned too far.
         function clampPan() {
-            const cw = container.clientWidth, ch = container.clientHeight; // Container width/height.
-            const iw = state.imgNaturalWidth * state.scale; // Scaled image width.
-            const ih = state.imgNaturalHeight * state.scale; // Scaled image height.
-            // Ensure panX is between (container width - image width) and 0.
-            state.panX = Math.max(Math.min(0, cw - iw), state.panX);
-            // Ensure panY is between (container height - image height) and 0.
-            state.panY = Math.max(Math.min(0, ch - ih), state.panY);
+            if (!state.imgNaturalWidth || !state.imgNaturalHeight) return; // Avoid division by zero if image not loaded
+            const cw = container.clientWidth, ch = container.clientHeight;
+            const iw = state.imgNaturalWidth * state.scale;
+            const ih = state.imgNaturalHeight * state.scale;
+            // Allow image to be smaller than container if zoomed out
+            const maxX = Math.max(0, iw - cw);
+            const maxY = Math.max(0, ih - ch);
+
+            state.panX = Math.max(Math.min(0, state.panX), cw - iw);
+            state.panY = Math.max(Math.min(0, state.panY), ch - ih);
+
+            // If image is smaller than container, center it or keep at 0,0
+             if (iw < cw) state.panX = (cw - iw) / 2; else state.panX = Math.max(cw - iw, Math.min(0, state.panX));
+             if (ih < ch) state.panY = (ch - ih) / 2; else state.panY = Math.max(ch - ih, Math.min(0, state.panY));
         }
 
-        // Function to apply the current scale and pan to the image element.
+
         function updateImageTransform(image, s) {
-            image.style.left = s.panX + 'px'; // Set left offset.
-            image.style.top = s.panY + 'px'; // Set top offset.
-            image.style.transform = `scale(${s.scale})`; // Set scale.
-            saveState(); // Save the state whenever the transform changes.
+            image.style.left = s.panX + 'px';
+            image.style.top = s.panY + 'px';
+            image.style.transform = `scale(${s.scale})`;
+            image.style.width = s.imgNaturalWidth ? `${s.imgNaturalWidth}px` : 'auto'; // Set base size for scale
+            image.style.height = s.imgNaturalHeight ? `${s.imgNaturalHeight}px` : 'auto';
         }
 
-        // Add a mousedown listener to the container to bring it to the front.
+
         container.addEventListener('mousedown', () => {
-            // Remove 'active' class from all containers.
+            if (!state.isActive) return;
             document.querySelectorAll('.img-container').forEach(c => c.classList.remove('active'));
-            // Add 'active' class to this container.
             container.classList.add('active');
         });
 
-        // Function to fetch the next camera image frame.
+        let fetchTimeoutId = null; // To clear timeout if container becomes inactive
+
         function fetchNextFrame() {
-            // Add a timestamp to the URL to bypass browser cache and get a fresh image.
+            if (!state.isActive) {
+                debugLog(`[${container.id}] fetchNextFrame: state.isActive is false. Stopping loop.`);
+                if (fetchTimeoutId) clearTimeout(fetchTimeoutId);
+                return;
+            }
+
             const imgUrl = `${src}?t=${Date.now()}`;
-            let timedOut = false;
-            // Set a timeout. If the image doesn't load within 4 seconds, assume it's stuck and try again.
-            const timeoutId = setTimeout(() => {
-                timedOut = true;
-                fetchNextFrame(); // Try fetching again.
+            let requestTimedOut = false; // Renamed from timedOut to avoid conflict
+            const requestTimeoutId = setTimeout(() => {
+                requestTimedOut = true;
+                debugLog(`[${container.id}] Image request timed out for ${imgUrl}. Retrying.`);
+                if (state.isActive) fetchNextFrame(); // Retry only if still active
             }, 4000);
 
-            // Create a temporary image object to load the new frame.
             const tempImg = new Image();
-            // When the image loads successfully...
+            tempImg.crossOrigin = "Anonymous";
             tempImg.onload = () => {
-                if (timedOut) return; // If we already timed out, ignore this load.
-                clearTimeout(timeoutId); // Clear the timeout.
-                img.src = tempImg.src; // Set the actual image's source to the loaded one.
-                // Store the original image dimensions.
+                if (requestTimedOut || !state.isActive) {
+                    if (!state.isActive) debugLog(`[${container.id}] tempImg.onload: state became inactive during load.`);
+                    if (requestTimedOut) debugLog(`[${container.id}] tempImg.onload: request had already timed out.`);
+                    clearTimeout(requestTimeoutId); // Clear this specific request's timeout
+                    return;
+                }
+                clearTimeout(requestTimeoutId);
+                img.src = tempImg.src; // Update the visible image
+
+                const existingOverlay = container.querySelector('.error-overlay');
+                if (existingOverlay) existingOverlay.remove();
+
                 state.imgNaturalWidth = tempImg.naturalWidth;
                 state.imgNaturalHeight = tempImg.naturalHeight;
-                // If this is the first time loading (not restoring from save)...
-                if (!state.initialized) {
-                    // Calculate the initial scale to fit the image within the container.
+
+                if (state.motionEnabled && state.imgNaturalWidth > 0 && state.isActive) {
+                    // debugLog(`[${container.id}] Motion detection ACTIVE. prevImageLoaded=${prevImageLoaded}.`); // Spammy
+                    ctx1.drawImage(canvas2, 0, 0, motionWidth, motionHeight); // Old canvas2 -> canvas1
+                    ctx2.drawImage(tempImg, 0, 0, motionWidth, motionHeight); // New image -> canvas2
+
+                    if (prevImageLoaded) {
+                        // debugLog(`[${container.id}] Comparing frames.`); // Spammy
+                        if (compareFrames(ctx1, ctx2, motionWidth, motionHeight, state.motionSensitivity)) {
+                            debugLog(`[${container.id}] Motion DETECTED! Calling playBeep.`);
+                            playBeep(container.id);
+                            motionIndicator.style.display = 'block';
+                            state.lastMotionTime = Date.now();
+                        }
+                    } else {
+                        debugLog(`[${container.id}] Priming motion detection. Setting prevImageLoaded = true.`);
+                        prevImageLoaded = true;
+                    }
+                }
+
+                if (motionIndicator.style.display === 'block' && (Date.now() - state.lastMotionTime > 500)) {
+                   motionIndicator.style.display = 'none';
+                }
+
+                if (!state.initialized && state.imgNaturalWidth > 0) {
+                    debugLog(`[${container.id}] First successful image load. Initializing scale and pan.`);
                     const scaleX = container.clientWidth / state.imgNaturalWidth;
                     const scaleY = container.clientHeight / state.imgNaturalHeight;
-                    state.scale = Math.min(scaleX, scaleY); // Use the smaller scale to fit.
-                    state.panX = 0; // Start with no pan.
-                    state.panY = 0;
-                    state.initialized = true; // Mark as initialized.
+                    state.scale = Math.min(scaleX, scaleY); // Fit image
+                    state.panX = (container.clientWidth - (state.imgNaturalWidth * state.scale)) / 2; // Center
+                    state.panY = (container.clientHeight - (state.imgNaturalHeight * state.scale)) / 2; // Center
+                    state.initialized = true;
+                    updateImageTransform(img, state); // Apply transform
+                    saveState(); // Save initial state once calculated
+                } else if (state.initialized) {
+                     updateImageTransform(img, state); // Just update if already initialized
                 }
-                updateImageTransform(img, state); // Apply the transform.
-                // Schedule the next fetch after 600ms (adjust for desired frame rate).
-                setTimeout(fetchNextFrame, 600);
+
+
+                if (state.isActive) { // Schedule next fetch only if still active
+                    fetchTimeoutId = setTimeout(fetchNextFrame, 600);
+                }
             };
-            // If the image fails to load...
             tempImg.onerror = () => {
-                // If it hasn't timed out yet...
-                if (!timedOut) {
-                    clearTimeout(timeoutId); // Clear the timeout.
-                    // Schedule the next fetch after 600ms (retry).
-                    setTimeout(fetchNextFrame, 600);
+                if (requestTimedOut || !state.isActive) { // Check isActive here too
+                    if (!state.isActive) debugLog(`[${container.id}] tempImg.onerror: state became inactive during load/error.`);
+                     clearTimeout(requestTimeoutId);
+                    return;
+                }
+                clearTimeout(requestTimeoutId);
+                debugLog(`[${container.id}] Error loading image ${imgUrl}.`);
+                let errorOverlay = container.querySelector('.error-overlay');
+                if (!errorOverlay) {
+                    errorOverlay = document.createElement('div');
+                    errorOverlay.className = 'error-overlay';
+                    errorOverlay.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(255,0,0,0.5);color:white;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:18px;z-index:100;pointer-events:none;';
+                    errorOverlay.textContent = 'Camera Error';
+                    container.appendChild(errorOverlay);
+                }
+                if (state.isActive) { // Retry only if still active
+                    fetchTimeoutId = setTimeout(fetchNextFrame, 2000); // Longer delay on error
                 }
             };
-            // Start loading the image.
             tempImg.src = imgUrl;
         }
 
-        // Start the image fetching loop.
-        fetchNextFrame();
+        fetchNextFrame(); // Start the loop
     }
 
-    // Load any previously saved state when the page first loads.
+    // Initial load of state from localStorage when the page loads
     loadState();
+
 </script>
 </body>
 </html>
-```
