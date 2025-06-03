@@ -11,8 +11,10 @@
   Add camera IPs under "ADD YOUR CAMERA IPs HERE"
   
   Modify load settings keys under 'load settings with keypress'
+
+  Specify config on url:  http://x.x.x.x?config=xxx
   
-                                               26May25
+                                               03Jun25
 -->
 
 
@@ -20,7 +22,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>Camera Viewer with Motion Detection</title>
+    <title>Camera Viewer</title>
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
@@ -89,8 +91,8 @@
             position: absolute;
             top: 4px;
             right: 4px;
-            background: #333;
-            color: white;
+            background: rgba(0,0,0,0);
+            color: #00A;
             border: none;
             font-size: 16px;
             cursor: pointer;
@@ -101,11 +103,11 @@
         .cam-title {
             position: absolute;
             top: 4px;
-            left: 8px;
-            color: #fff;
-            background: rgba(0,0,0,0.5);
+            left: 5px;
+            color: #00A;
+            background: rgba(0,0,0,0);
             padding: 2px 6px;
-            font-size: 14px;
+            font-size: 16px;
             z-index: 5;
             pointer-events: none;
         }
@@ -113,31 +115,31 @@
         /* Styles for motion detection controls */
         .motion-controls {
             position: absolute;
-            bottom: 4px;
-            left: 8px;
-            background: rgba(0,0,0,0.5);
-            padding: 3px 6px;
-            border-radius: 3px;
+            top: 26px;
+            left: 5px;
+            background: rgba(0,0,0,0);
+            padding: 0px 0px;
+            border-radius: 0px;
             z-index: 10;
-            color: white;
-            font-size: 12px;
+            color: #00A;
+            font-size: 8px;
             display: flex;
             align-items: center;
         }
 
         .motion-controls label {
-            margin-right: 5px;
+            margin-right: 0px;
             cursor: pointer;
         }
 
         .motion-controls input[type="checkbox"] {
-            margin-right: 5px;
+            margin-right: 0px;
             cursor: pointer;
         }
 
         .motion-controls input[type="range"] {
-            width: 80px;
-            height: 10px;
+            width: 120px;
+            height: 8px;
             cursor: pointer;
             display: none; /* Hidden by default */
             margin-left: 5px;
@@ -188,7 +190,7 @@
     }
     // --- END DEBUGGING ---
 
-
+    // load settings with keypress ('r' and 'b' unavailable)
     const keyConfigMap = [
         { key: 'm', config: 'main' },
         { key: 's', config: 'small' },
@@ -203,7 +205,7 @@
             const currentDisplay = window.getComputedStyle(tb).display;
             tb.style.display = (currentDisplay === 'none' || tb.style.display === 'none') ? 'block' : 'none';
         }
-        if (e.key === 'c') resetCameras();
+        if (e.key === 'r') resetCameras();
 
         const match = keyConfigMap.find(item => e.key === item.key);
         if (match) {
@@ -223,7 +225,7 @@
     const cameras = [
         { src: "http://192.168.1.100/jpg", id: "Front" },
         { src: "http://192.168.1.101/jpg", id: "Side" },
-        { src: "http://192.168.1.102/jpg", id: "Back" },
+        { src: "http://192.168.1.102/jpg", id: "Back" }
     ];
 
     const toolbar = document.getElementById('toolbar');
@@ -310,15 +312,17 @@
 
     function showInstructions() {
         alert(`CCTV Camera Viewer with Motion Detection
-          - Click a camera button to open its feed.
-          - Save/load/import/export configurations.
-          - Drag/resize windows.
+          - Click camera button to open its feed.
+          - Save/Load/Import/Export configuration.
+          - Drag/Resize windows.
           - SHIFT + Scroll to zoom, SHIFT + drag to pan.
-          - Motion Detection: Check box to enable, 
+          - Motion Detection: Check box to enable; 
             use slider for sensitivity.
-          - Press 'b' to hide/show the toolbar.
-          - Quick load configs: 'm', 's', 'f'.
-          - Reset to close all feeds (or press 'C').
+          - 'b' hide/show the toolbar.
+          - Quick load configs: 
+            'm' Main, 's' Side, 'f' Front.
+          - 'r'/Reset close all feeds.
+          - Specify config on URL: ?config=
         `);
     }
 
@@ -370,20 +374,27 @@
         debugLog('State saved.');
     }
 
-    function loadState() {
+    function getQueryParam(name) {
+        const params = new URLSearchParams(window.location.search);
+        return params.get(name);
+    }
+
+    function loadState(configName) {
         debugLog('Loading state...');
-        // First, clear all existing cameras and their loops properly
+
+        // Clear existing cameras
         document.querySelectorAll('.img-container').forEach(el => {
-            if (el._zoomPanState) {
-                debugLog(`Load: Setting isActive=false for old ${el.id}`);
-                el._zoomPanState.isActive = false;
-            }
+            if (el._zoomPanState) el._zoomPanState.isActive = false;
             el.remove();
         });
 
-        const stateString = localStorage.getItem('cameraState');
+        // Get state from URL config or fallback to default
+        const stateString = configName
+            ? localStorage.getItem('cameraState_' + configName)
+            : localStorage.getItem('cameraState');
+
         if (!stateString) {
-            debugLog('No state found in localStorage to load.');
+            debugLog('No state found to load.');
             return;
         }
 
@@ -392,26 +403,19 @@
             stateToLoad = JSON.parse(stateString);
         } catch (e) {
             console.error("Error parsing saved state:", e);
-            alert("Error loading saved state. It might be corrupted.");
-            localStorage.removeItem('cameraState'); // Clear corrupted state
+            alert("Error loading saved state.");
             return;
         }
 
-        if (Object.keys(stateToLoad).length === 0) {
-            debugLog('Saved state is empty. Nothing to load.');
-            return;
+        for (const camDef of cameras) {
+            (stateToLoad[camDef.id] || []).forEach(cfg => {
+                createCameraWindow(camDef, cfg);
+            });
         }
 
-        for (const camDef of cameras) { // Iterate over defined cameras
-            if (stateToLoad[camDef.id]) { // If this camera type has saved instances
-                 (stateToLoad[camDef.id] || []).forEach(cfg => {
-                    debugLog(`Loading config for ${camDef.id} (unique: ${cfg.uniqueId})`);
-                    createCameraWindow(camDef, cfg);
-                });
-            }
-        }
         debugLog('State loaded.');
     }
+
 
 
     function initAudio() {
@@ -491,7 +495,7 @@
           <div class="img-inner"><img crossorigin="anonymous" /></div>
           <div class="motion-indicator"></div>
           <div class="motion-controls">
-              <label for="motion_check_${uniqueId}">Motion:</label>
+              <label for="motion_check_${uniqueId}"></label>
               <input type="checkbox" id="motion_check_${uniqueId}" class="motion-checkbox">
               <input type="range" id="motion_slider_${uniqueId}" class="motion-slider" min="1" max="100" value="50">
           </div>
@@ -500,12 +504,36 @@
         initContainer(div, cam.src, saved);
     }
 
-    function compareFrames(ctx1, ctx2, width, height, sensitivity) {
+    function compareFrames(ctx1, ctx2, width, height, sensitivity, containerId = "unknown_cam") { // Added containerId for logging
         const imgData1 = ctx1.getImageData(0, 0, width, height).data;
         const imgData2 = ctx2.getImageData(0, 0, width, height).data;
         let diffCount = 0;
-        const threshold = 25;
-        const requiredDiffPixels = (101 - sensitivity) * (width * height / 400);
+
+        // --- MODIFIED PARAMETERS ---
+        // Original: const threshold = 10;
+        const threshold = 8; // Lowered from 10. Defines how much a single pixel's grayscale value needs to change.
+                             // This makes individual pixel changes easier to detect.
+
+        // Original calculation was: (101 - sensitivity) * (width * height / 400)
+        // New calculation aims for a less steep sensitivity curve and generally more sensitivity.
+
+        // N_scaler: Compresses the effect of the sensitivity slider.
+        // A higher N_scaler means the slider has a less dramatic effect (curve is flatter).
+        // Original formula implicitly had N_scaler around 1.0 relative to its 1-100 range.
+        const N_scaler = 2.0; 
+
+        // baseDivisor: Affects overall sensitivity. Higher baseDivisor = more sensitive (fewer pixels needed).
+        // Original was 400.0.
+        const baseDivisor = 800.0;
+
+        // 'sensitivity' is the slider value from 1 (low sensitivity) to 100 (high sensitivity).
+        // We want 'effectiveSensitivityFactor' to be low for high slider sensitivity, and high for low slider sensitivity.
+        // When slider sensitivity = 100 (max), effectiveSensitivityFactor = ((100-100)/2.0) + 1.0 = 1.0 (most sensitive factor part).
+        // When slider sensitivity = 1 (min), effectiveSensitivityFactor = ((100-1)/2.0) + 1.0 = 49.5 + 1.0 = 50.5 (least sensitive factor part).
+        const effectiveSensitivityFactor = ((100.0 - parseFloat(sensitivity)) / N_scaler) + 1.0;
+        
+        const requiredDiffPixels = effectiveSensitivityFactor * (width * height / baseDivisor);
+        // --- END MODIFIED PARAMETERS ---
 
         for (let i = 0; i < imgData1.length; i += 4) {
             const gray1 = (imgData1[i] + imgData1[i + 1] + imgData1[i + 2]) / 3;
@@ -513,7 +541,12 @@
             if (Math.abs(gray1 - gray2) > threshold) diffCount++;
         }
         const motionDetected = diffCount > requiredDiffPixels;
-        // debugLog(`compareFrames: diffCount=${diffCount}, required=${requiredDiffPixels.toFixed(2)}, detected=${motionDetected}`); // Very spammy
+
+        // For debugging the new values:
+        // Only log ~10% of the calls to reduce console spam, if DEBUG_MOTION is true.
+        if (DEBUG_MOTION && Math.random() < 0.1) { // Adjust 0.1 (10%) as needed for logging frequency
+            debugLog(`[${containerId}] compareFrames (slider: ${sensitivity}): diffCount=${diffCount}, reqDiffPixels=${requiredDiffPixels.toFixed(2)}, effectiveSensFactor=${effectiveSensitivityFactor.toFixed(2)}, threshold=${threshold}, detected=${motionDetected}`);
+        }
         return motionDetected;
     }
 
@@ -743,7 +776,7 @@
 
                     if (prevImageLoaded) {
                         // debugLog(`[${container.id}] Comparing frames.`); // Spammy
-                        if (compareFrames(ctx1, ctx2, motionWidth, motionHeight, state.motionSensitivity)) {
+                        if (compareFrames(ctx1, ctx2, motionWidth, motionHeight, state.motionSensitivity, container.id)) {
                             debugLog(`[${container.id}] Motion DETECTED! Calling playBeep.`);
                             playBeep(container.id);
                             motionIndicator.style.display = 'block';
@@ -805,7 +838,8 @@
     }
 
     // Initial load of state from localStorage when the page loads
-    loadState();
+    const startupConfig = getQueryParam('config');
+    loadState(startupConfig);
 
 </script>
 </body>
