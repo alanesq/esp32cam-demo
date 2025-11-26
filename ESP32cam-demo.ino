@@ -69,6 +69,7 @@
 
 
 
+
 //   ---------------------------------------------------------------------------------------------------------
 
     // Required by PlatformIO
@@ -101,14 +102,18 @@
 //                           -SETTINGS
 // ---------------------------------------------------------------
 
- char* stitle = "BackCam";                             // title of this sketch
- char* sversion = "01Apr25";                            // Sketch version
+ char* stitle = "ESPcamDemo";                           // title of this sketch
+ char* sversion = "26Nov25";                            // Sketch version
+
+ const float MAX_TEMP_C = 75.0;                         // ESP temperate above which live streaming is stopped
  
  framesize_t FRAME_SIZE_IMAGE = FRAMESIZE_SVGA;         // default camera resolution
     //           Resolutions available:
     //               160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 240X240,
     //               320x240 (QVGA), 400x296 (CIF), 640x480 (VGA default), 800x600 (SVGA),
     //               1024x768 (XGA), 1280x1024 (SXGA), 1600x1200 (UXGA)
+
+ int imageQuality = 5;                                  // Jpeg image quality 0-63 (lower = better)
 
  #define WDT_TIMEOUT 60                                 // timeout of watchdog timer (seconds) 
 
@@ -371,6 +376,7 @@ void setup() {
    digitalWrite(indicatorLED,HIGH);          // led off = High
    pinMode(iopinA, INPUT);                   // pin 13 - free io pin, can be used for input or output
    pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be used for input or output (must not be high at boot)
+   digitalWrite(iopinB, LOW);                // set pin 12 low asap to ensure it does not change esp boot mode
 
  // MCP23017 io expander (requires adafruit MCP23017 library)
  #if useMCP23017 == 1
@@ -502,7 +508,7 @@ if (reset) {
    config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA),
                                                  //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA),
                                                  //              1600x1200 (UXGA)
-   config.jpeg_quality = 10;                     // 0-63 lower number means higher quality (can cause failed image capture if set too low at higher resolutions)
+   config.jpeg_quality = imageQuality;                     // 0-63 lower number means higher quality (can cause failed image capture if set too low at higher resolutions)
    config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
    //config.fb_location = CAMERA_FB_IN_PSRAM;      // store the captured frame in PSRAM
    config.fb_count = 1;                          // if more than one, i2s runs in continuous mode. Use only with JPEG
@@ -821,7 +827,7 @@ byte storeImage() {
      String SDfilename = "/img/" + String(imageCounter + 1) + ".jpg";              // build the image file name
      File file = fs.open(SDfilename, FILE_WRITE);                                  // create file on sd card
      if (!file) {
-       if (serialDebug) Serial.println("Error: Failed to create file on sd-card: " + SDfilename);
+       if (serialDebug) Serial.printf("Error: Failed to create file on sd-card:  %s\n", spiffsFilename.c_str());
      } else {
        if (file.write(fb->buf, fb->len)) {                                         // File created ok so save image to it
          if (serialDebug) Serial.println("Image saved to sd card");
@@ -1241,7 +1247,7 @@ bool handleImg() {
 
      File f = SPIFFS.open(spiffsFilename, "r");                         // read file from spiffs
          if (!f) {
-           if (serialDebug) Serial.println("Error reading " + spiffsFilename);
+           if (serialDebug) Serial.printf("Error reading %s\n", spiffsFilename.c_str());
            sendHeader(client, "Display stored image");
            client.write("Error reading file from Spiffs\n");
            client.write("<br><a href='/'>Return</a>\n");       // link back
@@ -1250,7 +1256,7 @@ bool handleImg() {
          else {
              size_t sent = server.streamFile(f, "image/jpeg");     // send file to web page
              if (!sent) {
-               if (serialDebug) Serial.println("Error sending " + spiffsFilename);
+               if (serialDebug) Serial.printf("Error sending %s\n", spiffsFilename.c_str());
              } else {
                pRes = 1;                                           // flag sucess
              }
@@ -1490,7 +1496,7 @@ bool handleJPG() {
 
     for (int attempts = 0; attempts < 3; attempts++) {
         fb = esp_camera_fb_get();
-        if (fb && fb->buf && fb->len > 0) break;  // frame has been captured
+        if (fb && fb->buf && fb->len > 0) break;  // frame has been captured ok
         if (fb) esp_camera_fb_return(fb);
         fb = NULL;
         delay(60);                                // delay before retry
@@ -1555,23 +1561,40 @@ void handleStream(){
  client.write(HEADER, hdrLen);
  client.write(BOUNDARY, bdrLen);
 
- // send live jpg images until client disconnects
- while (true)
- {
-   if (!client.connected()) break;
-     fb = esp_camera_fb_get();                   // capture live image as jpg
-     if (!fb) {
-       if (serialDebug) Serial.println("Error: failed to capture jpg image");
-     } else {
-      // send image
-       client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
-       sprintf( buf, "%d\r\n\r\n", fb->len);       // format the image's size as html and put in to 'buf'
-       client.write(buf, strlen(buf));             // send result (image size)
-       client.write((char *)fb->buf, fb->len);     // send the image data
-       client.write(BOUNDARY, bdrLen);             // send html boundary      see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Type
-       esp_camera_fb_return(fb);                  // return camera frame buffer
-   }
- }
+// The original while loop block
+while (true)
+{
+  // 1. Check for excessive temperature
+  float currentTemp = temperatureRead();
+  if (currentTemp > MAX_TEMP_C) {
+    if (serialDebug) {
+      Serial.print("⚠️ WARNING: Overheating detected! Temperature: ");
+      Serial.print(currentTemp);
+      Serial.println("°C. Stopping stream.");
+    }
+    // Perform any necessary cleanup before breaking (optional)
+    // You might want to close the client connection here if it's open, but
+    // since you're breaking out of the loop, the main code will handle it.
+    break; // Exit the while loop to stop the streaming/capture process
+  }
+
+  // 2. Check client connection (original check)
+  if (!client.connected()) break;
+
+  // 3. Image Capture and Sending (original code)
+  fb = esp_camera_fb_get(); // capture live image as jpg
+  if (!fb) {
+    if (serialDebug) Serial.println("Error: failed to capture jpg image");
+  } else {
+    // send image
+    client.write(CTNTTYPE, cntLen);             // send content type html (i.e. jpg image)
+    sprintf( buf, "%d\r\n\r\n", fb->len);       // format the image's size as html and put in to 'buf'
+    client.write(buf, strlen(buf));             // send result (image size)
+    client.write((char *)fb->buf, fb->len);     // send the image data
+    client.write(BOUNDARY, bdrLen);             // send html boundary      
+    esp_camera_fb_return(fb);                   // return camera frame buffer
+  }
+}
 
  if (serialDebug) Serial.println("Video stream stopped");
  delay(3);
@@ -1772,7 +1795,7 @@ void readGrayscaleImage() {
         if (pixelVal < newminV) newminV = pixelVal;
       }
     }
-    client.println("Resized image: The lowest value pixel is " + String(newminV) + ", the highest is " + String(newmaxV));
+    client.printf("Resized image: The lowest value pixel is %d, the highest is %d\n", newminV, newmaxV);
     client.write("<br><br><a href='/'>Return</a>\n");       // link back    
 
   // display image as asciiArt
