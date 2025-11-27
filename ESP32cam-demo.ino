@@ -59,6 +59,9 @@
 //                          ====================================== 
 
 
+            #include "wifiSettings.h"     /*                // delete this line //
+
+
                         #define SSID_NAME "<WIFI SSID HERE>"
                         
                         #define SSID_PASWORD "<WIFI PASSWORD HERE>"
@@ -68,6 +71,7 @@
 
 
 
+                                           */              // delete this line //
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -103,7 +107,7 @@
 // ---------------------------------------------------------------
 
  char* stitle = "ESPcamDemo";                           // title of this sketch
- char* sversion = "26Nov25";                            // Sketch version
+ char* sversion = "27Nov25";                            // Sketch version
 
  const float MAX_TEMP_C = 75.0;                         // ESP temperate above which live streaming is stopped
  
@@ -1143,12 +1147,12 @@ void handleData(){
     server.sendContent("Image size: " + ImageResDetails);
     server.sendContent(",");
 
-  // line6 - memory - wifi
+  // line6 - memory - wifi - temp
     server.sendContent("Free memory: " + String(ESP.getFreeHeap() /1000) + "K");
     if (!psramFound()) server.sendContent(" (No PSRAM found!)");
     server.sendContent("&ensp; Wifi strength: " + String(WiFi.RSSI()) + "dBm");
-
-  // server.client().stop();
+    float currentTemp = temperatureRead();
+    server.sendContent("&ensp; Temperature: " + String(currentTemp) + "C");
 }
 
 
@@ -1564,7 +1568,7 @@ void handleStream(){
 // The original while loop block
 while (true)
 {
-  // 1. Check for excessive temperature
+  // Check for excessive temperature
   float currentTemp = temperatureRead();
   if (currentTemp > MAX_TEMP_C) {
     if (serialDebug) {
@@ -1572,16 +1576,14 @@ while (true)
       Serial.print(currentTemp);
       Serial.println("°C. Stopping stream.");
     }
-    // Perform any necessary cleanup before breaking (optional)
-    // You might want to close the client connection here if it's open, but
-    // since you're breaking out of the loop, the main code will handle it.
+    client.stop();
     break; // Exit the while loop to stop the streaming/capture process
   }
 
-  // 2. Check client connection (original check)
+  // If client has closed connection
   if (!client.connected()) break;
 
-  // 3. Image Capture and Sending (original code)
+  // Image Capture and Sending 
   fb = esp_camera_fb_get(); // capture live image as jpg
   if (!fb) {
     if (serialDebug) Serial.println("Error: failed to capture jpg image");
