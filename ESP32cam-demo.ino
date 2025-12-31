@@ -106,8 +106,8 @@
 //                           -SETTINGS
 // ---------------------------------------------------------------
 
- char* stitle = "ESPcamDemo";                           // title of this sketch
- char* sversion = "27Nov25";                            // Sketch version
+ char* stitle = "ESP32CamDemo";                         // title of this sketch
+ char* sversion = "31Dec25";                            // Sketch version
 
  const float MAX_TEMP_C = 75.0;                         // ESP temperate above which live streaming is stopped
  
@@ -146,9 +146,6 @@
  // Bright LED (Flash)
    const int brightLED = 4;                             // onboard Illumination/flash LED pin (4)
    int brightLEDbrightness = 0;                         // initial brightness (0 - 255)
-   const int ledFreq = 5000;                            // PWM settings
-   const int ledChannel = 15;                           // camera uses timer1
-   const int ledRresolution = 8;                        // resolution (8 = from 0 to 255)
 
  const int iopinA = 13;                                 // general io pin 13
  const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
@@ -203,7 +200,7 @@
 
 WebServer server(80);                          // serve web pages on port 80
 
-// Used to disable brownout detection
+// Used to disable brownout detection 
  #include "soc/soc.h"
  #include "soc/rtc_cntl_reg.h"
 
@@ -504,10 +501,8 @@ if (reset) {
         config.pin_sscb_scl = SIOC_GPIO_NUM; 
      #endif
    config.pin_pwdn = PWDN_GPIO_NUM;
-   config.pin_reset = RESET_GPIO_NUM;   
-   config.pin_pwdn = PWDN_GPIO_NUM;
    config.pin_reset = RESET_GPIO_NUM;
-   config.xclk_freq_hz = 10000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
+   config.xclk_freq_hz = 20000000;               // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
    config.pixel_format = PIXFORMAT_JPEG;                         // colour jpg format
    config.frame_size = FRAME_SIZE_IMAGE;         // Image sizes: 160x120 (QQVGA), 128x160 (QQVGA2), 176x144 (QCIF), 240x176 (HQVGA), 320x240 (QVGA),
                                                  //              400x296 (CIF), 640x480 (VGA, default), 800x600 (SVGA), 1024x768 (XGA), 1280x1024 (SXGA),
@@ -760,7 +755,7 @@ void changeResolution(framesize_t newRes) {
 
 
 // ----------------------------------------------------------------
-//     Capture image from camera and save to spiffs or sd card
+//     Capture image from camera and save to spiffs or SDcard
 // ----------------------------------------------------------------
 // returns 0 if failed, 1 if stored in spiffs, 2 if stored on sd card
 
@@ -814,7 +809,6 @@ byte storeImage() {
          return 0;
        }
      }
-     esp_camera_fb_return(fb);                               // return camera frame buffer
      if (sRes == 1 && serialDebug) {
        Serial.print("The picture has been saved to Spiffs as " + spiffsFilename);
        Serial.print(" - Size: ");
@@ -845,7 +839,6 @@ byte storeImage() {
    }
 
  esp_camera_fb_return(fb);        // return frame so memory can be released
-
  return sRes;
 
 } // storeImage
@@ -1489,52 +1482,69 @@ bool getNTPtime(int sec) {
 // ----------------------------------------------------------------
 
 bool handleJPG() {
-    WiFiClient client = server.client();          
-    char buf[32];
+
+    const int maxJPGattempts = 3;             // max attempts to capture a frame
+    const int maxTimeBeforeFrameDrop = 3000;  // it time since last capture over this then drop first frame
+
+    WiFiClient client = server.client();
+    if (!client.connected()) return false;
 
     camera_fb_t * fb = NULL;
 
-    // drop first frame to ensure it is not an old image
+    // the first frame can some times be an old one so if this is first capture in a while drop it
+    static unsigned long lastjpgCall = 0;
+    if(millis() - lastjpgCall >= maxTimeBeforeFrameDrop) {
       fb = esp_camera_fb_get();
       esp_camera_fb_return(fb);
+      lastjpgCall = millis();
+    }
 
-    for (int attempts = 0; attempts < 3; attempts++) {
+    // Capture Loop
+    for (int attempts = 0; attempts < maxJPGattempts; attempts++) {
         fb = esp_camera_fb_get();
-        if (fb && fb->buf && fb->len > 0) break;  // frame has been captured ok
+        if (fb && fb->len > 0) break; 
         if (fb) esp_camera_fb_return(fb);
         fb = NULL;
-        delay(60);                                // delay before retry
+        delay(50); 
     }
 
     if (!fb) {
-        if (serialDebug) Serial.println("Error: failed to capture image after retries");
-        return 0;
+        if (serialDebug) Serial.println("Err: Camera capture failed");
+        // Send 500 error to client so they aren't left hanging
+        client.println("HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/plain\r\n\r\nCamera capture failed.");
+        return false;
     }
 
-    ImageResDetails = String(fb->width) + "x" + String(fb->height);
+    ImageResDetails = String(fb->width) + "x" + String(fb->height);    // store image size
 
-    const char HEADER[] = "HTTP/1.1 200 OK\r\nAccess-Control-Allow-Origin: *\r\n";
-    const char CTNTTYPE[] = "Content-Type: image/jpeg\r\nContent-Length: ";
-    client.write(HEADER, strlen(HEADER));
-    client.write(CTNTTYPE, strlen(CTNTTYPE));
+    // Prepare headers
+    // Using snprintf to safely format the full header block
+    char hdr[150];
+    int hdrLen = snprintf(hdr, sizeof(hdr),
+        "HTTP/1.1 200 OK\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
+        "Content-Type: image/jpeg\r\n"
+        "Content-Length: %u\r\n"
+        "Connection: close\r\n\r\n", 
+        fb->len);
 
-    sprintf(buf, "%d\r\n\r\n", fb->len);
-    client.write(buf, strlen(buf));
-
+    // Send headers and image in as few packets as possible
     if (client.connected()) {
-        client.write((char *)fb->buf, fb->len);
-    } else {
-        if (serialDebug) Serial.println("Error: client disconnected during transmission");
+        client.write((const uint8_t *)hdr, hdrLen);
+        client.write((const uint8_t *)fb->buf, fb->len);
     }
 
-    delay(3);
-    client.clear();
-    client.stop();
-
+    // Cleanup
     esp_camera_fb_return(fb);
-    fb = NULL;
-
-    return 1;
+    
+    // Give the client a moment to receive the data before closing the socket
+    uint32_t waitTimeout = millis();
+    while (client.connected() && (millis() - waitTimeout < 1000)) {
+        delay(1);
+    }
+    
+    client.stop();
+    return true;
 }
 
 
@@ -1542,6 +1552,7 @@ bool handleJPG() {
 //      -stream requested     i.e. http://x.x.x.x/stream
 // ----------------------------------------------------------------
 // Sends video stream - thanks to Uwe Gerlach for the code showing me how to do this
+// Note: when streaming video setting config.fb_count to 2 should increase performance 
 
 void handleStream(){
 
