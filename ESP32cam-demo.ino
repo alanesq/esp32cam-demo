@@ -53,25 +53,17 @@
 //   ---------------------------------------------------------------------------------------------------------
 
 
+//                          ======================= 
+//                               wifi settings
+//                          ======================= 
 
-//                          ====================================== 
-//                                   Enter your wifi settings
-//                          ====================================== 
+#if __has_include("wifiSettings.h")            // if config file exists us it
+  #include "wifiSettings.h"
+#else                                          // if no config file found use these settings
+  #define SSID_NAME "<WIFI SSID HERE>"
+  #define SSID_PASWORD "<WIFI PASSWORD HERE>"
+#endif
 
-
-            #include "wifiSettings.h"     /*                // delete this line //
-
-
-                        #define SSID_NAME "<WIFI SSID HERE>"
-                        
-                        #define SSID_PASWORD "<WIFI PASSWORD HERE>"
-                        
-                        #define ENABLE_OTA 0                         // If OTA updating of this sketch is enabled (requires ota.h file)
-                        const String OTAPassword = "password";       // Password for performing OTA update (i.e. http://x.x.x.x/ota)
-
-
-
-                                           */              // delete this line //
 
 
 //   ---------------------------------------------------------------------------------------------------------
@@ -106,8 +98,8 @@
 //                           -SETTINGS
 // ---------------------------------------------------------------
 
- char* stitle = "ESP32CamDemo";                         // title of this sketch
- char* sversion = "31Dec25";                            // Sketch version
+ char* stitle = "SideCam";                        // title of this sketch
+ char* sversion = "06Mar26";                            // Sketch version
 
  const float MAX_TEMP_C = 75.0;                         // ESP temperate above which live streaming is stopped
  
@@ -147,9 +139,11 @@
    const int brightLED = 4;                             // onboard Illumination/flash LED pin (4)
    int brightLEDbrightness = 0;                         // initial brightness (0 - 255)
 
- const int iopinA = 13;                                 // general io pin 13
- const int iopinB = 12;                                 // general io pin 12 (must not be high at boot)
-
+ const int inputGPIOpin = 12;                           // input gpio pin  (Note: gpio12 and 13 available, 12 must not be high at boot)
+ const int outputGPIOpin = 13;                          // output gpio pin 
+ const bool BonStatus = 0;                              // gpio state which is considered "on" for the output pin
+ unsigned long BchangeTime = 0;                         // time output pin was last changed
+ int BonTimeLimit = 120;                                // max time output can be on (mins) - 0 = unlimited
 
 // camera settings (for the standard - OV2640 - CAMERA_MODEL_AI_THINKER)
 // see: https://randomnerdtutorials.com/esp32-cam-camera-pin-gpios/
@@ -375,9 +369,9 @@ void setup() {
  // define i/o pins
    pinMode(indicatorLED, OUTPUT);            // defined again as sd card config can reset it
    digitalWrite(indicatorLED,HIGH);          // led off = High
-   pinMode(iopinA, INPUT);                   // pin 13 - free io pin, can be used for input or output
-   pinMode(iopinB, OUTPUT);                  // pin 12 - free io pin, can be used for input or output (must not be high at boot)
-   digitalWrite(iopinB, LOW);                // set pin 12 low asap to ensure it does not change esp boot mode
+   pinMode(inputGPIOpin, INPUT_PULLUP);      // Input pin
+   pinMode(outputGPIOpin, OUTPUT);           // output pin (light?)
+   digitalWrite(outputGPIOpin, !BonStatus);  // turn output pin 'off'
 
  // MCP23017 io expander (requires adafruit MCP23017 library)
  #if useMCP23017 == 1
@@ -437,7 +431,14 @@ void loop() {
 
  server.handleClient();          // handle any incoming web page requests
 
-
+ // limit time output pin can be 'on'
+ if (digitalRead(outputGPIOpin) == BonStatus) {      // if output is 'on'
+  if ((millis() - BchangeTime) > (BonTimeLimit * 1000 * 60)) {
+    // time limit exceded
+    digitalWrite(outputGPIOpin, !BonStatus);   // turn pin 'off'
+    BchangeTime = millis();             // log time
+  }
+ }
 
 
 
@@ -869,10 +870,11 @@ void rootUserInput(WiFiClient &client) {
         }
       }
 
-    // if button1 was pressed (toggle io pin B)
+    // if button1 was pressed (toggle io pin)
       if (server.hasArg("button1")) {
         if (serialDebug) Serial.println("Button 1 pressed");
-        digitalWrite(iopinB,!digitalRead(iopinB));             // toggle output pin on/off
+        BchangeTime = millis();                                // log time
+        digitalWrite(outputGPIOpin, !digitalRead(outputGPIOpin));             // toggle output pin on/off
       }
 
     // if button2 was pressed (Cycle illumination LED)
@@ -1016,7 +1018,7 @@ void handleRoot() {
 
    // Control buttons
      client.write("<br><br>");
-     client.write("<input style='height: 35px;' name='button1' value='Toggle pin 12' type='submit'> \n");
+     client.write("<input style='height: 35px;' name='button1' value='Toggle Output Pin' type='submit'> \n");
      client.write("<input style='height: 35px;' name='button2' value='Cycle illumination LED' type='submit'> \n");
      client.write("<input style='height: 35px;' name='button3' value='Toggle Flash' type='submit'> \n");
      client.write("<input style='height: 35px;' name='button4' value='Wipe SPIFFS memory' type='submit'> \n");
@@ -1130,10 +1132,10 @@ void handleData(){
     server.sendContent(",");
 
   // line4 - gpio pin status
-    server.sendContent("GPIO output pin 12 is: ");
-    server.sendContent( (digitalRead(iopinB)==1) ? "ON" : "OFF" );
-    server.sendContent(" &ensp; GPIO input pin 13 is: ");
-    server.sendContent( (digitalRead(iopinA)==1) ? "ON" : "OFF" );
+    server.sendContent("GPIO output pin " + String(outputGPIOpin) + " is: ");
+    server.sendContent( (digitalRead(outputGPIOpin)==BonStatus) ? "ON" : "OFF" );
+    server.sendContent(" &ensp; GPIO input " + String(inputGPIOpin) +" is: ");
+    server.sendContent( (digitalRead(inputGPIOpin)==1) ? "ON" : "OFF" );
     server.sendContent(",");
 
   // line5 - image resolution
@@ -1875,11 +1877,14 @@ void handleSwitch() {
           if (Tvalue != NULL) {
             int val = Tvalue.toInt();        
             if (val == 0) {
-              digitalWrite(iopinB, LOW);
+              digitalWrite(outputGPIOpin, !BonStatus);
               reply = "Switched off";
             }
             if (val == 1) {
-              digitalWrite(iopinB, HIGH);
+              digitalWrite(outputGPIOpin, BonStatus);
+              // bodge as relay seems to fail to switch for some reason???
+                delay(20);
+                digitalWrite(outputGPIOpin, BonStatus);
               reply = "Switched on";
             }
           }
@@ -1923,7 +1928,10 @@ void handleTest() {
  // -------------------------------------------------------------------
 
 
-
+// temp gpio test
+pinMode(outputGPIOpin, INPUT);  
+delay(3000);
+pinMode(outputGPIOpin, OUTPUT);  
 
                           // test code goes here
 
