@@ -136,8 +136,7 @@ This looks like it may contain useful info. on another way of getting RGB data f
    https://eloquentarduino.github.io/2020/01/image-recognition-with-esp32-and-arduino/
 
 These modules require a good power supply.  I find it best to put a good sized smoothing capacitor across the 
-upply as the wifi especially can put lots 
-of spikes on the line.
+supply as the wifi especially can put lots of spikes on the line.
 If you get strange error messages, random reboots, wifi dropping out etc. first thing to do is make sure it is 
 not just a power problem.
 
