@@ -8,6 +8,7 @@
 
 
 
+
  * ESP32-CAM V2
  * AI-Thinker ESP32-CAM / OV2640
  *
@@ -67,8 +68,8 @@
 #else                                          // if no config file found use these settings
 
   // wifi
-    static const char *WIFI_SSID = "<WIFI SSID HERE>"
-    static const char *WIFI_PASSWORD = "<WIFI PASSWORD HERE>"
+    static const char *WIFI_SSID = "<WIFI SSID HERE>";
+    static const char *WIFI_PASSWORD = "<WIFI PASSWORD HERE>";
 
   // sketch title
     static const char *HOSTNAME      = "esp32cam-v2";
@@ -122,8 +123,8 @@ static const uint32_t MOTION_COOLDOWN_MS  = 10000;
 static const uint32_t TIMELAPSE_MIN_MS    = 1000;
 static const uint32_t SD_MIN_FREE_BYTES   = 2UL * 1024UL * 1024UL;
 static const float MAX_TEMP_C = 75.0f;
-static const int INPUT_GPIO_PIN = 12;
-static const int OUTPUT_GPIO_PIN = 13;
+static const int DEFAULT_INPUT_PIN = 12;
+static const int DEFAULT_OUTPUT_PIN = 13;
 static const int INDICATOR_LED_PIN = 33;
 static const bool OUTPUT_ON_LEVEL = LOW;
 static const uint32_t OUTPUT_TIME_LIMIT_MS = 120UL * 60UL * 1000UL;
@@ -152,10 +153,18 @@ struct Settings {
   uint16_t motionThreshold = 13;
   uint16_t motionMinChanged = 8;
   uint32_t timelapseMs = 0;
+  bool     swapGpios = false;
 };
 
 // One global Settings object holds the current camera configuration.
 Settings settings;
+
+// Dynamic GPIO pin accessors based on settings
+inline int activeInputPin() { return settings.swapGpios ? DEFAULT_OUTPUT_PIN : DEFAULT_INPUT_PIN; }
+inline int activeOutputPin() { return settings.swapGpios ? DEFAULT_INPUT_PIN : DEFAULT_OUTPUT_PIN; }
+
+#define INPUT_GPIO_PIN activeInputPin()
+#define OUTPUT_GPIO_PIN activeOutputPin()
 
 // Preferences gives us non-volatile storage backed by the ESP32's NVS area.
 // It is similar in purpose to EEPROM, but is key/value based.
@@ -187,6 +196,9 @@ uint32_t motionDisplayUntil = 0;
 bool motionDetected = false;
 uint32_t lastWiFiAttempt = 0;
 uint32_t streamFrameCounter = 0;
+
+// Forward declaration
+void applyPinModes();
 
 // ============================ HELPERS ============================
 // Small utility functions live here.  The aim is to keep the HTTP handlers
@@ -269,7 +281,7 @@ String timestampString() {
 // The filename includes a prefix (IMG, MOT, TLP, etc.), the timestamp and
 // an incrementing counter so repeated captures do not overwrite one another.
 String uniquePhotoPath(const char *prefix = "IMG") {
-  String base = "/" + String(prefix) + "_" + timestampString();
+  String base = "/img/" + String(prefix) + "_" + timestampString();
   String path = base + ".jpg";
   uint16_t n = 1;
   while (sdReady && SD_MMC.exists(path) && n < 1000) {
@@ -290,13 +302,14 @@ void scanNumberedImages() {
   while (f) {
     if (!f.isDirectory()) {
       String n = String(f.name());
-      if (n.startsWith("/img/") && n.endsWith(".jpg")) {
-        int a = 5;
-        int b = n.length() - 4;
-        String num = n.substring(a, b);
+      int slashIdx = n.lastIndexOf('/');
+      String baseName = (slashIdx >= 0) ? n.substring(slashIdx + 1) : n;
+      if (baseName.endsWith(".jpg")) {
+        int b = baseName.length() - 4;
+        String num = baseName.substring(0, b);
         bool numeric = num.length() > 0;
         for (size_t i = 0; i < num.length(); ++i) if (!isDigit(num[i])) numeric = false;
-        if (numeric) { int n = (int)num.toInt(); if (n > imageCounter) imageCounter = n; }
+        if (numeric) { int val = (int)num.toInt(); if (val > imageCounter) imageCounter = val; }
       }
     }
     f.close();
@@ -340,6 +353,7 @@ void saveSettings() {
   prefs.putUShort("mth", settings.motionThreshold);
   prefs.putUShort("mmc", settings.motionMinChanged);
   prefs.putULong("tlms", settings.timelapseMs);
+  prefs.putBool("swapg", settings.swapGpios);
   prefs.end();
 }
 
@@ -361,6 +375,7 @@ void loadSettings() {
   settings.motionThreshold = prefs.getUShort("mth", 13);
   settings.motionMinChanged = prefs.getUShort("mmc", 8);
   settings.timelapseMs = prefs.getULong("tlms", 0);
+  settings.swapGpios = prefs.getBool("swapg", false);
   prefs.end();
 
   settings.quality = clampInt(settings.quality, 5, 63);
@@ -371,6 +386,15 @@ void loadSettings() {
   settings.gain = clampInt(settings.gain, 0, 31);
   settings.motionThreshold = clampInt(settings.motionThreshold, 1, 60);
   settings.motionMinChanged = clampInt(settings.motionMinChanged, 1, 64);
+}
+
+// Apply pin modes according to current swap state
+void applyPinModes() {
+  int inPin = activeInputPin();
+  int outPin = activeOutputPin();
+  pinMode(inPin, INPUT_PULLUP);
+  pinMode(outPin, OUTPUT);
+  digitalWrite(outPin, !OUTPUT_ON_LEVEL);
 }
 
 // Push our Settings structure into the OV2640 sensor.
@@ -564,15 +588,18 @@ void pruneOldestPhotos(uint8_t keepAtLeast = 1) {
   const uint64_t freeB = total > SD_MMC.usedBytes() ? total - SD_MMC.usedBytes() : 0;
   if (freeB > max<uint64_t>(SD_MIN_FREE_BYTES, total / 20)) return;
 
-  File root = SD_MMC.open("/");
-  if (!root || !root.isDirectory()) return;
+  File root = SD_MMC.open("/img");
+  if (!root || !root.isDirectory()) { if (root) root.close(); return; }
 
   String oldest;
   File file = root.openNextFile();
   while (file) {
     String n = file.name();
-    if (!file.isDirectory() && n.endsWith(".jpg")) {
-      if (oldest.isEmpty() || n < oldest) oldest = n;
+    int slashIdx = n.lastIndexOf('/');
+    String baseName = (slashIdx >= 0) ? n.substring(slashIdx + 1) : n;
+    if (!file.isDirectory() && baseName.endsWith(".jpg")) {
+      String fullPath = "/img/" + baseName;
+      if (oldest.isEmpty() || fullPath < oldest) oldest = fullPath;
     }
     file.close();
     file = root.openNextFile();
@@ -613,6 +640,7 @@ String statusJson() {
   j += "\"quality\":" + String(settings.quality) + ",";
   j += "\"motionEnabled\":" + String(settings.motion ? "true" : "false") + ",";
   j += "\"timelapseMs\":" + String(settings.timelapseMs) + ",";
+  j += "\"swapGpios\":" + String(settings.swapGpios ? "true" : "false") + ",";
   j += "\"gpioInputPin\":" + String(INPUT_GPIO_PIN) + ",";
   j += "\"gpioInputState\":" + String(digitalRead(INPUT_GPIO_PIN) ? "true" : "false") + ",";
   j += "\"gpioOutputPin\":" + String(OUTPUT_GPIO_PIN) + ",";
@@ -640,6 +668,7 @@ String settingsJson() {
   j += "\"motionThreshold\":" + String(settings.motionThreshold) + ",";
   j += "\"motionMinChanged\":" + String(settings.motionMinChanged) + ",";
   j += "\"timelapseMs\":" + String(settings.timelapseMs) + ",";
+  j += "\"swapGpios\":" + String(settings.swapGpios ? "true" : "false") + ",";
   j += "\"gpioInputPin\":" + String(INPUT_GPIO_PIN) + ",";
   j += "\"gpioInputState\":" + String(digitalRead(INPUT_GPIO_PIN) ? "true" : "false") + ",";
   j += "\"gpioOutputPin\":" + String(OUTPUT_GPIO_PIN) + ",";
@@ -670,6 +699,7 @@ void applyArgsToSettings() {
   settings.vflip = argBool("vflip", settings.vflip);
   settings.flash = argBool("flash", settings.flash);
   settings.motion = argBool("motion", settings.motion);
+  settings.swapGpios = argBool("swapGpios", settings.swapGpios);
   if (server.hasArg("motionThreshold")) settings.motionThreshold = clampInt(server.arg("motionThreshold").toInt(), 1, 60);
   if (server.hasArg("motionMinChanged")) settings.motionMinChanged = clampInt(server.arg("motionMinChanged").toInt(), 1, 64);
   if (server.hasArg("timelapseMs")) {
@@ -679,6 +709,7 @@ void applyArgsToSettings() {
 
   applySensorSettings();
   setFlash(settings.flash);
+  applyPinModes();
   nextTimelapse = millis() + (settings.timelapseMs ? settings.timelapseMs : 0);
 }
 
@@ -809,19 +840,25 @@ void handleJpeg() {
 void handleFiles() {
   if (!sdReady) return sendJson("{\"error\":\"SD not available\"}", 503);
   String j = "[";
-  File root = SD_MMC.open("/");
-  File f = root.openNextFile();
-  bool first = true;
-  while (f) {
-    if (!f.isDirectory() && String(f.name()).endsWith(".jpg")) {
-      if (!first) j += ",";
-      j += "{\"name\":\"" + jsonEscape(String(f.name())) + "\",\"size\":" + String((unsigned long)f.size()) + "}";
-      first = false;
+  File root = SD_MMC.open("/img");
+  if (root && root.isDirectory()) {
+    File f = root.openNextFile();
+    bool first = true;
+    while (f) {
+      String n = f.name();
+      int slashIdx = n.lastIndexOf('/');
+      String baseName = (slashIdx >= 0) ? n.substring(slashIdx + 1) : n;
+      if (!f.isDirectory() && baseName.endsWith(".jpg")) {
+        if (!first) j += ",";
+        String fullPath = "/img/" + baseName;
+        j += "{\"name\":\"" + jsonEscape(fullPath) + "\",\"size\":" + String((unsigned long)f.size()) + "}";
+        first = false;
+      }
+      f.close();
+      f = root.openNextFile();
     }
-    f.close();
-    f = root.openNextFile();
+    root.close();
   }
-  root.close();
   j += "]";
   sendJson(j);
 }
@@ -868,26 +905,39 @@ uint32_t clearJpegFiles(fs::FS &fs, const char *rootPath) {
   if (!root || !root.isDirectory()) { if (root) root.close(); return 0; }
   File f = root.openNextFile();
   while (f) {
-    String n = f.name();
-    bool dir = f.isDirectory();
+    String name = f.name();
+    bool isDir = f.isDirectory();
+    String fullPath = name;
+    if (!fullPath.startsWith("/")) {
+      String rp = String(rootPath);
+      if (rp.endsWith("/")) fullPath = rp + name;
+      else fullPath = rp + "/" + name;
+    }
     f.close();
-    if (dir) {
-      if (n == "/img") {
-        File sub = fs.open(n);
-        if (sub && sub.isDirectory()) {
-          File sf = sub.openNextFile();
-          while (sf) {
-            String sn = sf.name();
-            bool sdir = sf.isDirectory();
-            sf.close();
-            if (!sdir && isJpegName(sn) && fs.remove(sn)) ++removed;
-            sf = sub.openNextFile();
+    if (isDir) {
+      File sub = fs.open(fullPath);
+      if (sub && sub.isDirectory()) {
+        File sf = sub.openNextFile();
+        while (sf) {
+          String subName = sf.name();
+          bool subIsDir = sf.isDirectory();
+          String subFullPath = subName;
+          if (!subFullPath.startsWith("/")) {
+            if (fullPath.endsWith("/")) subFullPath = fullPath + subName;
+            else subFullPath = fullPath + "/" + subName;
           }
-          sub.close();
+          sf.close();
+          if (!subIsDir && isJpegName(subFullPath) && fs.remove(subFullPath)) {
+            ++removed;
+          }
+          sf = sub.openNextFile();
         }
+        sub.close();
       }
-    } else if (isJpegName(n) && fs.remove(n)) {
-      ++removed;
+    } else {
+      if (isJpegName(fullPath) && fs.remove(fullPath)) {
+        ++removed;
+      }
     }
     f = root.openNextFile();
   }
@@ -920,7 +970,7 @@ void handleData() {
   server.send(200, "text/plain", out);
 }
 
-// Control the spare output GPIO (GPIO13).
+// Control the spare output GPIO (GPIO13 or swapped GPIO12).
 // The output is active-low on this particular build, so OUTPUT_ON_LEVEL
 // defines which digitalWrite() value means "ON".
 void handleSwitch() {
@@ -966,8 +1016,6 @@ int requestWebPage(String *page, String *received, int maxWaitTime) {
 // Small diagnostic endpoint used to check that the HTTP server and a
 // camera capture path are working.
 void handleTest() {
-  // Do not temporarily change GPIO13 to INPUT here.  That makes the displayed
-  // state misleading and can also interfere with attached hardware.
   const int inRaw = digitalRead(INPUT_GPIO_PIN);
   const int outRaw = digitalRead(OUTPUT_GPIO_PIN);
   const bool outOn = (outRaw == OUTPUT_ON_LEVEL);
@@ -978,9 +1026,9 @@ void handleTest() {
   html += "Temperature: <b>" + String(temperatureRead()) + " C</b><br>";
   html += "Free heap: <b>" + String(ESP.getFreeHeap()) + " bytes</b><br>";
   html += "Free PSRAM: <b>" + String(psramFound()?ESP.getFreePsram():0) + " bytes</b><br><hr>";
-  html += "GPIO12 input: <b>" + String(inRaw ? "HIGH (1)" : "LOW (0)") + "</b>";
+  html += "GPIO " + String(INPUT_GPIO_PIN) + " input: <b>" + String(inRaw ? "HIGH (1)" : "LOW (0)") + "</b>";
   html += "<br>Mode: INPUT_PULLUP (LOW normally means the input is being pulled to ground).<br><br>";
-  html += "GPIO13 output: <b>" + String(outOn ? "ON" : "OFF") + "</b>";
+  html += "GPIO " + String(OUTPUT_GPIO_PIN) + " output: <b>" + String(outOn ? "ON" : "OFF") + "</b>";
   html += " &nbsp; raw level: <b>" + String(outRaw ? "HIGH (1)" : "LOW (0)") + "</b>";
   html += "<br>Logical ON level is <code>" + String(OUTPUT_ON_LEVEL ? "HIGH" : "LOW") + "</code> (active-low output).<br>";
   html += "<button onclick=\"location.href=\'/switch?on=1\'\">Output ON</button>";
@@ -1065,8 +1113,8 @@ void readGrayscaleImage() {
     return server.send(500,"text/plain","grayscale capture failed");
   }
 
-  const int newWidth = 115;
-  const int newHeight = 42;
+  const int newWidth = 230;
+  const int newHeight = 84;
   const size_t newBufSize = (size_t)newWidth * newHeight;
   uint8_t *small = (uint8_t*)malloc(newBufSize);
   if (!small) {
@@ -1310,8 +1358,9 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(
 <div class="wide"><label>Timelapse (seconds, 0=off)</label><input id="timelapseSec" type="number" min="0" step="1"></div>
 <div class="check"><input id="hmirror" type="checkbox"><span>H mirror</span></div><div class="check"><input id="vflip" type="checkbox"><span>V flip</span></div>
 <div class="check"><input id="flash" type="checkbox"><span>Flash</span></div><div class="check"><input id="motion" type="checkbox"><span>Motion capture</span></div>
+<div class="check wide"><input id="swapGpios" type="checkbox"><span>Swap GPIO 12 & 13 (Input/Output)</span></div>
 <div class="wide"><button onclick="saveSettings()">Apply & save</button></div></div></section>
-<section class="card"><h3>GPIO</h3><div class="stat"><span>GPIO12 input</span><strong id="gpioIn" class="gpioState">—</strong></div><div class="stat"><span>GPIO13 output</span><strong id="gpioOut" class="gpioState">—</strong></div><div class="row" style="margin-top:8px"><button onclick="setOutput(1)">Output ON</button><button onclick="setOutput(0)">Output OFF</button></div><p class="hint">GPIO12 is configured as an input with pull-up. GPIO13 is the spare output. GPIO12 must not be driven high during boot.</p></section>
+<section class="card"><h3>GPIO</h3><div class="stat"><span id="gpioInLabel">GPIO12 input</span><strong id="gpioIn" class="gpioState">—</strong></div><div class="stat"><span id="gpioOutLabel">GPIO13 output</span><strong id="gpioOut" class="gpioState">—</strong></div><div class="row" style="margin-top:8px"><button onclick="setOutput(1)">Output ON</button><button onclick="setOutput(0)">Output OFF</button></div><p class="hint">Configured input is set with pull-up. Configured output is the spare output. Input pin must not be driven high during boot.</p></section>
 <section class="card"><h3>System</h3><div id="status"></div></section>
 <section class="card"><h3>Pages & API</h3><div class="linkgrid">
 <a href="/">/</a><a href="/jpg">/jpg</a><a href="/jpeg">/jpeg</a><a href="/photo">/photo</a><a href="/img">/img</a><a href="/img?img=1">/img?img=1</a><a href="/stream">/stream</a><a href="/rgb">/rgb</a><a href="/graydata">/graydata</a><a href="/data">/data</a><a href="/test">/test</a><a href="/ping">/ping</a><a href="/reboot">/reboot</a><a href="/switch?on=1">/switch?on=1</a><a href="/switch?on=0">/switch?on=0</a><a href="/api/status">/api/status</a><a href="/api/settings">/api/settings</a><a href="/api/files">/api/files</a><a href="/ota">/ota</a></div><p class="hint">/stream confirms streaming is enabled and explains the separate MJPEG service on port 81. The dashboard preview uses that service automatically. /jpg is the direct still-image endpoint used by external applications.</p><p id="motionBanner" class="hint">Motion monitoring status</p></section>
@@ -1326,20 +1375,20 @@ $('stream').src='http://'+location.hostname+':81/stream';
 // automatically parse the JSON returned by the ESP32 API.
 async function j(url,opt){let r=await fetch(url,opt);if(!r.ok)throw new Error(await r.text());return await r.json()}
 // Load the saved camera settings from the ESP32 and put them into the form.
-async function load(){try{let s=await j('/api/settings');$('resolution').value=s.resolution;$('quality').value=s.quality;$('brightness').value=s.brightness;$('contrast').value=s.contrast;$('saturation').value=s.saturation;$('exposure').value=s.exposure;$('gain').value=s.gain;$('motionThreshold').value=s.motionThreshold;$('motionMinChanged').value=s.motionMinChanged;$('timelapseSec').value=s.timelapseMs/1000;$('hmirror').checked=s.hmirror;$('vflip').checked=s.vflip;$('flash').checked=s.flash;$('motion').checked=s.motion}catch(e){$('msg').textContent='Settings load failed: '+e}}
+async function load(){try{let s=await j('/api/settings');$('resolution').value=s.resolution;$('quality').value=s.quality;$('brightness').value=s.brightness;$('contrast').value=s.contrast;$('saturation').value=s.saturation;$('exposure').value=s.exposure;$('gain').value=s.gain;$('motionThreshold').value=s.motionThreshold;$('motionMinChanged').value=s.motionMinChanged;$('timelapseSec').value=s.timelapseMs/1000;$('hmirror').checked=s.hmirror;$('vflip').checked=s.vflip;$('flash').checked=s.flash;$('motion').checked=s.motion;$('swapGpios').checked=s.swapGpios;$('gpioInLabel').textContent='GPIO'+s.gpioInputPin+' input';$('gpioOutLabel').textContent='GPIO'+s.gpioOutputPin+' output';}catch(e){$('msg').textContent='Settings load failed: '+e}}
 // Gather the current form values, POST them to the ESP32, then refresh
 // the display so the page reflects what the firmware accepted.
-async function saveSettings(){try{let q=new URLSearchParams({resolution:$('resolution').value,quality:$('quality').value,brightness:$('brightness').value,contrast:$('contrast').value,saturation:$('saturation').value,exposure:$('exposure').value,gain:$('gain').value,motionThreshold:$('motionThreshold').value,motionMinChanged:$('motionMinChanged').value,timelapseMs:String(Number($('timelapseSec').value||0)*1000),hmirror:$('hmirror').checked,vflip:$('vflip').checked,flash:$('flash').checked,motion:$('motion').checked});let s=await j('/api/settings',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:q.toString()});$('msg').textContent='Applied & saved: '+s.resolution;if($('illumination').value!=='')fetch('/illumination?level='+encodeURIComponent($('illumination').value));await load();await status()}catch(e){$('msg').textContent='Save failed: '+e}}
-// Turn the spare GPIO13 output on or off through the HTTP API.
+async function saveSettings(){try{let q=new URLSearchParams({resolution:$('resolution').value,quality:$('quality').value,brightness:$('brightness').value,contrast:$('contrast').value,saturation:$('saturation').value,exposure:$('exposure').value,gain:$('gain').value,motionThreshold:$('motionThreshold').value,motionMinChanged:$('motionMinChanged').value,timelapseMs:String(Number($('timelapseSec').value||0)*1000),hmirror:$('hmirror').checked,vflip:$('vflip').checked,flash:$('flash').checked,motion:$('motion').checked,swapGpios:$('swapGpios').checked});let s=await j('/api/settings',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:q.toString()});$('msg').textContent='Applied & saved: '+s.resolution;if($('illumination').value!=='')fetch('/illumination?level='+encodeURIComponent($('illumination').value));await load();await status()}catch(e){$('msg').textContent='Save failed: '+e}}
+// Turn the spare GPIO output on or off through the HTTP API.
 async function setOutput(v){try{await fetch('/switch?on='+v);await status()}catch(e){$('msg').textContent='GPIO command failed: '+e}}
 // Browser capture action: ask the ESP32 to save the next image, then let
 // the browser navigate to that response so the image can be viewed/downloaded.
 async function capture(){location.href='/capture?save=1'}
 // Poll status information every two seconds.  This keeps the dashboard
 // useful as a live diagnostic panel instead of a one-time snapshot.
-async function status(){try{let s=await j('/api/status');$('status').innerHTML=[['Hostname',s.hostname],['IP',s.ip],['RSSI',s.rssi+' dBm'],['Uptime',s.uptime+' s'],['Free heap',s.freeHeap],['Free PSRAM',s.freePSRAM],['SD free',Math.round(s.sdFree/1048576)+' MB'],['Last JPEG',s.lastJpegBytes+' bytes'],['Capture',s.lastCaptureMs+' ms'],['Photos',s.captures],['Motion events',s.motionEvents],['Timelapse',s.timelapse]].map(x=>'<div class="stat"><span>'+x[0]+'</span><strong>'+x[1]+'</strong></div>').join('');$('hostname').textContent=s.hostname;$('gpioIn').textContent=s.gpioInputState?'ON/HIGH':'OFF/LOW';$('gpioOut').textContent=s.gpioOutputState?'ON':'OFF';let m=document.getElementById('motionBanner');if(m){if(s.motionDetected){m.textContent='⚠ MOTION DETECTED';m.className='motionOn'}else{m.textContent=s.motionEnabled?'Motion monitoring active':'Motion capture is OFF';m.className='hint'}}}catch(e){$('status').textContent='Status unavailable'}}
+async function status(){try{let s=await j('/api/status');$('status').innerHTML=[['Hostname',s.hostname],['IP',s.ip],['RSSI',s.rssi+' dBm'],['Uptime',s.uptime+' s'],['Free heap',s.freeHeap],['Free PSRAM',s.freePSRAM],['SD free',Math.round(s.sdFree/1048576)+' MB'],['Last JPEG',s.lastJpegBytes+' bytes'],['Capture',s.lastCaptureMs+' ms'],['Photos',s.captures],['Motion events',s.motionEvents],['Timelapse',s.timelapse]].map(x=>'<div class="stat"><span>'+x[0]+'</span><strong>'+x[1]+'</strong></div>').join('');$('hostname').textContent=s.hostname;$('gpioIn').textContent=s.gpioInputState?'ON/HIGH':'OFF/LOW';$('gpioOut').textContent=s.gpioOutputState?'ON':'OFF';$('gpioInLabel').textContent='GPIO'+s.gpioInputPin+' input';$('gpioOutLabel').textContent='GPIO'+s.gpioOutputPin+' output';let m=document.getElementById('motionBanner');if(m){if(s.motionDetected){m.textContent='⚠ MOTION DETECTED';m.className='motionOn'}else{m.textContent=s.motionEnabled?'Motion monitoring active':'Motion capture is OFF';m.className='hint'}}}catch(e){$('status').textContent='Status unavailable'}}
 // Refresh the SD-card file list shown in the dashboard.
-async function loadFiles(){try{let a=await j('/api/files');$('files').innerHTML=a.reverse().map(f=>'<div class="file"><span>'+f.name.replace('/','')+' ('+Math.round(f.size/1024)+' KB)</span><span><a href="/download?name='+encodeURIComponent(f.name)+'">view</a> <button style="width:auto" onclick="del(\''+f.name+'\')">×</button></span></div>').join('')}catch(e){$('files').textContent='SD card unavailable'}}
+async function loadFiles(){try{let a=await j('/api/files');$('files').innerHTML=a.reverse().map(f=>'<div class="file"><span>'+f.name+' ('+Math.round(f.size/1024)+' KB)</span><span><a href="/download?name='+encodeURIComponent(f.name)+'">view</a> <button style="width:auto" onclick="del(\''+f.name+'\')">×</button></span></div>').join('')}catch(e){$('files').textContent='SD card unavailable'}}
 // Delete one selected image, then refresh the list.
 async function del(n){await j('/api/delete?name='+encodeURIComponent(n));loadFiles()}
 // Delete all stored JPEG images after asking the user for confirmation.
@@ -1566,15 +1615,14 @@ void setup() {
   // camera/network stack starts doing work.
   pinMode(FLASH_GPIO_NUM, OUTPUT);
   digitalWrite(FLASH_GPIO_NUM, LOW);
-  pinMode(INPUT_GPIO_PIN, INPUT_PULLUP);
-  pinMode(OUTPUT_GPIO_PIN, OUTPUT);
-  digitalWrite(OUTPUT_GPIO_PIN, !OUTPUT_ON_LEVEL);
-  pinMode(INDICATOR_LED_PIN, OUTPUT);
-  digitalWrite(INDICATOR_LED_PIN, HIGH);
 
   // Restore persistent camera settings before initialising the sensor.
   // initCamera() then applies those values to the OV2640.
   loadSettings();
+  applyPinModes();
+
+  pinMode(INDICATOR_LED_PIN, OUTPUT);
+  digitalWrite(INDICATOR_LED_PIN, HIGH);
 
   // Camera failure is treated as fatal because most of this project depends
   // on being able to obtain frames.  A delayed restart gives the Serial
@@ -1641,7 +1689,7 @@ void loop() {
 
   // Check whether it is time for the next timelapse photo.
   timelapseTask();
-  // Safety timeout for the spare output: if something turned GPIO13 on,
+  // Safety timeout for the spare output: if something turned the output on,
   // automatically turn it back off after OUTPUT_TIME_LIMIT_MS.
   //
   // This prevents a forgotten web/API command from leaving an attached
