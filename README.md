@@ -1,6 +1,9 @@
 
 ## ESP32Cam-demo sketch for use with the Arduino IDE 
 
+NOTE: You may be interested to have a look at a version of this sketch I asked ChatGPT to write, it is very impressive
+HERE: https://github.com/alanesq/esp32cam-demo/blob/master/ESP32cam-demo-v2.ino <br>
+
 I show in this sketch how to use the esp32cam as easily as possible.  Everything I learn I try to add to it, please let me know if you have anything which you think can be added or changed to improve it - I am not a professional programmer so am sure there is plenty of room for improvement... <br><br>
 
 This sketch has got a bit larger than I anticipated but this is just because it now has so many individual demonstrations of ways to use the camera, I have tried to make each part as easy to follow as possible with lots of comments etc.. <br>
