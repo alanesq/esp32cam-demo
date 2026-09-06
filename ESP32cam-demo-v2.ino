@@ -6,6 +6,8 @@
     06Sep26
 
 
+
+
  * ESP32-CAM V2
  * AI-Thinker ESP32-CAM / OV2640
  *
@@ -46,7 +48,23 @@
 #include <SPIFFS.h>
 
 // ============================ USER CONFIG ============================
-                    
+// Everything in this section is intended to be safe and easy to customise.
+//
+// The sketch first looks for a separate "wifiSettings.h" file.  That lets you
+// keep Wi-Fi and OTA credentials out of the main sketch if you prefer.
+// If that file is not present, the fallback values immediately below are used.
+// =======================================================================
+
+// if config file esists (wifiSettings.h) it gets the settings from there otherwise use the ones below
+
+// __has_include() is a compile-time check.  It lets the sketch work both:
+//   1. with a separate wifiSettings.h file, and
+//   2. as a single self-contained .ino file.
+//
+// This is handy when moving the project between computers/installations.
+#if __has_include("wifiSettings.h")            // if config file exists us it
+  #include "wifiSettings.h"
+#else                                          // if no config file found use these settings
 
   // wifi
     static const char *WIFI_SSID = "<WIFI SSID HERE>"
@@ -59,14 +77,17 @@
     static const char *OTA_USERNAME = "admin";
     static const char *OTA_PASSWORD = "password";  
 
-
-
+#endif
 
 // Optional static hostname only; DHCP is used for IP configuration.
 static const long GMT_OFFSET_SEC = 0;
 static const int  DST_OFFSET_SEC = 3600;
 
 // AI-Thinker ESP32-CAM camera pins.
+//
+// These GPIO numbers are part of the physical wiring between the ESP32 and
+// the OV2640 camera module.  They are NOT general-purpose pins you can freely
+// reassign without changing the camera wiring/board definition.
 #define PWDN_GPIO_NUM     32
 #define RESET_GPIO_NUM    -1
 #define XCLK_GPIO_NUM      0
@@ -87,6 +108,14 @@ static const int  DST_OFFSET_SEC = 3600;
 #define FLASH_GPIO_NUM     4
 
 // ============================ LIMITS ============================
+// Timing, GPIO and safety limits used throughout the program.
+// Keeping these values in one place makes the sketch much easier to tune.
+//
+// A few names worth knowing:
+//   *_MS       = a time interval in milliseconds
+//   *_BYTES    = a size in bytes
+//   *_GPIO_PIN = a physical ESP32 GPIO number
+// =======================================================================
 static const uint32_t WIFI_RETRY_MS       = 10000;
 static const uint32_t MOTION_SAMPLE_MS    = 700;
 static const uint32_t MOTION_COOLDOWN_MS  = 10000;
@@ -102,6 +131,12 @@ static const uint8_t RGB_SAMPLE_BYTES = 60;
 #define ENABLE_OTA 1
 
 // ============================ SETTINGS ============================
+// "Settings" contains the user-adjustable camera behaviour.
+//
+// This is deliberately kept separate from the runtime variables below.
+// The Settings structure is stored in ESP32 Preferences (NVS), so the last
+// selected values survive a reboot/power cycle.
+
 struct Settings {
   uint8_t  framesize = FRAMESIZE_VGA;
   uint8_t  quality = 10;
@@ -119,9 +154,18 @@ struct Settings {
   uint32_t timelapseMs = 0;
 };
 
+// One global Settings object holds the current camera configuration.
 Settings settings;
+
+// Preferences gives us non-volatile storage backed by the ESP32's NVS area.
+// It is similar in purpose to EEPROM, but is key/value based.
 Preferences prefs;
 
+// Port 80: normal HTTP requests for the dashboard, APIs, captures, etc.
+// Port 81: a separate raw MJPEG server used for the live camera stream.
+//
+// Keeping the stream on its own server prevents the normal web/API server
+// from having to manage a long-lived multipart image response.
 WebServer server(80);
 WiFiServer streamServer(81);
 
@@ -145,6 +189,13 @@ uint32_t lastWiFiAttempt = 0;
 uint32_t streamFrameCounter = 0;
 
 // ============================ HELPERS ============================
+// Small utility functions live here.  The aim is to keep the HTTP handlers
+// and the main loop readable instead of putting lots of low-level conversion,
+// filename and settings code inline.
+
+// Escape characters that have special meaning inside a JSON string.
+// We build JSON by hand in this sketch, so strings must be escaped before
+// they are inserted into JSON responses.
 String jsonEscape(const String &s) {
   String o;
   o.reserve(s.length() + 8);
@@ -159,6 +210,8 @@ String jsonEscape(const String &s) {
   return o;
 }
 
+// Convert the camera driver's numeric frame-size constant into the same
+// human-readable name shown in the web dashboard.
 const char *framesizeName(uint8_t f) {
   switch (f) {
     case FRAMESIZE_QQVGA: return "QQVGA";
@@ -172,6 +225,9 @@ const char *framesizeName(uint8_t f) {
   }
 }
 
+// Do the reverse of framesizeName(): turn a dashboard string such as "VGA"
+// back into the numeric frame-size constant expected by the camera driver.
+// If the supplied text is unknown, keep the current value unchanged.
 uint8_t parseFramesize(const String &s) {
   if (s == "QQVGA") return FRAMESIZE_QQVGA;
   if (s == "QVGA")  return FRAMESIZE_QVGA;
@@ -183,6 +239,8 @@ uint8_t parseFramesize(const String &s) {
   return settings.framesize;
 }
 
+// Read a boolean HTTP argument.  A missing argument leaves the current
+// setting alone, while common true/false spellings are accepted.
 bool argBool(const String &name, bool current) {
   if (!server.hasArg(name)) return current;
   String v = server.arg(name);
@@ -190,10 +248,15 @@ bool argBool(const String &name, bool current) {
   return v == "1" || v == "true" || v == "on" || v == "yes";
 }
 
+// Safety helper: force a value into an allowed range.
+// Example: clampInt(99, 0, 31) returns 31.
 int clampInt(int v, int lo, int hi) {
   return v < lo ? lo : (v > hi ? hi : v);
 }
 
+// Return a filesystem-friendly UTC/local time string for filenames.
+// If NTP has not supplied a valid time yet, a fallback timestamp is used
+// instead of producing a nonsense date.
 String timestampString() {
   struct tm tmNow;
   if (!getLocalTime(&tmNow, 20)) return String(millis());
@@ -202,6 +265,9 @@ String timestampString() {
   return String(b);
 }
 
+// Generate a unique path for a JPEG on the SD card.
+// The filename includes a prefix (IMG, MOT, TLP, etc.), the timestamp and
+// an incrementing counter so repeated captures do not overwrite one another.
 String uniquePhotoPath(const char *prefix = "IMG") {
   String base = "/" + String(prefix) + "_" + timestampString();
   String path = base + ".jpg";
@@ -212,6 +278,9 @@ String uniquePhotoPath(const char *prefix = "IMG") {
   return path;
 }
 
+// Look through existing files at startup and recover the highest numbered
+// image counter.  This prevents the counter from jumping backwards after a
+// reboot and accidentally generating duplicate names.
 void scanNumberedImages() {
   imageCounter = 0;
   if (!sdReady) return;
@@ -236,6 +305,7 @@ void scanNumberedImages() {
   root.close();
 }
 
+// Build a simple sequential filename/path for image storage.
 String numberedPhotoPath() {
   if (!sdReady) return String("/img/1.jpg");
   int n = imageCounter + 1;
@@ -244,11 +314,16 @@ String numberedPhotoPath() {
   return "/img/" + String(n) + ".jpg";
 }
 
+// Turn the ESP32-CAM's built-in flash LED on or off.
+// The actual pin level depends on the board wiring, so the polarity is
+// kept in this one small function rather than scattered through the code.
 void setFlash(bool on) {
   settings.flash = on;
   digitalWrite(FLASH_GPIO_NUM, on ? HIGH : LOW);
 }
 
+// Save every user-adjustable setting to NVS (non-volatile storage).
+// Preferences stores simple values by key, so the next boot can restore them.
 void saveSettings() {
   prefs.begin("camv2", false);
   prefs.putUChar("size", settings.framesize);
@@ -268,6 +343,8 @@ void saveSettings() {
   prefs.end();
 }
 
+// Load settings saved by saveSettings().
+// Missing keys are given the defaults from the Settings structure.
 void loadSettings() {
   prefs.begin("camv2", true);
   settings.framesize = prefs.getUChar("size", FRAMESIZE_VGA);
@@ -296,7 +373,14 @@ void loadSettings() {
   settings.motionMinChanged = clampInt(settings.motionMinChanged, 1, 64);
 }
 
+// Push our Settings structure into the OV2640 sensor.
+//
+// This function is important because changing a value in RAM does not by
+// itself change the camera.  The sensor object must also receive the new
+// brightness/contrast/exposure/etc. values.
 void applySensorSettings() {
+  // The camera driver gives us the live sensor object.  All image controls
+  // below are applied directly to that sensor.
   sensor_t *s = esp_camera_sensor_get();
   if (!s) return;
   s->set_framesize(s, (framesize_t)settings.framesize);
@@ -320,7 +404,14 @@ void applySensorSettings() {
 }
 
 // ============================ CAMERA ============================
+// Initialise the OV2640 camera.
+//
+// This constructs the camera configuration structure expected by the ESP32
+// camera driver, enables PSRAM-aware frame buffering when available, starts
+// the driver and finally applies the stored sensor settings.
 bool initCamera() {
+  // camera_config_t is the driver's description of how the ESP32 is wired
+  // to the OV2640 and how captured frames should be buffered/encoded.
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -341,6 +432,8 @@ bool initCamera() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
+  // JPEG is used because it keeps frame data compact enough for Wi-Fi and
+  // SD storage.  It also lets the browser display the frame directly.
   config.pixel_format = PIXFORMAT_JPEG;
   config.frame_size = (framesize_t)settings.framesize;
   config.jpeg_quality = settings.quality;
@@ -353,7 +446,9 @@ bool initCamera() {
     config.frame_size = (framesize_t)min((int)settings.framesize, (int)FRAMESIZE_VGA);
   }
 
+  // Hand the completed configuration to the Espressif camera driver.
   esp_err_t err = esp_camera_init(&config);
+  // Any non-OK result means the camera driver could not be started.
   if (err != ESP_OK) {
     Serial.printf("Camera init failed: 0x%x\n", err);
     return false;
@@ -363,6 +458,9 @@ bool initCamera() {
   return true;
 }
 
+// Capture a frame from the camera and return ownership of the frame buffer
+// to the caller.  The caller MUST eventually call esp_camera_fb_return()
+// or the camera can run out of frame buffers.
 camera_fb_t *captureFrame() {
   uint32_t start = micros();
   camera_fb_t *fb = esp_camera_fb_get();
@@ -374,6 +472,8 @@ camera_fb_t *captureFrame() {
   return fb;
 }
 
+// Write one already-captured camera frame to a filesystem path.
+// "fb" is the camera frame buffer returned by esp_camera_fb_get().
 bool saveFrame(camera_fb_t *fb, const String &path) {
   if (!sdReady || !fb) return false;
   if (SD_MMC.totalBytes() - SD_MMC.usedBytes() < SD_MIN_FREE_BYTES) return false;
@@ -385,6 +485,9 @@ bool saveFrame(camera_fb_t *fb, const String &path) {
 }
 
 
+// Fallback storage helper for a frame when the SD card is unavailable.
+// The sketch mainly uses SD for photo storage, but SPIFFS can still provide
+// a small internal fallback for situations where that is useful.
 bool saveFrameSPIFFS(camera_fb_t *fb) {
   if (!spiffsReady || !fb) return false;
   SPIFFS.remove("/image.jpg");
@@ -395,7 +498,13 @@ bool saveFrameSPIFFS(camera_fb_t *fb) {
   return written == fb->len;
 }
 
+// Capture one fresh JPEG and optionally save it to SD.
+//
+// This is the common capture path used by normal snapshots, motion events
+// and timelapse images.  The function also updates capture statistics.
 bool captureToSD(const char *prefix, String *savedPath = nullptr) {
+  // A capture can request the normal flash setting or a non-zero
+  // illumination level from the dashboard.
   bool flashOn = settings.flash || illuminationBrightness > 0;
   uint8_t oldBrightness = illuminationBrightness;
   if (flashOn) {
@@ -426,6 +535,10 @@ bool captureToSD(const char *prefix, String *savedPath = nullptr) {
 
 
 // ============================ SD ============================
+// Mount the microSD card in 1-bit mode.
+//
+// 1-bit mode matters on this board because it reduces SD_MMC pin usage and
+// leaves GPIO4 available for the built-in flash LED.
 bool initSD() {
   // AI-Thinker ESP32-CAM: 1-bit mode keeps GPIO4 available for flash LED.
   if (!SD_MMC.begin("/sdcard", true)) {
@@ -440,6 +553,10 @@ bool initSD() {
   return true;
 }
 
+// Remove old photos when the card is running low on free space.
+// The goal is to prevent future captures from failing simply because the
+// filesystem has filled up.  "keepAtLeast" prevents the cleanup from trying
+// to remove the only remaining image.
 void pruneOldestPhotos(uint8_t keepAtLeast = 1) {
   if (!sdReady) return;
   // Keep pruning until at least 5% free or 2MB free, whichever is larger.
@@ -468,6 +585,9 @@ void pruneOldestPhotos(uint8_t keepAtLeast = 1) {
 }
 
 // ============================ JSON / API ============================
+// Build the JSON object returned by /api/status.
+// The browser periodically polls this endpoint to refresh diagnostics,
+ // GPIO states and motion status without reloading the whole page.
 String statusJson() {
   uint64_t total = sdReady ? SD_MMC.totalBytes() : 0;
   uint64_t used  = sdReady ? SD_MMC.usedBytes() : 0;
@@ -501,6 +621,9 @@ String statusJson() {
   return j;
 }
 
+// Build a JSON representation of the current Settings structure.
+// The dashboard uses this both when initially loading the form and after
+// applying new values.
 String settingsJson() {
   String j = "{";
   j += "\"resolution\":\"" + String(framesizeName(settings.framesize)) + "\",";
@@ -525,6 +648,7 @@ String settingsJson() {
   return j;
 }
 
+// Common helper for sending JSON with the correct content type.
 void sendJson(const String &body, int code = 200) {
   server.send(code, "application/json; charset=utf-8", body);
 }
@@ -532,6 +656,8 @@ void sendJson(const String &body, int code = 200) {
 void handleStatus() { sendJson(statusJson()); }
 void handleSettingsGet() { sendJson(settingsJson()); }
 
+// Read camera/settings values from HTTP query/form arguments and validate
+// them before copying them into the global Settings structure.
 void applyArgsToSettings() {
   if (server.hasArg("resolution")) settings.framesize = parseFramesize(server.arg("resolution"));
   if (server.hasArg("quality")) settings.quality = clampInt(server.arg("quality").toInt(), 5, 63);
@@ -556,18 +682,25 @@ void applyArgsToSettings() {
   nextTimelapse = millis() + (settings.timelapseMs ? settings.timelapseMs : 0);
 }
 
+// Legacy/general settings handler: apply incoming HTTP arguments,
+// save the new settings to NVS, then return the updated settings as JSON.
 void handleSettingsSet() {
   applyArgsToSettings();
   saveSettings();
   sendJson(settingsJson());
 }
 
+// POST version of the settings handler used by the modern dashboard.
+// POST is preferable for a larger group of form values because the values
+// are sent in the request body rather than encoded into the URL.
 void handleSettingsSetPost() {
   applyArgsToSettings();
   saveSettings();
   sendJson(settingsJson());
 }
 
+// Send one camera frame directly as an HTTP JPEG response.
+// This is the core helper behind the /jpg, /jpeg, /photo and related endpoints.
 void sendJpegFrame(camera_fb_t *fb) {
   WiFiClient client = server.client();
   client.setTimeout(1000);
@@ -577,6 +710,7 @@ void sendJpegFrame(camera_fb_t *fb) {
   client.write(fb->buf, fb->len);
 }
 
+// HTTP handler for /jpg: capture a fresh still image and return it directly.
 void handleJPG() {
   static uint32_t lastJpg = 0;
   if (millis() - lastJpg > 3000) {
@@ -594,6 +728,8 @@ void handleJPG() {
   esp_camera_fb_return(fb);
 }
 
+// HTTP handler for the dashboard's "Capture" action.
+// A query parameter can request that the image is also stored on SD.
 void handleCapture() {
   bool flash = settings.flash;
   if (server.hasArg("flash")) flash = argBool("flash", settings.flash);
@@ -612,6 +748,8 @@ void handleCapture() {
   esp_camera_fb_return(fb);
 }
 
+// /photo is another still-image endpoint kept for compatibility with
+// applications that expect this path.
 void handlePhoto() {
   bool flashOn = settings.flash || illuminationBrightness > 0;
   uint8_t old = illuminationBrightness;
@@ -629,6 +767,8 @@ void handlePhoto() {
 }
 
 
+// /img is another compatibility endpoint.  Its optional query argument is
+// accepted so existing callers can continue using /img?img=1.
 void handleImg() {
   if (sdReady) {
     int n = imageCounter;
@@ -659,11 +799,13 @@ void handleImg() {
   }
 }
 
+// /jpeg is an alias for a normal JPEG still capture.
 void handleJpeg() {
   server.send(200, "text/html", "<!doctype html><html><body><img id='i' src='/jpg'><script>setInterval(()=>{i.src='/jpg?t='+Date.now()},2000)</script></body></html>");
 }
 
 
+// Return a JSON list of stored image files on the SD card.
 void handleFiles() {
   if (!sdReady) return sendJson("{\"error\":\"SD not available\"}", 503);
   String j = "[";
@@ -684,12 +826,16 @@ void handleFiles() {
   sendJson(j);
 }
 
+// Normalise/validate a requested filesystem path before opening it.
+// This is important because the path ultimately comes from an HTTP client.
 String safePath(String p) {
   if (!p.startsWith("/")) p = "/" + p;
   p.replace("..", "");
   return p;
 }
 
+// Send an image file from the SD card back to the browser.
+// The filename is supplied as a request parameter and is sanitised first.
 void handleDownload() {
   if (!sdReady || !server.hasArg("name")) return server.send(400, "text/plain", "Missing name");
   String p = safePath(server.arg("name"));
@@ -709,6 +855,7 @@ void handleDelete() {
   sendJson(String("{\"ok\":") + (ok ? "true" : "false") + "}", ok ? 200 : 404);
 }
 
+// Simple extension check used when deciding which files count as photos.
 bool isJpegName(const String &name) {
   String n = name;
   n.toLowerCase();
@@ -748,6 +895,8 @@ uint32_t clearJpegFiles(fs::FS &fs, const char *rootPath) {
   return removed;
 }
 
+// HTTP handler that deletes all stored JPEG images.
+// This is intentionally separate from handleDelete(), which removes one file.
 void handleClearImages() {
   uint32_t removed = 0;
   if (sdReady) removed = clearJpegFiles(SD_MMC, "/");
@@ -756,6 +905,7 @@ void handleClearImages() {
   sendJson(String("{\"ok\":true,\"removed\":") + String(removed) + "}");
 }
 
+// Return raw image/camera data used by one of the compatibility endpoints.
 void handleData() {
   uint64_t freeB = sdReady ? (SD_MMC.totalBytes() - SD_MMC.usedBytes()) : 0;
   String out;
@@ -770,6 +920,9 @@ void handleData() {
   server.send(200, "text/plain", out);
 }
 
+// Control the spare output GPIO (GPIO13).
+// The output is active-low on this particular build, so OUTPUT_ON_LEVEL
+// defines which digitalWrite() value means "ON".
 void handleSwitch() {
   if (!server.hasArg("on")) return server.send(400, "text/plain", "error - no command received");
   int v = server.arg("on").toInt();
@@ -778,16 +931,26 @@ void handleSwitch() {
   else server.send(400,"text/plain","Invalid value");
 }
 
+// Tiny health-check endpoint: useful for external scripts because it returns
+// a predictable response without requiring a camera capture.
 void handlePing() { server.send(200, "text/plain", "ok"); }
 
+// Explicitly reboot the board.  The short delay lets the HTTP response leave
+// the network stack before the ESP32 resets.
 void handleReboot() { server.send(200, "text/plain", "Rebooting...."); delay(300); ESP.restart(); }
 
+// Generic 404 handler.  It prints the requested URI, method and arguments,
+// which makes debugging accidental/wrong URLs much easier from a browser
+// or Serial-connected development session.
 void handleNotFound() {
   String out = "File Not Found\n\nURI: " + server.uri() + "\nMethod: " + String(server.method()==HTTP_GET ? "GET" : "POST") + "\nArguments: " + String(server.args()) + "\n";
   for (uint8_t i=0;i<server.args();i++) out += " " + server.argName(i) + ": " + server.arg(i) + "\n";
   server.send(404, "text/plain", out);
 }
 
+// Small outbound HTTP helper used by diagnostic/testing functionality.
+// It performs a GET and optionally returns both the page body and the
+// requested URL/response information to the caller.
 int requestWebPage(String *page, String *received, int maxWaitTime) {
   if (!page || !received) return -1;
   WiFiClient client;
@@ -800,6 +963,8 @@ int requestWebPage(String *page, String *received, int maxWaitTime) {
   return code;
 }
 
+// Small diagnostic endpoint used to check that the HTTP server and a
+// camera capture path are working.
 void handleTest() {
   // Do not temporarily change GPIO13 to INPUT here.  That makes the displayed
   // state misleading and can also interfere with attached hardware.
@@ -824,6 +989,9 @@ void handleTest() {
   server.send(200,"text/html",html);
 }
 
+// Capture a JPEG and provide sampled RGB-related data for diagnostics.
+// This is not intended to be a full JPEG decoder; it is a lightweight
+// test/inspection endpoint.
 void readRGBImage() {
   if (!psramFound()) return server.send(503,"text/plain","error: no psram available");
   camera_fb_t *fb = captureFrame();
@@ -849,6 +1017,8 @@ void readRGBImage() {
   esp_camera_fb_return(fb);
 }
 
+// Similar diagnostic endpoint that samples the captured image as
+// grayscale/luminance values.
 void readGrayscaleImage() {
   if (!psramFound()) return server.send(503,"text/plain","error: no PSRAM available");
 
@@ -948,6 +1118,7 @@ void readGrayscaleImage() {
   initCamera();
 }
 
+// Set the remembered illumination/flash level exposed by the web UI.
 void handleIllumination() {
   if (!server.hasArg("level")) return server.send(400,"text/plain","Missing level");
   illuminationBrightness = clampInt(server.arg("level").toInt(), 0, 255);
@@ -959,6 +1130,14 @@ void handleIllumination() {
 // Samples a small number of pixels from the current JPEG frame's raw bytes.
 // This deliberately uses JPEG byte differences rather than full image decoding:
 // cheap, fast and suitable for an ESP32-CAM without an image-processing stack.
+// Compare the current camera frame against a small stored baseline.
+//
+// This is deliberately lightweight: rather than doing expensive full-frame
+// image analysis, it samples luminance at a number of locations and counts
+// how many samples changed by at least motionThreshold.
+//
+// The baseline is updated over time, so the detector is aimed at noticeable
+// scene changes rather than being a sophisticated computer-vision system.
 bool motionChanged(camera_fb_t *fb) {
   if (!fb || fb->len < 256) return false;
   static uint8_t baseline[32];
@@ -975,6 +1154,8 @@ bool motionChanged(camera_fb_t *fb) {
     }
     baseline[i] = v;
   }
+  // The first sample establishes a baseline.  There cannot be a meaningful
+  // "change" result until at least one previous frame has been seen.
   if (!baselineValid) {
     baselineValid = true;
     return false;
@@ -982,18 +1163,35 @@ bool motionChanged(camera_fb_t *fb) {
   return changed >= settings.motionMinChanged;
 }
 
+// Non-blocking motion-detection service.
+//
+// Called from loop() on every pass, but it actually performs a camera sample
+// only every MOTION_SAMPLE_MS milliseconds.  That keeps the main loop free
+// to service HTTP requests and the live stream between samples.
 void motionTask() {
+  // millis() intentionally wraps after a long time.  Unsigned subtraction
+  // plus the signed comparison pattern used here keeps timing tests robust.
   uint32_t now = millis();
   if (motionDetected && (int32_t)(now - motionDisplayUntil) >= 0) motionDetected = false;
+  // Motion detection is opt-in.  Exit immediately when it is disabled so
+  // the camera is not periodically captured just for motion monitoring.
   if (!settings.motion) return;
+  // Do not sample on every loop() iteration; that would consume camera and
+  // CPU bandwidth and could interfere with the live stream.
   if (now - lastMotionSample < MOTION_SAMPLE_MS) return;
   lastMotionSample = now;
 
+  // Motion sampling uses the same camera capture mechanism as normal photos.
+  // The frame is inspected briefly and then returned immediately so the
+  // camera buffer is available again for streaming/captures.
   camera_fb_t *fb = captureFrame();
   if (!fb) return;
   bool changed = motionChanged(fb);
   esp_camera_fb_return(fb);
 
+  // Require a cooldown between stored motion events.  Without this, one
+  // person moving in front of the camera could fill the SD card with dozens
+  // of nearly identical images.
   if (changed && now - lastMotionEvent >= MOTION_COOLDOWN_MS) {
     lastMotionEvent = now;
     motionDetected = true;
@@ -1010,10 +1208,20 @@ void motionTask() {
   }
 }
 
+// Non-blocking timelapse service.
+//
+// Instead of delay()'ing for the requested interval, this compares millis()
+// with nextTimelapse.  That means Wi-Fi, web requests and motion monitoring
+// continue running while the timelapse waits for its next capture time.
 void timelapseTask() {
+  // Timelapse is active only when an SD card is ready and a non-zero interval
+  // has been configured.  A zero interval means "off" in the dashboard.
   if (!sdReady || settings.timelapseMs == 0) return;
   uint32_t now = millis();
   if ((int32_t)(now - nextTimelapse) < 0) return;
+  // Schedule the following capture before doing the actual capture.  This
+  // keeps the timing tied to the requested interval rather than accumulating
+  // the capture/write time into every successive delay.
   nextTimelapse = now + settings.timelapseMs;
   String path;
   if (captureToSD("TLP", &path)) timelapseCount++;
@@ -1021,8 +1229,22 @@ void timelapseTask() {
 }
 
 // ============================ STREAM ============================
+// The live preview uses MJPEG: a sequence of independent JPEG images sent
+// over one long-lived HTTP response.  The browser displays them as a stream.
+//
+// The stream server listens on TCP port 81, separate from the main port-80
+// WebServer used by the dashboard and REST-like API endpoints.
+
+// Service the one active MJPEG client.
+//
+// This is written as a polling function instead of a blocking server handler.
+// The main loop calls it repeatedly, so the ESP32 can continue doing other
+// work between frames.
 void serviceStream() {
   static WiFiClient client;
+  // There is intentionally only one stream client at a time.  If the old
+  // client disconnected, accept a new connection; otherwise keep using the
+  // existing connection.
   if (!client || !client.connected()) {
     WiFiClient incoming = streamServer.accept();
     if (!incoming) return;
@@ -1040,6 +1262,8 @@ void serviceStream() {
   camera_fb_t *fb = captureFrame();
   if (!fb) return;
 
+  // multipart/x-mixed-replace is the simple MJPEG format used here:
+  // boundary -> JPEG headers -> JPEG bytes -> CRLF -> next boundary.
   client.printf("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %u\r\nX-Frame: %lu\r\n\r\n",
                 (unsigned)fb->len, (unsigned long)++streamFrameCounter);
   size_t written = client.write(fb->buf, fb->len);
@@ -1050,11 +1274,31 @@ void serviceStream() {
 }
 
 // ============================ WEB UI ============================
+// The complete dashboard is stored in flash (PROGMEM) as a C++ raw string.
+//
+// A raw string literal lets us embed HTML/CSS/JavaScript without escaping
+// every quote.  The browser receives this at GET /.
+//
+// The JavaScript talks back to the ESP32 through the /api/... endpoints and
+// automatically refreshes status/file listings in the background.
+
 static const char INDEX_HTML[] PROGMEM = R"HTML(
+<!--
+  ESP32-CAM dashboard
+  -------------------
+  This HTML is embedded in the firmware so the board does not need an
+  external web server.  The UI is deliberately simple: one page contains
+  the camera preview, camera controls, GPIO controls, system statistics,
+  API links and the SD-card file browser.
+
+  The JavaScript near the bottom calls the ESP32 HTTP API endpoints.
+-->
 <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ESP32-CAM</title><style>
 :root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#e8edf3;background:#10141a}body{margin:0}header{padding:14px 18px;background:#171d25;position:sticky;top:0;z-index:2}h1{font-size:20px;margin:0}main{display:grid;grid-template-columns:minmax(320px,2fr) minmax(280px,1fr);gap:16px;padding:16px;max-width:1200px;margin:auto}.card{background:#171d25;border:1px solid #27313d;border-radius:12px;padding:14px}.view{width:100%;background:#000;border-radius:10px;display:block}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.wide{grid-column:1/-1}label{font-size:12px;color:#9eabb9}input,select,button{width:100%;box-sizing:border-box;margin-top:4px;padding:9px;border-radius:8px;border:1px solid #364454;background:#0f141a;color:#fff}button{cursor:pointer}.row{display:flex;gap:8px}.row>*{flex:1}.stat{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #222b35;font-size:13px}.files{max-height:320px;overflow:auto}.file{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid #222b35}.check{display:flex;align-items:center;gap:8px;min-height:38px}.check input{width:auto;margin:0;flex:0 0 auto}.gpioState{display:inline-block;min-width:54px;font-weight:600}.linkgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.linkgrid a{display:block;text-decoration:none;color:#fff;background:#0f141a;border:1px solid #364454;border-radius:8px;padding:9px;text-align:center;font-size:13px}.hint{font-size:12px;color:#9eabb9;line-height:1.5}.motionOn{font-size:18px;font-weight:700}@media(max-width:800px){main{grid-template-columns:1fr}.linkgrid{grid-template-columns:1fr 1fr}}
 </style></head><body><header><h1>ESP32CAM - <span id="hostname" class="hostnameBadge">Loading...</span></h1></header><main>
+<!-- Main live-preview card.  The browser connects directly to port 81. -->
+
 <section class="card"><img id="stream" class="view"><div class="row" style="margin-top:8px"><button onclick="capture()">Capture</button><button onclick="location.reload()">Reconnect stream</button></div><p id="msg"></p></section>
 <section class="card"><h3>Camera</h3><div class="grid">
 <div class="wide"><label>Resolution</label><select id="resolution"><option>QQVGA</option><option>QVGA</option><option>VGA</option><option>SVGA</option><option>XGA</option><option>SXGA</option><option>UXGA</option></select></div>
@@ -1074,16 +1318,34 @@ static const char INDEX_HTML[] PROGMEM = R"HTML(
 <section class="card"><h3>SD photos</h3><div class="row"><button onclick="loadFiles()">Refresh</button><button onclick="clearImages()">Clear ALL stored images</button></div><div id="files" class="files"></div></section>
 </main><script>
 const $=id=>document.getElementById(id);
+// The live MJPEG stream intentionally comes from the separate port-81
+// server.  location.hostname makes this work regardless of the ESP32's
+// current DHCP-assigned IP address.
 $('stream').src='http://'+location.hostname+':81/stream';
+// Shared fetch() helper: make an HTTP request, reject non-2xx replies and
+// automatically parse the JSON returned by the ESP32 API.
 async function j(url,opt){let r=await fetch(url,opt);if(!r.ok)throw new Error(await r.text());return await r.json()}
+// Load the saved camera settings from the ESP32 and put them into the form.
 async function load(){try{let s=await j('/api/settings');$('resolution').value=s.resolution;$('quality').value=s.quality;$('brightness').value=s.brightness;$('contrast').value=s.contrast;$('saturation').value=s.saturation;$('exposure').value=s.exposure;$('gain').value=s.gain;$('motionThreshold').value=s.motionThreshold;$('motionMinChanged').value=s.motionMinChanged;$('timelapseSec').value=s.timelapseMs/1000;$('hmirror').checked=s.hmirror;$('vflip').checked=s.vflip;$('flash').checked=s.flash;$('motion').checked=s.motion}catch(e){$('msg').textContent='Settings load failed: '+e}}
+// Gather the current form values, POST them to the ESP32, then refresh
+// the display so the page reflects what the firmware accepted.
 async function saveSettings(){try{let q=new URLSearchParams({resolution:$('resolution').value,quality:$('quality').value,brightness:$('brightness').value,contrast:$('contrast').value,saturation:$('saturation').value,exposure:$('exposure').value,gain:$('gain').value,motionThreshold:$('motionThreshold').value,motionMinChanged:$('motionMinChanged').value,timelapseMs:String(Number($('timelapseSec').value||0)*1000),hmirror:$('hmirror').checked,vflip:$('vflip').checked,flash:$('flash').checked,motion:$('motion').checked});let s=await j('/api/settings',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:q.toString()});$('msg').textContent='Applied & saved: '+s.resolution;if($('illumination').value!=='')fetch('/illumination?level='+encodeURIComponent($('illumination').value));await load();await status()}catch(e){$('msg').textContent='Save failed: '+e}}
+// Turn the spare GPIO13 output on or off through the HTTP API.
 async function setOutput(v){try{await fetch('/switch?on='+v);await status()}catch(e){$('msg').textContent='GPIO command failed: '+e}}
+// Browser capture action: ask the ESP32 to save the next image, then let
+// the browser navigate to that response so the image can be viewed/downloaded.
 async function capture(){location.href='/capture?save=1'}
+// Poll status information every two seconds.  This keeps the dashboard
+// useful as a live diagnostic panel instead of a one-time snapshot.
 async function status(){try{let s=await j('/api/status');$('status').innerHTML=[['Hostname',s.hostname],['IP',s.ip],['RSSI',s.rssi+' dBm'],['Uptime',s.uptime+' s'],['Free heap',s.freeHeap],['Free PSRAM',s.freePSRAM],['SD free',Math.round(s.sdFree/1048576)+' MB'],['Last JPEG',s.lastJpegBytes+' bytes'],['Capture',s.lastCaptureMs+' ms'],['Photos',s.captures],['Motion events',s.motionEvents],['Timelapse',s.timelapse]].map(x=>'<div class="stat"><span>'+x[0]+'</span><strong>'+x[1]+'</strong></div>').join('');$('hostname').textContent=s.hostname;$('gpioIn').textContent=s.gpioInputState?'ON/HIGH':'OFF/LOW';$('gpioOut').textContent=s.gpioOutputState?'ON':'OFF';let m=document.getElementById('motionBanner');if(m){if(s.motionDetected){m.textContent='⚠ MOTION DETECTED';m.className='motionOn'}else{m.textContent=s.motionEnabled?'Motion monitoring active':'Motion capture is OFF';m.className='hint'}}}catch(e){$('status').textContent='Status unavailable'}}
+// Refresh the SD-card file list shown in the dashboard.
 async function loadFiles(){try{let a=await j('/api/files');$('files').innerHTML=a.reverse().map(f=>'<div class="file"><span>'+f.name.replace('/','')+' ('+Math.round(f.size/1024)+' KB)</span><span><a href="/download?name='+encodeURIComponent(f.name)+'">view</a> <button style="width:auto" onclick="del(\''+f.name+'\')">×</button></span></div>').join('')}catch(e){$('files').textContent='SD card unavailable'}}
+// Delete one selected image, then refresh the list.
 async function del(n){await j('/api/delete?name='+encodeURIComponent(n));loadFiles()}
+// Delete all stored JPEG images after asking the user for confirmation.
 async function clearImages(){if(!confirm('Delete ALL stored JPEG images?'))return;try{let r=await j('/api/clear-images');$('msg').textContent='Deleted '+r.removed+' image(s)';loadFiles()}catch(e){$('msg').textContent='Clear failed: '+e}}
+// Initial page population followed by lightweight periodic polling.
+// The page does not need WebSockets for this application.
 load();status();loadFiles();setInterval(status,2000);setInterval(loadFiles,10000);
 </script></body></html>
 )HTML";
@@ -1093,6 +1355,9 @@ void handleRoot() {
 }
 
 // ============================ WIFI ============================
+// Start the ESP32 as a Wi-Fi station using the configured network.
+// Power-saving is disabled because it can make a live camera stream feel
+// sluggish or irregular.
 void beginWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(HOSTNAME);
@@ -1101,6 +1366,9 @@ void beginWiFi() {
   lastWiFiAttempt = millis();
 }
 
+// Non-blocking Wi-Fi reconnect service.
+// Rather than sitting in a long while() loop whenever Wi-Fi disappears,
+// the main loop retries every WIFI_RETRY_MS milliseconds.
 void serviceWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
   uint32_t now = millis();
@@ -1110,15 +1378,23 @@ void serviceWiFi() {
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
 
+// =======================================================================
+// OTA (Over-The-Air) UPDATE SUPPORT
+// =======================================================================
+// This whole section is compiled only when ENABLE_OTA is non-zero.
+// The OTA page is protected by HTTP Basic Authentication and accepts a
+// compiled .bin firmware file.
 #if ENABLE_OTA
 bool otaStarted = false;
 bool otaFailed = false;
 bool otaAuthorized = false;
 
+// Tell the browser to display an HTTP Basic Authentication prompt.
 void otaRequestAuth() {
   server.requestAuthentication(BASIC_AUTH, "ESP32-CAM OTA", "Enter the OTA password");
 }
 
+// Return true only when the supplied OTA username/password are valid.
 bool otaCheckAuth() {
   if (!server.authenticate(OTA_USERNAME, OTA_PASSWORD)) {
     otaRequestAuth();
@@ -1127,6 +1403,7 @@ bool otaCheckAuth() {
   return true;
 }
 
+// Render the HTML upload page used for firmware updates.
 void handleOTAPage() {
   if (!otaCheckAuth()) return;
   String html = "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'><title>ESP32-CAM V2 OTA</title>";
@@ -1140,6 +1417,11 @@ void handleOTAPage() {
   server.send(200,"text/html",html);
 }
 
+// Process an incoming firmware upload in chunks.
+//
+// The WebServer library calls this repeatedly with UPLOAD_FILE_START,
+// UPLOAD_FILE_WRITE and UPLOAD_FILE_END events.  The firmware is written
+// directly into the inactive OTA partition as chunks arrive.
 void handleOTAUpload() {
   HTTPUpload &upload = server.upload();
   if (upload.status == UPLOAD_FILE_START) {
@@ -1182,6 +1464,8 @@ void handleOTAUpload() {
   }
 }
 
+// Finish the OTA HTTP request.  When the upload was successful, reboot so
+// the ESP32 bootloader can start the newly written application partition.
 void handleOTAFinal() {
   if (!server.authenticate(OTA_USERNAME, OTA_PASSWORD)) {
     otaAuthorized = false;
@@ -1199,6 +1483,9 @@ void handleOTAFinal() {
 }
 #endif
 
+// Register every HTTP route and start both servers.
+// Keeping all route registration in one place makes it easy to see the
+// sketch's public web/API interface at a glance.
 void startServers() {
   server.on("/", HTTP_GET, handleRoot);
   server.on("/api/status", HTTP_GET, handleStatus);
@@ -1242,6 +1529,9 @@ void startServers() {
   streamServer.begin();
 }
 
+// Print a concise diagnostic summary after startup.
+// This is especially useful when the ESP32 is headless and the Serial
+// Monitor is the easiest way to discover its current IP and hardware state.
 void printBootInfo() {
   Serial.println();
   Serial.println("=== ESP32-CAM V2 ===");
@@ -1253,10 +1543,27 @@ void printBootInfo() {
   Serial.println();
 }
 
+// =======================================================================
+// Arduino startup sequence
+// =======================================================================
+// setup() runs exactly once after reset/power-up.
+//
+// The order is intentional:
+//   1. start Serial
+//   2. configure GPIO defaults
+//   3. restore saved settings
+//   4. initialise the camera
+//   5. mount filesystems
+//   6. start Wi-Fi/NTP
+//   7. register/start HTTP services
+//   8. wait briefly for Wi-Fi and print diagnostics
+// =======================================================================
 void setup() {
   Serial.begin(115200);
   delay(200);
 
+  // Put all locally controlled pins into a known safe state before the
+  // camera/network stack starts doing work.
   pinMode(FLASH_GPIO_NUM, OUTPUT);
   digitalWrite(FLASH_GPIO_NUM, LOW);
   pinMode(INPUT_GPIO_PIN, INPUT_PULLUP);
@@ -1265,22 +1572,37 @@ void setup() {
   pinMode(INDICATOR_LED_PIN, OUTPUT);
   digitalWrite(INDICATOR_LED_PIN, HIGH);
 
+  // Restore persistent camera settings before initialising the sensor.
+  // initCamera() then applies those values to the OV2640.
   loadSettings();
 
+  // Camera failure is treated as fatal because most of this project depends
+  // on being able to obtain frames.  A delayed restart gives the Serial
+  // Monitor a chance to show the error before rebooting.
   if (!initCamera()) {
     Serial.println("Fatal: camera failed. Restarting in 5 seconds.");
     delay(5000);
     ESP.restart();
   }
 
+  // SPIFFS is the ESP32's internal flash filesystem.  The "true" argument
+  // allows it to be formatted automatically if mounting fails.
   spiffsReady = SPIFFS.begin(true);
+
+  // SD card is the preferred bulk storage for captured photographs.
   sdReady = initSD();
   if (sdReady) pruneOldestPhotos();
 
+  // Start Wi-Fi and ask the ESP32 time service to synchronise its clock.
+  // Correct time makes saved photo filenames and timestamps much more useful.
   beginWiFi();
   configTime(GMT_OFFSET_SEC, DST_OFFSET_SEC, "pool.ntp.org", "time.nist.gov", "time.google.com");
 
+  // Start the normal web/API server and the separate port-81 MJPEG stream.
   startServers();
+
+  // If timelapse is enabled, schedule the first capture one full interval
+  // from now.  If disabled, the task simply remains inactive.
   nextTimelapse = millis() + (settings.timelapseMs ? settings.timelapseMs : 0);
 
   uint32_t wifiWaitStart = millis();
@@ -1292,12 +1614,38 @@ void setup() {
   printBootInfo();
 }
 
+// =======================================================================
+// Main Arduino loop
+// =======================================================================
+// Keep loop() short and non-blocking.
+//
+// Each task is written so it normally does a little work and returns.  The
+// timing checks inside motionTask(), timelapseTask() and serviceWiFi() mean
+// they can safely be called on every pass without wasting time waiting.
+//
+// The only intentional tiny delay is delay(1), which yields enough CPU time
+// for background ESP32/Wi-Fi housekeeping while keeping the loop responsive.
+// =======================================================================
 void loop() {
+  // Handle ordinary HTTP requests on port 80.
   server.handleClient();
+
+  // Handle the long-lived MJPEG client on port 81.
   serviceStream();
+
+  // Retry Wi-Fi if it has gone away.
   serviceWiFi();
+
+  // Check whether it is time for the next motion sample.
   motionTask();
+
+  // Check whether it is time for the next timelapse photo.
   timelapseTask();
+  // Safety timeout for the spare output: if something turned GPIO13 on,
+  // automatically turn it back off after OUTPUT_TIME_LIMIT_MS.
+  //
+  // This prevents a forgotten web/API command from leaving an attached
+  // device powered indefinitely.
   if (digitalRead(OUTPUT_GPIO_PIN) == OUTPUT_ON_LEVEL && OUTPUT_TIME_LIMIT_MS > 0 && millis() - outputChangedAt > OUTPUT_TIME_LIMIT_MS) {
     digitalWrite(OUTPUT_GPIO_PIN, !OUTPUT_ON_LEVEL);
   }
