@@ -7,6 +7,9 @@
   
   This was an experiment to see what could be acheived using
   A.I. to write all the code.
+  
+  Note: Motion detection will only function whilst the window
+        is visible (set it to always on top to ensure it stays active)
 
   Add camera IPs under "ADD YOUR CAMERA IPs HERE"
   
@@ -15,11 +18,12 @@
   
   Specify config on url:  http://x.x.x.x?config=xxx
   
-                                               14Aug25
+  Note: uses misc/interact.min.js from https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js
+  
+                                               10Oct26
 -->
 
 
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
@@ -35,13 +39,25 @@
             overflow: hidden;
             font-family: sans-serif;
         }
-        /* Styles for the toolbar at the top */
+        /* security lights */
+        #lights {
+          color: #05F;
+          position: fixed; /* stays relative to the viewport */
+          bottom: 3px;     /* distance from bottom edge */
+          right: 8px;      /* distance from right edge */         
+          display: none;            /* initially hide the buttons - press 'b' to display them */   
+        }
+        .lightLink:hover {
+          color: #099;
+        }
+        /* Styles for the button toolbar at the bottom of screen */
         #toolbar {
             position: relative;
             background: transparent;
             width: 100%;
             height: 0;
             overflow: visible;
+            display: none;            /* initially hide the buttons - press 'b' to display them */
         }
         /* Styles for buttons within the toolbar */
         #toolbar button {
@@ -51,7 +67,10 @@
             color: white;
             border: none;
             cursor: pointer;
-        }
+        }       
+        #toolbar button:hover {
+          color: #666;
+        }        
         /* Styles for the containers holding each camera image */
         .img-container {
             position: absolute;
@@ -63,6 +82,19 @@
         }
         .img-container.active {
             z-index: 1000;
+        }
+        /* Green = motion detection enabled & active timer; amber = detector error; red = motion detected. */
+        .img-container.motion-enabled {
+            border-color: #20c56b;
+            box-shadow: 0 0 0 2px rgba(32, 197, 107, 0.8);
+        }
+        .img-container.motion-error {
+            border-color: #ffb020;
+            box-shadow: 0 0 0 2px rgba(255, 176, 32, 0.9);
+        }
+        .img-container.motion-triggered {
+            border-color: #ff2929;
+            box-shadow: 0 0 0 2px rgba(255, 41, 41, 0.95);
         }
         /* Styles for the inner div used for zoom/pan */
         .img-inner {
@@ -85,8 +117,8 @@
             position: absolute;
             top: 4px;
             right: 4px;
-            background: rgba(0,0,0,0);
-            color: #00A;
+            background: rgba(0,0,0,0.45);
+            color: #fff;
             border: none;
             font-size: 16px;
             cursor: pointer;
@@ -97,76 +129,88 @@
             position: absolute;
             top: 4px;
             left: 5px;
-            color: #00A;
-            background: rgba(0,0,0,0);
-            padding: 2px 6px;
-            font-size: 16px;
-            z-index: 5;
-            pointer-events: none;
-        }
-        /* Styles for motion detection controls */
-        .motion-controls {
-            position: absolute;
-            top: 26px;
-            left: 5px;
-            background: rgba(0,0,0,0);
-            padding: 0px 0px;
-            border-radius: 0px;
-            z-index: 10;
-            color: #00A;
-            font-size: 8px;
             display: flex;
             align-items: center;
+            gap: 6px;
+            color: #fff;
+            background: rgba(0,0,0,0.4);
+            padding: 2px 6px;
+            font-size: 16px;
+            z-index: 10;
+            pointer-events: auto;
+            white-space: nowrap;
         }
-        .motion-controls label {
-            margin-right: 0px;
+        .cam-title input[type="checkbox"] {
+            width: 13px;
+            height: 13px;
+            margin: 0;
             cursor: pointer;
+            flex: 0 0 auto;
+            accent-color: #20c56b;
         }
-        .motion-controls input[type="checkbox"] {
-            margin-right: 0px;
-            cursor: pointer;
+        /* Motion sensitivity remains available when motion detection is enabled. */
+        .motion-controls {
+            position: absolute;
+            top: 30px;
+            left: 5px;
+            background: transparent;
+            padding: 0;
+            border-radius: 0;
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            opacity: 0.9;
+            white-space: nowrap;
         }
         .motion-controls input[type="range"] {
-            width: 120px;
-            height: 8px;
+            width: 100px;
+            height: 10px;
             cursor: pointer;
             display: none; /* Hidden by default */
-            margin-left: 5px;
+            margin: 0;
             vertical-align: middle;
         }
          .motion-controls input[type="range"].visible {
             display: inline-block; /* Show when checkbox is checked */
          }
-         .motion-indicator {
+        .motion-indicator {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            background-color: rgba(255, 0, 0, 0.7);
-            display: none; /* Hidden by default */
+            padding: 10px 14px;
+            border-radius: 5px;
+            background-color: rgba(220, 20, 20, 0.94);
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+            display: none; /* Shown briefly when motion is detected */
             z-index: 100;
             pointer-events: none; /* Allow clicks through */
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.65);
             animation: pulse 0.5s infinite alternate;
         }
+        .motion-indicator::after { content: "MOTION DETECTED"; }
         @keyframes pulse {
-            from { transform: translate(-50%, -50%) scale(1); opacity: 0.7; }
-            to   { transform: translate(-50%, -50%) scale(1.2); opacity: 0.3; }
+            from { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            to   { transform: translate(-50%, -50%) scale(1.04); opacity: 0.8; }
         }
         /* Timer styles */
         .timer-controls {
             position: absolute;
-            top: 44px;
+            top: 49px;
             left: 5px;
-            background: rgba(0,0,0,0.4);
             padding: 5px;
             border-radius: 3px;
             z-index: 10;
             color: #00A;
             font-size: 12px;
             display: none; /* Hidden by default */
+            color: #ff9900;
+            background-color: rgb(128,128,128);
+            opacity: 0.85;
         }
         .timer-controls.visible {
             display: block;
@@ -174,20 +218,15 @@
         .timer-controls input {
             width: 40px;
             margin-left: 5px;
-            background: #333;
-            color: white;
             border: 1px solid #555;
         }
         .timer-display {
             margin-left: 10px;
             font-weight: bold;
-            color: #ff9900;
         }
         .timer-controls button {
             margin-left: 5px;
             padding: 2px 6px;
-            background: #444;
-            color: white;
             border: none;
             cursor: pointer;
             font-size: 10px;
@@ -196,14 +235,152 @@
 </head>
 <body>
 <div id="toolbar"></div>
-<script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+<script src="misc/interact.min.js"></script>
 <script>
+
+    // CAMERAS - ADD YOUR CAMERA IPs HERE
+    const cameras = [
+        { src: "http://x.x.x.x/jpg", id: "Cam1" },
+        { src: "http://x.x.x.x/jpg", id: "Cam2" }
+    ];
+    
+    
     let isShiftPressed = false;
     let audioContext = null; // Global AudioContext
     let lastBeepTime = 0;
-    const beepCooldown = 1000; // 1 second cooldown
+    const beepCooldown = 2000; // 2 second cooldown
+    
+
+    // --- MOTION HISTORY STORAGE ---
+    const motionHistory = [];
+    const MAX_HISTORY = 10;
+
+    function showMotionHistory() {
+        const existingOverlay = document.getElementById('motion_history_overlay');
+        if (existingOverlay) existingOverlay.remove();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'motion_history_overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: sans-serif;
+        `;
+
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            background: #222;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90vw;
+            max-width: 700px;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 25px rgba(0,0,0,0.7);
+        `;
+
+        const header = document.createElement('div');
+        header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;';
+        header.innerHTML = `<h3 style="margin: 0; color: #20c56b;">Motion Detection History</h3>`;
+        
+        const closeTop = document.createElement('button');
+        closeTop.textContent = '×';
+        closeTop.style.cssText = 'background: none; border: none; color: #fff; font-size: 24px; cursor: pointer;';
+        closeTop.onclick = () => overlay.remove();
+        header.appendChild(closeTop);
+        dialog.appendChild(header);
+
+        const listContainer = document.createElement('div');
+        listContainer.style.cssText = 'flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px;';
+
+        if (motionHistory.length === 0) {
+            listContainer.innerHTML = `<p style="text-align: center; color: #888; padding: 40px 0;">No motion events recorded yet.</p>`;
+        } else {
+            motionHistory.forEach((item) => {
+                const card = document.createElement('div');
+                card.style.cssText = `
+                    display: flex;
+                    align-items: center;
+                    background: #1a1a1a;
+                    border: 1px solid #444;
+                    border-radius: 6px;
+                    padding: 10px;
+                    gap: 15px;
+                `;
+
+                const img = document.createElement('img');
+                img.src = item.dataUrl;
+                img.style.cssText = 'width: 120px; height: 90px; object-fit: cover; border-radius: 4px; cursor: pointer; border: 1px solid #333;';
+                img.onclick = () => {
+                    const w = window.open('');
+                    w.document.write(`<img src="${item.dataUrl}" style="max-width:100%; background:#000;" alt="Motion Snapshot"/>`);
+                };
+
+                const info = document.createElement('div');
+                info.style.cssText = 'flex: 1; display: flex; flex-direction: column; gap: 4px;';
+                info.innerHTML = `
+                    <div style="font-weight: bold; color: #ff2929; font-size: 15px;">${item.camId} Camera</div>
+                    <div style="font-size: 13px; color: #ccc;">Detected at: ${item.time} (${item.date})</div>
+                `;
+
+                const actions = document.createElement('div');
+                actions.style.cssText = 'display: flex; gap: 8px;';
+
+                const downloadBtn = document.createElement('button');
+                downloadBtn.textContent = 'Download';
+                downloadBtn.style.cssText = 'background: #20c56b; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;';
+                downloadBtn.onclick = () => {
+                    const a = document.createElement('a');
+                    a.href = item.dataUrl;
+                    a.download = `motion_${item.camId.toLowerCase()}_${item.time.replace(/:/g, '-')}.jpg`;
+                    a.click();
+                };
+
+                actions.appendChild(downloadBtn);
+                card.appendChild(img);
+                card.appendChild(info);
+                card.appendChild(actions);
+                listContainer.appendChild(card);
+            });
+        }
+
+        dialog.appendChild(listContainer);
+
+        const footer = document.createElement('div');
+        footer.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-top: 15px; border-top: 1px solid #333; padding-top: 10px;';
+
+        const clearBtn = document.createElement('button');
+        clearBtn.textContent = 'Clear History';
+        clearBtn.style.cssText = 'background: #444; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;';
+        clearBtn.onclick = () => {
+            motionHistory.length = 0;
+            overlay.remove();
+            showMotionHistory();
+        };
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = 'Close';
+        closeBtn.style.cssText = 'background: #333; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer;';
+        closeBtn.onclick = () => overlay.remove();
+
+        footer.appendChild(clearBtn);
+        footer.appendChild(closeBtn);
+        dialog.appendChild(footer);
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+    }
+    // --- END MOTION HISTORY ---
+
     // --- DEBUGGING ---
-    const DEBUG_MOTION = true; // Set to true to enable detailed motion logs
+    const DEBUG_MOTION = false; // Set to true to enable detailed motion logs
     function debugLog(message) {
         if (DEBUG_MOTION) {
             console.log(`[${new Date().toLocaleTimeString()}] ${message}`);
@@ -218,11 +395,18 @@
     ];
     window.addEventListener('keydown', e => {
         if (e.key === 'Shift') isShiftPressed = true;
+        const target = e.target;
+        const typing = target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
+        if (typing) return;
         if (e.key === 'b') {
+            // buttons
             const tb = document.getElementById('toolbar');
-            // Correctly toggle display for toolbar, which might not have explicit display style initially
-            const currentDisplay = window.getComputedStyle(tb).display;
-            tb.style.display = (currentDisplay === 'none' || tb.style.display === 'none') ? 'block' : 'none';
+            const tbDisplay = window.getComputedStyle(tb).display;
+            tb.style.display = (tbDisplay === 'none' || tb.style.display === 'none') ? 'block' : 'none';
+            // security lights
+            const tc = document.getElementById('lights');
+            const tcDisplay = window.getComputedStyle(tc).display;
+            tc.style.display = (tcDisplay === 'none' || tc.style.display === 'none') ? 'block' : 'none';            
         }
         if (e.key === 'r') resetCameras();
         const match = keyConfigMap.find(item => e.key === item.key);
@@ -238,11 +422,9 @@
     window.addEventListener('keyup', e => { if (e.key === 'Shift') isShiftPressed = false; });
     window.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
     
-    // ADD YOUR CAMERA IPs HERE
-    const cameras = [
-        { src: "http://192.168.1.100/jpg", id: "Front" },
-        { src: "http://192.168.1.200/jpg", id: "Side" }
-        
+    
+
+    // cameras
     const toolbar = document.getElementById('toolbar');
     const camButtonContainer = document.createElement('span');
     camButtonContainer.style.position = 'fixed';
@@ -281,17 +463,123 @@
         }
     });
     createButton('Export', () => {
-        const data = localStorage.getItem('cameraState');
-        if (data) {
-            const blob = new Blob([data], { type: 'application/json' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'camera_config.json';
-            a.click();
-            URL.revokeObjectURL(a.href); // Clean up
-        } else {
-            alert('No current state to export.');
+        // Find all named configurations currently saved in localStorage.
+        const configs = Object.keys(localStorage)
+            .filter(key => key.startsWith('cameraState_'))
+            .map(key => ({
+                key: key,
+                name: key.substring('cameraState_'.length)
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        if (configs.length === 0) {
+            alert('No saved configurations to export.');
+            return;
         }
+
+        // Build a simple selection dialog.
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: sans-serif;
+        `;
+
+        const dialog = document.createElement('div');
+        dialog.style.cssText = `
+            background: #222;
+            color: white;
+            padding: 20px;
+            border-radius: 6px;
+            min-width: 300px;
+            max-width: 90vw;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        `;
+
+        const title = document.createElement('h3');
+        title.textContent = 'Select configurations to export';
+        title.style.marginTop = '0';
+        dialog.appendChild(title);
+
+        const list = document.createElement('div');
+        list.style.cssText = 'max-height: 400px; overflow-y: auto; margin: 10px 0 15px;';
+
+        configs.forEach(config => {
+            const label = document.createElement('label');
+            label.style.cssText = 'display:block; padding:5px; cursor:pointer;';
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = config.key;
+            checkbox.checked = true;
+            checkbox.style.marginRight = '8px';
+
+            label.appendChild(checkbox);
+            label.appendChild(document.createTextNode(config.name));
+            list.appendChild(label);
+        });
+
+        dialog.appendChild(list);
+
+        const buttonRow = document.createElement('div');
+        buttonRow.style.cssText = 'display:flex; gap:8px; justify-content:flex-end;';
+
+        const selectAll = document.createElement('button');
+        selectAll.textContent = 'Select All';
+        selectAll.onclick = () => list.querySelectorAll('input').forEach(cb => cb.checked = true);
+
+        const selectNone = document.createElement('button');
+        selectNone.textContent = 'Select None';
+        selectNone.onclick = () => list.querySelectorAll('input').forEach(cb => cb.checked = false);
+
+        const cancel = document.createElement('button');
+        cancel.textContent = 'Cancel';
+        cancel.onclick = () => overlay.remove();
+
+        const exportSelected = document.createElement('button');
+        exportSelected.textContent = 'Export Selected';
+        exportSelected.onclick = () => {
+            const selected = [...list.querySelectorAll('input:checked')];
+
+            if (selected.length === 0) {
+                alert('Please select at least one configuration.');
+                return;
+            }
+
+            // Store all selected configurations together in one JSON file.
+            const exportData = {};
+            selected.forEach(cb => {
+                exportData[cb.value.substring('cameraState_'.length)] =
+                    JSON.parse(localStorage.getItem(cb.value));
+            });
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+                type: 'application/json'
+            });
+
+            const a = document.createElement('a');
+            const downloadUrl = URL.createObjectURL(blob);
+            a.href = downloadUrl;
+            a.download = 'camera_configs.json';
+            a.click();
+            // Delayed revocation avoids interrupting browsers that start downloads asynchronously.
+            setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+            overlay.remove();
+        };
+
+        buttonRow.appendChild(selectAll);
+        buttonRow.appendChild(selectNone);
+        buttonRow.appendChild(cancel);
+        buttonRow.appendChild(exportSelected);
+        dialog.appendChild(buttonRow);
+
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
     });
     createButton('Import', () => {
         const input = document.createElement('input');
@@ -300,21 +588,47 @@
         input.onchange = () => {
             const file = input.files[0];
             if (!file) return;
+
             const reader = new FileReader();
             reader.onload = e => {
                 try {
-                    JSON.parse(e.target.result); // Validate JSON
-                    localStorage.setItem('cameraState', e.target.result);
-                    loadState();
+                    const imported = JSON.parse(e.target.result);
+
+                    // Multi-config export: restore every named configuration.
+                    // A single-layout export maps camera IDs to arrays. A multi-config
+                    // export maps config names to state objects, so exclude arrays here.
+                    const isMultiConfig = imported &&
+                        typeof imported === 'object' &&
+                        !Array.isArray(imported) &&
+                        Object.values(imported).every(value =>
+                            value && typeof value === 'object' && !Array.isArray(value)
+                        );
+
+                    if (isMultiConfig) {
+                        Object.entries(imported).forEach(([name, state]) => {
+                            localStorage.setItem(
+                                'cameraState_' + name,
+                                JSON.stringify(state)
+                            );
+                        });
+
+                        alert(`Imported ${Object.keys(imported).length} configuration(s).`);
+                    } else {
+                        // Backwards compatibility with the original single-state export.
+                        localStorage.setItem('cameraState', e.target.result);
+                        loadState();
+                    }
                 } catch (err) {
                     alert('Error parsing JSON file: ' + err.message);
                 }
             };
+
             reader.onerror = () => alert('Error reading file.');
             reader.readAsText(file);
         };
         input.click();
     });
+    createButton('History', showMotionHistory, '20px');
     createButton('Reset', resetCameras, '20px');
     createButton('About', showInstructions, '20px');
     function showInstructions() {
@@ -323,8 +637,10 @@
           - Save/Load/Import/Export configuration.
           - Drag/Resize windows.
           - SHIFT + Scroll to zoom, SHIFT + drag to pan.
-          - Motion Detection: Check box to enable; 
-            use slider for sensitivity.
+          - Motion Detection: Use the checkbox beside the camera name; a green border means detection is active and timer is running.
+            A red alert appears when motion is detected; an amber border indicates a detector error.
+            Detection analyses only the visible part of the image, including zoom and pan.
+          - Images always stretch to fill each window when it is resized.
           - Timer: Set countdown (1-120 mins) when motion is enabled.
             Timer will auto-disable motion when it reaches zero.
           - 'b' hide/show the toolbar.
@@ -334,40 +650,37 @@
           - Specify config on URL: ?config=
         `);
     }
+    function stopCameraWindow(container) {
+        const state = container?._zoomPanState;
+        if (!state) return;
+        state.isActive = false;
+        state.isPanning = false;
+        if (state.timerInterval) {
+            clearInterval(state.timerInterval);
+            state.timerInterval = null;
+        }
+        if (state.abortController) state.abortController.abort();
+        if (typeof state.stopFetching === 'function') state.stopFetching();
+        if (state.interactable && typeof state.interactable.unset === 'function') {
+            state.interactable.unset();
+        }
+    }
     function closeCameraWindow(buttonElement) {
         const container = buttonElement.parentElement;
-        if (container && container._zoomPanState) {
-            debugLog(`Closing camera ${container.id}. Setting isActive=false.`);
-            container._zoomPanState.isActive = false; // Signal to stop fetching
-            
-            // Clear any active timer
-            if (container._zoomPanState.timerInterval) {
-                clearInterval(container._zoomPanState.timerInterval);
-            }
+        if (container) {
+            debugLog(`Closing camera ${container.id}.`);
+            stopCameraWindow(container);
+            container.remove();
         }
-        if (container) container.remove();
         saveState();
     }
     function resetCameras() {
         debugLog('Resetting all cameras.');
         document.querySelectorAll('.img-container').forEach(el => {
-            if (el._zoomPanState) {
-                debugLog(`Reset: Setting isActive=false for ${el.id}`);
-                el._zoomPanState.isActive = false;
-                
-                // Clear any active timer
-                if (el._zoomPanState.timerInterval) {
-                    clearInterval(el._zoomPanState.timerInterval);
-                }
-            }
+            stopCameraWindow(el);
             el.remove();
         });
         localStorage.removeItem('cameraState'); // Clears the *active* saved state
-        // Also clear any named configs if desired, or just the active one
-        // For instance, to clear all 'cameraState_...'
-        // Object.keys(localStorage).forEach(key => {
-        //   if (key.startsWith('cameraState_')) localStorage.removeItem(key);
-        // });
     }
 
     function saveState() {
@@ -386,7 +699,8 @@
                 motionSensitivity: s.motionSensitivity,
                 timerMinutes: s.timerMinutes,
                 timerSeconds: s.timerSeconds,
-                timerActive: s.timerActive
+                timerActive: s.timerActive,
+                stretch: s.stretch
             });
         });
         localStorage.setItem('cameraState', JSON.stringify(stateToSave));
@@ -400,17 +714,12 @@
         debugLog('Loading state...');
         // Clear existing cameras
         document.querySelectorAll('.img-container').forEach(el => {
-            if (el._zoomPanState) {
-                el._zoomPanState.isActive = false;
-                if (el._zoomPanState.timerInterval) {
-                    clearInterval(el._zoomPanState.timerInterval);
-                }
-            }
+            stopCameraWindow(el);
             el.remove();
         });
-        // Get state from URL config or fallback to default
+        // Prefer the URL-selected configuration; fall back to the active layout if it is missing.
         const stateString = configName
-            ? localStorage.getItem('cameraState_' + configName)
+            ? (localStorage.getItem('cameraState_' + configName) || localStorage.getItem('cameraState'))
             : localStorage.getItem('cameraState');
         if (!stateString) {
             debugLog('No state found to load.');
@@ -419,14 +728,18 @@
         let stateToLoad;
         try {
             stateToLoad = JSON.parse(stateString);
+            if (!stateToLoad || typeof stateToLoad !== 'object' || Array.isArray(stateToLoad)) {
+                throw new Error('Configuration must be an object.');
+            }
         } catch (e) {
             console.error("Error parsing saved state:", e);
-            alert("Error loading saved state.");
+            alert("Error loading saved state: " + e.message);
             return;
         }
         for (const camDef of cameras) {
-            (stateToLoad[camDef.id] || []).forEach(cfg => {
-                createCameraWindow(camDef, cfg);
+            const windows = Array.isArray(stateToLoad[camDef.id]) ? stateToLoad[camDef.id] : [];
+            windows.forEach(cfg => {
+                if (cfg && typeof cfg === 'object' && !Array.isArray(cfg)) createCameraWindow(camDef, cfg);
             });
         }
         debugLog('State loaded.');
@@ -448,32 +761,49 @@
         }
     }
     function playBeep(cameraIdentifier = "unknown", isWarning = false) {
-        const now = Date.now();
-        if (!audioContext || audioContext.state !== 'running') {
-            debugLog(`playBeep (${cameraIdentifier}): AudioContext not ready or not running. State: ${audioContext ? audioContext.state : 'null'}`);
+        const nowMs = Date.now();
+        if (!isWarning && nowMs - lastBeepTime < beepCooldown) return;
+        if (!audioContext) {
+            debugLog(`playBeep (${cameraIdentifier}): AudioContext is unavailable.`);
             return;
         }
-        if (now - lastBeepTime < beepCooldown && !isWarning) {
-            // debugLog(`playBeep (${cameraIdentifier}): Beep cooldown active.`); // Can be spammy
-            return;
+        lastBeepTime = nowMs;
+
+        const emitTone = () => {
+            if (!audioContext || audioContext.state !== 'running') {
+                debugLog(`playBeep (${cameraIdentifier}): AudioContext is not running.`);
+                return;
+            }
+            const startAt = audioContext.currentTime;
+            const duration = isWarning ? 0.55 : 1.50; // Length of beeps in seconds (2nd = motion detected)
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(isWarning ? 440 : 880, startAt);
+            gainNode.gain.setValueAtTime(0.0001, startAt);
+            gainNode.gain.exponentialRampToValueAtTime(isWarning ? 0.4 : 0.38, startAt + 0.015);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+            oscillator.start(startAt);
+            oscillator.stop(startAt + duration + 0.02);
+            debugLog(`playBeep triggered by ${cameraIdentifier}`);
+        };
+
+        if (audioContext.state === 'suspended') {
+            audioContext.resume().then(emitTone).catch(error => {
+                console.error('Unable to resume motion alert audio:', error);
+            });
+        } else {
+            emitTone();
         }
-        lastBeepTime = now;
-        debugLog(`playBeep triggered by ${cameraIdentifier}`);
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        oscillator.type = 'sine';
-        // Different sound for warning
-        oscillator.frequency.setValueAtTime(isWarning ? 440 : 880, audioContext.currentTime);
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Reduced volume slightly
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + (isWarning ? 0.5 : 0.1)); // Longer beep for warning
     }
     document.body.addEventListener('click', initAudio, { once: true });
     document.body.addEventListener('keydown', initAudio, { once: true });
+    document.body.addEventListener('pointerdown', initAudio, { once: true });
     function createCameraWindow(cam, saved = null) {
-        const uniqueId = saved?.uniqueId || `${cam.id}_${Date.now()}`;
+        const rawUniqueId = saved?.uniqueId || `${cam.id}_${Date.now()}`;
+        const uniqueId = String(rawUniqueId).replace(/[^A-Za-z0-9_-]/g, '_') || `${cam.id}_${Date.now()}`;
         // Check if a window with this uniqueId already exists (e.g., from a partial loadState)
         if (document.getElementById(uniqueId)) {
             debugLog(`Window with ID ${uniqueId} already exists. Skipping creation.`);
@@ -485,10 +815,14 @@
         div.id = uniqueId;
         div.setAttribute('data-cam-id', cam.id);
         if (saved) {
-            div.style.left = saved.left;
-            div.style.top = saved.top;
-            div.style.width = saved.width;
-            div.style.height = saved.height;
+            const asPx = (value, fallback, min = -Infinity) => {
+                const parsed = typeof value === 'number' ? value : Number.parseFloat(value);
+                return Number.isFinite(parsed) && parsed >= min ? `${parsed}px` : fallback;
+            };
+            div.style.left = asPx(saved.left, '20px');
+            div.style.top = asPx(saved.top, '20px');
+            div.style.width = asPx(saved.width, '320px', 100);
+            div.style.height = asPx(saved.height, '240px', 75);
         } else {
             const x = Math.random() * 200 + 20; // Keep initial windows more on screen
             const y = Math.random() * 150 + 20;
@@ -496,16 +830,17 @@
         }
         div.innerHTML = `
           <button class="close-btn" onclick="closeCameraWindow(this)">×</button>
-          <div class="cam-title">${cam.id}</div>
+          <div class="cam-title">
+              <span>${cam.id}</span>
+              <input type="checkbox" id="motion_check_${uniqueId}" class="motion-checkbox" aria-label="Enable motion detection" title="Enable motion detection">
+          </div>
           <div class="img-inner"><img crossorigin="anonymous" /></div>
           <div class="motion-indicator"></div>
           <div class="motion-controls">
-              <label for="motion_check_${uniqueId}"></label>
-              <input type="checkbox" id="motion_check_${uniqueId}" class="motion-checkbox">
-              <input type="range" id="motion_slider_${uniqueId}" class="motion-slider" min="1" max="100" value="50">
+              <input type="range" aria-label="Motion sensitivity" id="motion_slider_${uniqueId}" class="motion-slider" min="1" max="100" value="50" title="Motion sensitivity">
           </div>
           <div class="timer-controls" id="timer_controls_${uniqueId}">
-              <label for="timer_input_${uniqueId}">Timer:</label>
+              <!-- <label for="timer_input_${uniqueId}">Stop:</label> -->
               <input type="number" id="timer_input_${uniqueId}" min="1" max="120" value="30">
               <button id="timer_start_${uniqueId}">Start</button>
               <button id="timer_stop_${uniqueId}">Stop</button>
@@ -515,44 +850,54 @@
         document.body.appendChild(div);
         initContainer(div, cam.src, saved);
     }
-    function compareFrames(ctx1, ctx2, width, height, sensitivity, containerId = "unknown_cam") { // Added containerId for logging
-        const imgData1 = ctx1.getImageData(0, 0, width, height).data;
-        const imgData2 = ctx2.getImageData(0, 0, width, height).data;
-        let diffCount = 0;
-        // --- MODIFIED PARAMETERS ---
-        // Original: const threshold = 10;
-        const threshold = 8; // Lowered from 10. Defines how much a single pixel's grayscale value needs to change.
-                             // This makes individual pixel changes easier to detect.
-        // Original calculation was: (101 - sensitivity) * (width * height / 400)
-        // New calculation aims for a less steep sensitivity curve and generally more sensitivity.
-        // N_scaler: Compresses the effect of the sensitivity slider.
-        // A higher N_scaler means the slider has a less dramatic effect (curve is flatter).
-        // Original formula implicitly had N_scaler around 1.0 relative to its 1-100 range.
-        const N_scaler = 2.0; 
-        // baseDivisor: Affects overall sensitivity. Higher baseDivisor = more sensitive (fewer pixels needed).
-        // Original was 400.0.
-        const baseDivisor = 800.0;
-        // 'sensitivity' is the slider value from 1 (low sensitivity) to 100 (high sensitivity).
-        // We want 'effectiveSensitivityFactor' to be low for high slider sensitivity, and high for low slider sensitivity.
-        // When slider sensitivity = 100 (max), effectiveSensitivityFactor = ((100-100)/2.0) + 1.0 = 1.0 (most sensitive factor part).
-        // When slider sensitivity = 1 (min), effectiveSensitivityFactor = ((100-1)/2.0) + 1.0 = 49.5 + 1.0 = 50.5 (least sensitive factor part).
-        const effectiveSensitivityFactor = ((100.0 - parseFloat(sensitivity)) / N_scaler) + 1.0;
-        
-        const requiredDiffPixels = effectiveSensitivityFactor * (width * height / baseDivisor);
-        // --- END MODIFIED PARAMETERS ---
-        for (let i = 0; i < imgData1.length; i += 4) {
-            const gray1 = (imgData1[i] + imgData1[i + 1] + imgData1[i + 2]) / 3;
-            const gray2 = (imgData2[i] + imgData2[i + 1] + imgData2[i + 2]) / 3;
-            if (Math.abs(gray1 - gray2) > threshold) diffCount++;
+    function compareFrames(ctx1, ctx2, width, height, sensitivity, containerId = "unknown_cam") {
+        const first = ctx1.getImageData(0, 0, width, height).data;
+        const second = ctx2.getImageData(0, 0, width, height).data;
+        const pixelCount = width * height;
+        const deltas = new Int16Array(pixelCount);
+        const deltaHistogram = new Uint32Array(511); // Signed luminance differences: -255..255.
+
+        // Use perceptual luminance rather than an unweighted RGB average.
+        for (let pixel = 0, offset = 0; pixel < pixelCount; pixel++, offset += 4) {
+            const gray1 = 0.2126 * first[offset] + 0.7152 * first[offset + 1] + 0.0722 * first[offset + 2];
+            const gray2 = 0.2126 * second[offset] + 0.7152 * second[offset + 1] + 0.0722 * second[offset + 2];
+            const delta = Math.max(-255, Math.min(255, Math.round(gray2 - gray1)));
+            deltas[pixel] = delta;
+            deltaHistogram[delta + 255]++;
         }
-        const motionDetected = diffCount > requiredDiffPixels;
-        // For debugging the new values:
-        // Only log ~10% of the calls to reduce console spam, if DEBUG_MOTION is true.
-        if (DEBUG_MOTION && Math.random() < 0.1) { // Adjust 0.1 (10%) as needed for logging frequency
-            debugLog(`[${containerId}] compareFrames (slider: ${sensitivity}): diffCount=${diffCount}, reqDiffPixels=${requiredDiffPixels.toFixed(2)}, effectiveSensFactor=${effectiveSensitivityFactor.toFixed(2)}, threshold=${threshold}, detected=${motionDetected}`);
+
+        // Remove the median whole-frame brightness shift. This reduces false alarms caused
+        // by auto-exposure, light changes and mild flicker affecting most of the image.
+        const midpoint = Math.floor(pixelCount / 2);
+        let accumulated = 0;
+        let baselineDelta = 0;
+        for (let bin = 0; bin < deltaHistogram.length; bin++) {
+            accumulated += deltaHistogram[bin];
+            if (accumulated > midpoint) {
+                baselineDelta = bin - 255;
+                break;
+            }
+        }
+
+        const sensitivityValue = Math.max(1, Math.min(100, Number(sensitivity) || 50));
+        const sensitivityFraction = (sensitivityValue - 1) / 99;
+        // High slider values lower both the per-pixel threshold and the changed-area requirement.
+        // These thresholds are more responsive than the previous defaults, particularly at mid-range sensitivity.
+        const pixelThreshold = 24 - (13 * sensitivityFraction); // 24 at low sensitivity, 11 at high.
+        const requiredRatio = 0.060 - (0.052 * sensitivityFraction); // 6% down to 0.8% of sampled pixels.
+        const requiredDiffPixels = Math.max(12, Math.ceil(pixelCount * requiredRatio));
+        let diffCount = 0;
+        for (let pixel = 0; pixel < pixelCount; pixel++) {
+            if (Math.abs(deltas[pixel] - baselineDelta) >= pixelThreshold) diffCount++;
+        }
+
+        const motionDetected = diffCount >= requiredDiffPixels;
+        if (DEBUG_MOTION) {
+            debugLog(`[${containerId}] changed=${diffCount}/${pixelCount}, required=${requiredDiffPixels}, threshold=${pixelThreshold.toFixed(1)}, detected=${motionDetected}`);
         }
         return motionDetected;
     }
+
     function initContainer(container, src, saved) {
         const inner = container.querySelector('.img-inner');
         const img = inner.querySelector('img');
@@ -570,6 +915,8 @@
         
         motionControlsDiv.addEventListener('mousedown', (event) => event.stopPropagation());
         motionControlsDiv.addEventListener('pointerdown', (event) => event.stopPropagation());
+        motionCheckbox.addEventListener('mousedown', (event) => event.stopPropagation());
+        motionCheckbox.addEventListener('pointerdown', (event) => event.stopPropagation());
         timerControls.addEventListener('mousedown', (event) => event.stopPropagation());
         timerControls.addEventListener('pointerdown', (event) => event.stopPropagation());
         
@@ -577,30 +924,52 @@
         const canvas2 = document.createElement('canvas');
         const ctx1 = canvas1.getContext('2d', { willReadFrequently: true });
         const ctx2 = canvas2.getContext('2d', { willReadFrequently: true });
-        const motionWidth = 64;
-        const motionHeight = 48;
+        // A larger sampling grid catches smaller movements without processing full-resolution frames.
+        const motionWidth = 96;
+        const motionHeight = 72;
         canvas1.width = canvas2.width = motionWidth;
         canvas1.height = canvas2.height = motionHeight;
         let prevImageLoaded = false;
+        const savedScale = Number(saved?.scale);
+        const savedPanX = Number(saved?.panX);
+        const savedPanY = Number(saved?.panY);
+        const savedSensitivity = Number(saved?.motionSensitivity);
+        const savedMinutes = Number(saved?.timerMinutes);
+        const savedSeconds = Number(saved?.timerSeconds);
         const state = {
-            scale: saved?.scale || 1, panX: saved?.panX || 0, panY: saved?.panY || 0,
+            scale: Number.isFinite(savedScale) && savedScale > 0 ? Math.min(10, Math.max(0.1, savedScale)) : 1,
+            panX: Number.isFinite(savedPanX) ? savedPanX : 0,
+            panY: Number.isFinite(savedPanY) ? savedPanY : 0,
+            stretch: true,
+            pendingStretchMigration: !!saved && saved.stretch !== true && Number.isFinite(savedScale) && savedScale > 0,
+            lastInnerWidth: inner.clientWidth,
+            lastInnerHeight: inner.clientHeight,
             isPanning: false, startX: 0, startY: 0,
             imgNaturalWidth: 0, imgNaturalHeight: 0,
             initialized: !!saved,
-            motionEnabled: saved?.motionEnabled || false,
-            motionSensitivity: saved?.motionSensitivity || 50,
+            motionEnabled: saved?.motionEnabled === true,
+            motionSensitivity: Number.isFinite(savedSensitivity) ? Math.min(100, Math.max(1, savedSensitivity)) : 50,
             lastMotionTime: 0,
-            isActive: true, // NEW: Flag to control the fetch loop
+            lastMotionBeepTime: 0,
+            motionHitStreak: 0,
+            isActive: true,
+            abortController: new AbortController(),
+            interactable: null,
+            stopFetching: null,
+            activeImageRequest: null,
+            activeRequestTimeoutId: null,
             // Timer properties
-            timerMinutes: saved?.timerMinutes || 30,
-            timerSeconds: saved?.timerSeconds || 0,
-            timerActive: saved?.timerActive || false,
+            timerMinutes: Number.isFinite(savedMinutes) ? Math.min(120, Math.max(0, Math.trunc(savedMinutes))) : 30,
+            timerSeconds: Number.isFinite(savedSeconds) ? Math.min(59, Math.max(0, Math.trunc(savedSeconds))) : 0,
+            timerActive: saved?.timerActive === true,
             timerInterval: null
         };
         container._zoomPanState = state; // Attach state to the DOM element
         debugLog(`[${container.id}] Initializing. MotionEnabled: ${state.motionEnabled}, Sensitivity: ${state.motionSensitivity}, IsActive: ${state.isActive}`);
         
         motionCheckbox.checked = state.motionEnabled;
+        // Border is green ONLY when motion is enabled AND the timer is active
+        container.classList.toggle('motion-enabled', state.motionEnabled && state.timerActive);
         motionSlider.value = state.motionSensitivity;
         if (state.motionEnabled) {
             motionSlider.classList.add('visible');
@@ -615,14 +984,22 @@
             const newMotionEnabledState = motionCheckbox.checked;
             debugLog(`[${container.id}] Checkbox changed. Old motionEnabled: ${state.motionEnabled}, New: ${newMotionEnabledState}`);
             state.motionEnabled = newMotionEnabledState;
+            container.classList.toggle('motion-enabled', state.motionEnabled && state.timerActive);
+            container.classList.remove('motion-error', 'motion-triggered');
             motionSlider.classList.toggle('visible', state.motionEnabled);
             timerControls.classList.toggle('visible', state.motionEnabled);
+            
+            // Immediate test beep when checking the box
+            if (state.motionEnabled) {
+                playBeep(container.id, true);
+            }
             
             // Reset prevImageLoaded whenever motion is toggled on OR off
             debugLog(`[${container.id}] Resetting prevImageLoaded to false due to checkbox change.`);
             prevImageLoaded = false;
             
             if (!state.motionEnabled) {
+                state.motionHitStreak = 0;
                 motionIndicator.style.display = 'none';
                 // Stop timer if motion is disabled
                 if (state.timerInterval) {
@@ -637,7 +1014,6 @@
         
         motionSlider.addEventListener('input', () => {
             state.motionSensitivity = parseInt(motionSlider.value, 10);
-            // No saveState() on input for performance, only on change
         });
         
         motionSlider.addEventListener('change', () => {
@@ -645,7 +1021,7 @@
             debugLog(`[${container.id}] Sensitivity changed to ${state.motionSensitivity}`);
             saveState();
         });
-        
+
         // Timer event listeners
         timerInput.value = state.timerMinutes;
         
@@ -679,6 +1055,7 @@
                 state.timerInterval = null;
             }
             state.timerActive = false;
+            container.classList.remove('motion-enabled');
             updateTimerDisplay();
             saveState();
         });
@@ -689,6 +1066,7 @@
             }
             
             state.timerActive = true;
+            container.classList.toggle('motion-enabled', state.motionEnabled);
             updateTimerDisplay();
             
             state.timerInterval = setInterval(() => {
@@ -706,6 +1084,7 @@
                     // Turn off motion detection
                     state.motionEnabled = false;
                     motionCheckbox.checked = false;
+                    container.classList.remove('motion-enabled', 'motion-error', 'motion-triggered');
                     motionSlider.classList.remove('visible');
                     timerControls.classList.remove('visible');
                     motionIndicator.style.display = 'none';
@@ -738,46 +1117,68 @@
             startTimer();
         }
         
-        interact(container)
-            .draggable({ /* ... listeners ... */ }) // Keep existing interactjs setup
-            .resizable({ /* ... listeners ... */ }); // Keep existing interactjs setup
-        // ... (Keep existing interact, draggable, resizable, wheel, mousedown, mousemove, mouseup, clampPan, updateImageTransform, container mousedown listeners) ...
-        // The following are copy-pasted but should be verified if you made changes there not shown in the original problem
-        interact(container)
-            .draggable({
-                listeners: {
-                    start(event) { if (isShiftPressed) event.interaction.stop(); },
-                    move(event) {
-                        if (isShiftPressed || !state.isActive) return; // Added !state.isActive check
-                        container.style.left = (parseFloat(container.style.left) || 0) + event.dx + 'px';
-                        container.style.top = (parseFloat(container.style.top) || 0) + event.dy + 'px';
-                    },
-                    end() { if (!isShiftPressed && state.isActive) saveState(); }
-                }
-            })
-            .resizable({
+        const cameraInteractable = interact(container);
+        state.interactable = cameraInteractable;
+        cameraInteractable.draggable({
+            listeners: {
+                start(event) { if (isShiftPressed) event.interaction.stop(); },
+                move(event) {
+                    if (isShiftPressed || !state.isActive) return;
+                    container.style.left = (parseFloat(container.style.left) || 0) + event.dx + 'px';
+                    container.style.top = (parseFloat(container.style.top) || 0) + event.dy + 'px';
+                },
+                end() { if (!isShiftPressed && state.isActive) saveState(); }
+            }
+        });
+
+        function configureResizable() {
+            const minSize = interact.modifiers.restrictSize({ min: { width: 100, height: 75 } });
+            cameraInteractable.resizable({
                 edges: { left: true, right: true, bottom: true, top: true },
-                modifiers: [
-                    interact.modifiers.aspectRatio({ ratio: 'preserve' }), // Use 'preserve' for natural aspect ratio
-                    interact.modifiers.restrictSize({ min: { width: 100, height: 75 } })
-                ],
+                modifiers: [minSize],
                 listeners: {
                     move(event) {
                         if (!state.isActive) return;
+
+                        const oldWidth = state.lastInnerWidth || inner.clientWidth;
+                        const oldHeight = state.lastInnerHeight || inner.clientHeight;
+                        if (event.deltaRect) {
+                            container.style.left = (parseFloat(container.style.left) || 0) + event.deltaRect.left + 'px';
+                            container.style.top = (parseFloat(container.style.top) || 0) + event.deltaRect.top + 'px';
+                        }
                         container.style.width = event.rect.width + 'px';
                         container.style.height = event.rect.height + 'px';
-                        // Recalculate scale to fit, reset pan, only if natural dimensions are known
+                        prevImageLoaded = false;
+                        state.motionHitStreak = 0;
+
+                        const newWidth = inner.clientWidth;
+                        const newHeight = inner.clientHeight;
+                        if (state.scale > 1) {
+                            const oldOverflowX = oldWidth * (state.scale - 1);
+                            const oldOverflowY = oldHeight * (state.scale - 1);
+                            const cropX = oldOverflowX > 0 ? Math.max(0, Math.min(1, -state.panX / oldOverflowX)) : 0.5;
+                            const cropY = oldOverflowY > 0 ? Math.max(0, Math.min(1, -state.panY / oldOverflowY)) : 0.5;
+                            state.panX = -cropX * newWidth * (state.scale - 1);
+                            state.panY = -cropY * newHeight * (state.scale - 1);
+                        } else {
+                            state.panX = 0;
+                            state.panY = 0;
+                        }
+                        state.lastInnerWidth = newWidth;
+                        state.lastInnerHeight = newHeight;
+
                         if (state.imgNaturalWidth > 0 && state.imgNaturalHeight > 0) {
-                            const scaleX = container.clientWidth / state.imgNaturalWidth;
-                            const scaleY = container.clientHeight / state.imgNaturalHeight;
-                            state.scale = Math.min(scaleX, scaleY); // Fit mode
-                            state.panX = 0; state.panY = 0;
+                            clampPan();
                             updateImageTransform(img, state);
                         }
                     },
                     end() { if (state.isActive) saveState(); }
                 }
             });
+        }
+        configureResizable();
+
+        let zoomSaveTimeoutId = null;
         inner.addEventListener('wheel', e => {
             if (!isShiftPressed || !state.isActive) return;
             e.preventDefault();
@@ -785,13 +1186,19 @@
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
             const prevScale = state.scale;
-            state.scale += -e.deltaY * 0.0005 * state.scale; // Scale relative to current scale
+            state.scale += -e.deltaY * 0.0005 * state.scale;
             state.scale = Math.min(Math.max(0.1, state.scale), 10);
             state.panX = mouseX - ((mouseX - state.panX) * (state.scale / prevScale));
             state.panY = mouseY - ((mouseY - state.panY) * (state.scale / prevScale));
+            prevImageLoaded = false;
+            state.motionHitStreak = 0;
             clampPan();
             updateImageTransform(img, state);
-            // No saveState() on wheel, usually saved on mouseup after pan or resize end
+            if (zoomSaveTimeoutId !== null) clearTimeout(zoomSaveTimeoutId);
+            zoomSaveTimeoutId = setTimeout(() => {
+                zoomSaveTimeoutId = null;
+                if (state.isActive) saveState();
+            }, 250);
         });
         inner.addEventListener('mousedown', e => {
             if (!isShiftPressed || !state.isActive) return;
@@ -801,42 +1208,40 @@
             state.startY = e.clientY - state.panY;
             inner.style.cursor = 'grabbing';
         });
-        window.addEventListener('mousemove', e => { // Global listener
-            if (state.isPanning && state.isActive) { // Check state.isActive here too
+        window.addEventListener('mousemove', e => {
+            if (state.isPanning && state.isActive) {
                 state.panX = e.clientX - state.startX;
                 state.panY = e.clientY - state.startY;
+                prevImageLoaded = false;
+                state.motionHitStreak = 0;
                 clampPan();
                 updateImageTransform(img, state);
             }
-        });
-        window.addEventListener('mouseup', () => { // Global listener
-            if (state.isPanning && state.isActive) { // Check state.isActive
+        }, { signal: state.abortController.signal });
+        window.addEventListener('mouseup', () => {
+            if (state.isPanning && state.isActive) {
                 state.isPanning = false;
                 inner.style.cursor = 'grab';
                 saveState();
             }
-        });
+        }, { signal: state.abortController.signal });
         function clampPan() {
-            if (!state.imgNaturalWidth || !state.imgNaturalHeight) return; // Avoid division by zero if image not loaded
-            const cw = container.clientWidth, ch = container.clientHeight;
-            const iw = state.imgNaturalWidth * state.scale;
-            const ih = state.imgNaturalHeight * state.scale;
-            // Allow image to be smaller than container if zoomed out
-            const maxX = Math.max(0, iw - cw);
-            const maxY = Math.max(0, ih - ch);
-            state.panX = Math.max(Math.min(0, state.panX), cw - iw);
-            state.panY = Math.max(Math.min(0, state.panY), ch - ih);
-            // If image is smaller than container, center it or keep at 0,0
-             if (iw < cw) state.panX = (cw - iw) / 2; else state.panX = Math.max(cw - iw, Math.min(0, state.panX));
-             if (ih < ch) state.panY = (ch - ih) / 2; else state.panY = Math.max(ch - ih, Math.min(0, state.panY));
+            if (!state.imgNaturalWidth || !state.imgNaturalHeight) return;
+            const cw = inner.clientWidth, ch = inner.clientHeight;
+            const iw = cw * state.scale;
+            const ih = ch * state.scale;
+            if (iw < cw) state.panX = (cw - iw) / 2;
+            else state.panX = Math.max(cw - iw, Math.min(0, state.panX));
+            if (ih < ch) state.panY = (ch - ih) / 2;
+            else state.panY = Math.max(ch - ih, Math.min(0, state.panY));
         }
 
         function updateImageTransform(image, s) {
             image.style.left = s.panX + 'px';
             image.style.top = s.panY + 'px';
             image.style.transform = `scale(${s.scale})`;
-            image.style.width = s.imgNaturalWidth ? `${s.imgNaturalWidth}px` : 'auto'; // Set base size for scale
-            image.style.height = s.imgNaturalHeight ? `${s.imgNaturalHeight}px` : 'auto';
+            image.style.width = inner.clientWidth ? `${inner.clientWidth}px` : 'auto';
+            image.style.height = inner.clientHeight ? `${inner.clientHeight}px` : 'auto';
         }
 
         container.addEventListener('mousedown', () => {
@@ -844,85 +1249,181 @@
             document.querySelectorAll('.img-container').forEach(c => c.classList.remove('active'));
             container.classList.add('active');
         });
-        let fetchTimeoutId = null; // To clear timeout if container becomes inactive
+        let fetchTimeoutId = null;
+        state.stopFetching = () => {
+            if (fetchTimeoutId !== null) clearTimeout(fetchTimeoutId);
+            fetchTimeoutId = null;
+            if (zoomSaveTimeoutId !== null) clearTimeout(zoomSaveTimeoutId);
+            zoomSaveTimeoutId = null;
+            if (state.activeRequestTimeoutId !== null) clearTimeout(state.activeRequestTimeoutId);
+            state.activeRequestTimeoutId = null;
+            if (state.activeImageRequest) {
+                state.activeImageRequest.onload = null;
+                state.activeImageRequest.onerror = null;
+                state.activeImageRequest.src = '';
+                state.activeImageRequest = null;
+            }
+        };
         function fetchNextFrame() {
             if (!state.isActive) {
                 debugLog(`[${container.id}] fetchNextFrame: state.isActive is false. Stopping loop.`);
                 if (fetchTimeoutId) clearTimeout(fetchTimeoutId);
                 return;
             }
-            const imgUrl = `${src}?t=${Date.now()}`;
-            let requestTimedOut = false; // Renamed from timedOut to avoid conflict
+            const imgUrl = `${src}${src.includes('?') ? '&' : '?'}t=${Date.now()}`;
+            let requestTimedOut = false;
             const requestTimeoutId = setTimeout(() => {
                 requestTimedOut = true;
-                debugLog(`[${container.id}] Image request timed out for ${imgUrl}. Retrying.`);
-                if (state.isActive) fetchNextFrame(); // Retry only if still active
+                if (state.activeRequestTimeoutId === requestTimeoutId) state.activeRequestTimeoutId = null;
+                debugLog(`[${container.id}] Image request timed out. Retrying.`);
+                if (state.isActive) fetchNextFrame();
             }, 4000);
+            state.activeRequestTimeoutId = requestTimeoutId;
             const tempImg = new Image();
+            state.activeImageRequest = tempImg;
             tempImg.crossOrigin = "Anonymous";
             tempImg.onload = () => {
                 if (requestTimedOut || !state.isActive) {
                     if (!state.isActive) debugLog(`[${container.id}] tempImg.onload: state became inactive during load.`);
                     if (requestTimedOut) debugLog(`[${container.id}] tempImg.onload: request had already timed out.`);
-                    clearTimeout(requestTimeoutId); // Clear this specific request's timeout
+                    clearTimeout(requestTimeoutId);
                     return;
                 }
                 clearTimeout(requestTimeoutId);
-                img.src = tempImg.src; // Update the visible image
+                if (state.activeRequestTimeoutId === requestTimeoutId) state.activeRequestTimeoutId = null;
+                if (state.activeImageRequest === tempImg) state.activeImageRequest = null;
+                img.src = tempImg.src;
                 const existingOverlay = container.querySelector('.error-overlay');
                 if (existingOverlay) existingOverlay.remove();
                 state.imgNaturalWidth = tempImg.naturalWidth;
                 state.imgNaturalHeight = tempImg.naturalHeight;
-                if (state.motionEnabled && state.imgNaturalWidth > 0 && state.isActive) {
-                    // debugLog(`[${container.id}] Motion detection ACTIVE. prevImageLoaded=${prevImageLoaded}.`); // Spammy
-                    ctx1.drawImage(canvas2, 0, 0, motionWidth, motionHeight); // Old canvas2 -> canvas1
-                    const sx = -state.panX / state.scale;
-                    const sy = -state.panY / state.scale;
-                    const sw = container.clientWidth / state.scale;
-                    const sh = container.clientHeight / state.scale;
-                    ctx2.drawImage(tempImg, sx, sy, sw, sh, 0, 0, motionWidth, motionHeight);                    
-                    if (prevImageLoaded) {
-                        // debugLog(`[${container.id}] Comparing frames.`); // Spammy
-                        if (compareFrames(ctx1, ctx2, motionWidth, motionHeight, state.motionSensitivity, container.id)) {
-                            debugLog(`[${container.id}] Motion DETECTED! Calling playBeep.`);
-                            playBeep(container.id);
-                            motionIndicator.style.display = 'block';
-                            state.lastMotionTime = Date.now();
+
+                // Only evaluate motion detection if checkbox is checked AND timer is running
+                if (state.motionEnabled && state.timerActive && state.imgNaturalWidth > 0 && state.isActive) {
+                    try {
+                        ctx1.drawImage(canvas2, 0, 0, motionWidth, motionHeight);
+                        const viewportWidth = inner.clientWidth;
+                        const viewportHeight = inner.clientHeight;
+                        ctx2.clearRect(0, 0, motionWidth, motionHeight);
+                        ctx2.fillStyle = '#000';
+                        ctx2.fillRect(0, 0, motionWidth, motionHeight);
+                        if (viewportWidth > 0 && viewportHeight > 0) {
+                            const drawX = (state.panX / viewportWidth) * motionWidth;
+                            const drawY = (state.panY / viewportHeight) * motionHeight;
+                            const drawWidth = motionWidth * state.scale;
+                            const drawHeight = motionHeight * state.scale;
+                            ctx2.drawImage(tempImg, drawX, drawY, drawWidth, drawHeight);
                         }
-                    } else {
-                        debugLog(`[${container.id}] Priming motion detection. Setting prevImageLoaded = true.`);
-                        prevImageLoaded = true;
+
+                        if (prevImageLoaded) {
+                            const motionDetected = compareFrames(ctx1, ctx2, motionWidth, motionHeight, state.motionSensitivity, container.id);
+                            state.motionDetectionError = false;
+                            container.classList.remove('motion-error');
+                            if (motionDetected) {
+                                state.motionHitStreak = Math.min(2, state.motionHitStreak + 1);
+                                state.lastMotionTime = Date.now();
+                                motionIndicator.style.display = 'block';
+                                container.classList.add('motion-triggered');
+                                if (state.motionHitStreak >= 2 && Date.now() - state.lastMotionBeepTime >= 2000) {
+                                    playBeep(container.id);
+                                    state.lastMotionBeepTime = Date.now();
+
+                                    // --- RECORD MOTION SNAPSHOT ---
+                                    try {
+                                        const snapCanvas = document.createElement('canvas');
+                                        snapCanvas.width = tempImg.naturalWidth || 320;
+                                        snapCanvas.height = tempImg.naturalHeight || 240;
+                                        const snapCtx = snapCanvas.getContext('2d');
+                                        snapCtx.drawImage(tempImg, 0, 0);
+                                        
+                                        motionHistory.unshift({
+                                            camId: container.getAttribute('data-cam-id'),
+                                            time: new Date().toLocaleTimeString(),
+                                            date: new Date().toLocaleDateString(),
+                                            dataUrl: snapCanvas.toDataURL('image/jpeg', 0.85)
+                                        });
+                                        
+                                        if (motionHistory.length > MAX_HISTORY) {
+                                            motionHistory.pop();
+                                        }
+                                    } catch (err) {
+                                        console.error("Error capturing motion snapshot:", err);
+                                    }
+                                    // ----------------------------
+                                }
+                            } else {
+                                state.motionHitStreak = 0;
+                            }
+                        } else {
+                            prevImageLoaded = true;
+                        }
+                    } catch (error) {
+                        state.motionHitStreak = 0;
+                        prevImageLoaded = false;
+                        container.classList.add('motion-error');
+                        if (!state.motionDetectionError) {
+                            console.error(`[${container.id}] Motion detection failed. Check camera CORS/canvas access.`, error);
+                        }
+                        state.motionDetectionError = true;
                     }
                 }
-                if (motionIndicator.style.display === 'block' && (Date.now() - state.lastMotionTime > 500)) {
-                   motionIndicator.style.display = 'none';
+                if (motionIndicator.style.display === 'block' && (Date.now() - state.lastMotionTime > 1100)) {
+                    motionIndicator.style.display = 'none';
+                    container.classList.remove('motion-triggered');
                 }
-                if (!state.initialized && state.imgNaturalWidth > 0) {
-                    debugLog(`[${container.id}] First successful image load. Initializing scale and pan.`);
-                    const scaleX = container.clientWidth / state.imgNaturalWidth;
-                    const scaleY = container.clientHeight / state.imgNaturalHeight;
-                    state.scale = Math.min(scaleX, scaleY); // Fit image
-                    state.panX = (container.clientWidth - (state.imgNaturalWidth * state.scale)) / 2; // Center
-                    state.panY = (container.clientHeight - (state.imgNaturalHeight * state.scale)) / 2; // Center
+                if (state.pendingStretchMigration && state.imgNaturalWidth > 0 && state.imgNaturalHeight > 0) {
+                    const oldFitScale = Math.min(
+                        inner.clientWidth / state.imgNaturalWidth,
+                        inner.clientHeight / state.imgNaturalHeight
+                    );
+                    if (oldFitScale > 0) {
+                        const zoomFactor = state.scale / oldFitScale;
+                        const panScaleX = inner.clientWidth / (state.imgNaturalWidth * oldFitScale);
+                        const panScaleY = inner.clientHeight / (state.imgNaturalHeight * oldFitScale);
+                        state.scale = Math.min(10, Math.max(0.1, zoomFactor));
+                        state.panX *= panScaleX;
+                        state.panY *= panScaleY;
+                    } else {
+                        state.scale = 1;
+                        state.panX = 0;
+                        state.panY = 0;
+                    }
+                    state.pendingStretchMigration = false;
                     state.initialized = true;
-                    updateImageTransform(img, state); // Apply transform
-                    saveState(); // Save initial state once calculated
+                    state.lastInnerWidth = inner.clientWidth;
+                    state.lastInnerHeight = inner.clientHeight;
+                    clampPan();
+                    updateImageTransform(img, state);
+                    saveState();
+                } else if (!state.initialized && state.imgNaturalWidth > 0) {
+                    state.scale = 1;
+                    state.panX = 0;
+                    state.panY = 0;
+                    state.initialized = true;
+                    state.lastInnerWidth = inner.clientWidth;
+                    state.lastInnerHeight = inner.clientHeight;
+                    updateImageTransform(img, state);
+                    saveState();
                 } else if (state.initialized) {
-                     updateImageTransform(img, state); // Just update if already initialized
+                    state.lastInnerWidth = inner.clientWidth;
+                    state.lastInnerHeight = inner.clientHeight;
+                    updateImageTransform(img, state);
                 }
 
-                if (state.isActive) { // Schedule next fetch only if still active
+                if (state.isActive) {
                     fetchTimeoutId = setTimeout(fetchNextFrame, 600);
                 }
             };
             tempImg.onerror = () => {
-                if (requestTimedOut || !state.isActive) { // Check isActive here too
+                if (requestTimedOut || !state.isActive) {
                     if (!state.isActive) debugLog(`[${container.id}] tempImg.onerror: state became inactive during load/error.`);
                      clearTimeout(requestTimeoutId);
                     return;
                 }
                 clearTimeout(requestTimeoutId);
-                debugLog(`[${container.id}] Error loading image ${imgUrl}.`);
+                if (state.activeRequestTimeoutId === requestTimeoutId) state.activeRequestTimeoutId = null;
+                if (state.activeImageRequest === tempImg) state.activeImageRequest = null;
+                debugLog(`[${container.id}] Error loading camera image.`);
                 let errorOverlay = container.querySelector('.error-overlay');
                 if (!errorOverlay) {
                     errorOverlay = document.createElement('div');
@@ -931,17 +1432,30 @@
                     errorOverlay.textContent = 'Camera Error';
                     container.appendChild(errorOverlay);
                 }
-                if (state.isActive) { // Retry only if still active
-                    fetchTimeoutId = setTimeout(fetchNextFrame, 2000); // Longer delay on error
+                if (state.isActive) {
+                    fetchTimeoutId = setTimeout(fetchNextFrame, 2000);
                 }
             };
             tempImg.src = imgUrl;
         }
-        fetchNextFrame(); // Start the loop
+        fetchNextFrame();
     }
     // Initial load of state from localStorage when the page loads
     const startupConfig = getQueryParam('config');
     loadState(startupConfig);
 </script>
+
+<!-- Light controls at bottom of screen -->
+<div id="lights">LIGHTS: front
+    <a class="lightLink" href="#" onclick="fetch('http://192.168.1.144/switch?on=1'); return false;">On</a> 
+    <a class="lightLink" href="#" onclick="fetch('http://192.168.1.144/switch?on=0'); return false;">Off</a>
+    , side
+    <a class="lightLink" href="#" onclick="fetch('http://192.168.1.192/switch?on=1'); return false;">On</a> 
+    <a class="lightLink" href="#" onclick="fetch('http://192.168.1.192/switch?on=0'); return false;">Off</a>        
+    , back
+    <a class="lightLink" href="#" onclick="fetch('http://192.168.1.118/control?relayOn=2'); return false;">On</a> 
+    <a class="lightLink" href="#" onclick="fetch('http://192.168.1.118/control?relayOff=2'); return false;">Off</a>      
+</div>  
+   
 </body>
 </html>
