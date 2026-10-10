@@ -1444,18 +1444,6 @@
     const startupConfig = getQueryParam('config');
     loadState(startupConfig);
 </script>
-
-<!-- Light controls at bottom of screen -->
-<div id="lights">LIGHTS: front
-    <a class="lightLink" href="#" onclick="fetch('http://192.168.1.144/switch?on=1'); return false;">On</a> 
-    <a class="lightLink" href="#" onclick="fetch('http://192.168.1.144/switch?on=0'); return false;">Off</a>
-    , side
-    <a class="lightLink" href="#" onclick="fetch('http://192.168.1.192/switch?on=1'); return false;">On</a> 
-    <a class="lightLink" href="#" onclick="fetch('http://192.168.1.192/switch?on=0'); return false;">Off</a>        
-    , back
-    <a class="lightLink" href="#" onclick="fetch('http://192.168.1.118/control?relayOn=2'); return false;">On</a> 
-    <a class="lightLink" href="#" onclick="fetch('http://192.168.1.118/control?relayOff=2'); return false;">Off</a>      
-</div>  
    
 </body>
 </html>
